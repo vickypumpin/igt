@@ -30,6 +30,7 @@ import BrandMessagesPage from "@/pages/brand/messages";
 import PaymentsPage from "@/pages/brand/payments";
 import BrandBillingPage from "@/pages/brand/billing";
 import BrandAccountEditPage from "@/pages/brand/account-edit";
+import BrandRewardsPage from "@/pages/brand/rewards";
 
 import CreatorDashboardPage from "@/pages/creator/dashboard";
 import InvitesPage from "@/pages/creator/invites";
@@ -229,6 +230,7 @@ function AppRouter() {
           <Route path="/messages" component={BrandMessagesPage} />
           <Route path="/payments" component={PaymentsPage} />
 
+          <Route path="/rewards" component={BrandRewardsPage} />
           <Route path="/billing" component={BrandBillingPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />

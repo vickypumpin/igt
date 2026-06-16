@@ -256,6 +256,20 @@ export const useAdminMessages = <TData = AdminMessage[]>(options?: {
     ...options?.query,
   });
 
+// ── Reward Creators (POST /rewards) ───────────────────────────────────────────
+
+export const useRewardCreators = (
+  options?: UseMutationOptions<{ paymentUrl: string; txRef: string }, unknown, { creatorIds: number[]; amount: number; rewardType: string; campaignId?: number | null }>
+) =>
+  useMutation<{ paymentUrl: string; txRef: string }, unknown, { creatorIds: number[]; amount: number; rewardType: string; campaignId?: number | null }>({
+    mutationFn: (data) =>
+      customFetch<{ paymentUrl: string; txRef: string }>("/api/rewards", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
 // ── Account Profile (GET/PUT /api/account/profile) ───────────────────────────
 
 export interface AccountProfile {
