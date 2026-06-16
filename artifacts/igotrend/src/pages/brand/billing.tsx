@@ -26,7 +26,7 @@ export default function BrandBillingPage() {
 
   const handleBuy = (pkg: typeof GEM_PACKAGES[0]) => {
     purchaseMutation.mutate(
-      { packageId: pkg.id, amount: pkg.amountNGN, gems: pkg.gems, currency: "NGN" },
+      { packageId: pkg.id, currency: "NGN" },
       {
         onSuccess: (data) => {
           if (data.paymentUrl) {

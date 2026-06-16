@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, usersTable, settingsTable } from "@workspace/db";
+import { db, pool, usersTable, settingsTable } from "@workspace/db";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
@@ -16,9 +16,11 @@ const userShape = (u: typeof usersTable.$inferSelect) => ({
 });
 
 router.get("/admin/accounts", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const { role, status, search, page = "1", limit: lim = "20" } = req.query as Record<string, string>;
-  const pageNum = parseInt(page, 10);
-  const limitNum = parseInt(lim, 10);
+  const role = req.query.role as string | undefined;
+  const status = req.query.status as string | undefined;
+  const search = req.query.search as string | undefined;
+  const pageNum = parseInt((req.query.page as string) ?? "1", 10);
+  const limitNum = parseInt((req.query.limit as string) ?? "20", 10);
   const offset = (pageNum - 1) * limitNum;
 
   const conditions: ReturnType<typeof eq>[] = [];
@@ -51,7 +53,7 @@ router.get("/admin/accounts", requireAuth, requireRole("admin"), async (req, res
 });
 
 router.patch("/admin/accounts/:id/status", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   const { action } = req.body;
   const updates: Partial<typeof usersTable.$inferInsert> = {};
   if (action === "suspend") { updates.isActive = false; updates.isLocked = true; }
@@ -64,7 +66,7 @@ router.patch("/admin/accounts/:id/status", requireAuth, requireRole("admin"), as
 });
 
 router.delete("/admin/accounts/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(req.params.id as string, 10);
   await db.delete(usersTable).where(eq(usersTable.id, id));
   res.json({ message: "Deleted" });
 });
@@ -82,14 +84,10 @@ async function getOrCreateSettings() {
 router.get("/admin/settings/general", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
   const s = await getOrCreateSettings();
   res.json({
-    siteName: s.siteName ?? null,
-    siteDescription: s.siteDescription ?? null,
-    contactEmail: s.contactEmail ?? null,
-    registrationStatus: s.registrationStatus ?? null,
-    loginStatus: s.loginStatus ?? null,
-    facebookUrl: s.facebookUrl ?? null,
-    instagramUrl: s.instagramUrl ?? null,
-    youtubeUrl: s.youtubeUrl ?? null,
+    siteName: s.siteName ?? null, siteDescription: s.siteDescription ?? null,
+    contactEmail: s.contactEmail ?? null, registrationStatus: s.registrationStatus ?? null,
+    loginStatus: s.loginStatus ?? null, facebookUrl: s.facebookUrl ?? null,
+    instagramUrl: s.instagramUrl ?? null, youtubeUrl: s.youtubeUrl ?? null,
   });
 });
 
@@ -149,20 +147,41 @@ router.put("/admin/settings/smtp", requireAuth, requireRole("admin"), async (req
   res.json({ message: "SMTP settings saved" });
 });
 
-// ── Roles & Permissions (static matrix stored in settings) ────────────────────
+// ── Roles & Permissions — persisted in a dedicated DB column ─────────────────
 
 const DEFAULT_PERMISSIONS = {
-  brand:   { createCampaign: true, inviteCreators: true, viewAnalytics: true, purchaseGems: true, manageProfile: true },
-  creator: { acceptInvites: true, submitContent: true, requestPayout: true, viewEarnings: true, manageProfile: true },
-  admin:   { manageUsers: true, manageCampaigns: true, manageSettings: true, manageContent: true, broadcastMessages: true },
+  brand:   { createCampaign: true,  inviteCreators: true,  viewAnalytics: true,   purchaseGems: true,       manageProfile: true },
+  creator: { acceptInvites: true,   submitContent: true,   requestPayout: true,   viewEarnings: true,       manageProfile: true },
+  admin:   { manageUsers: true,     manageCampaigns: true, manageSettings: true,  manageContent: true,      broadcastMessages: true },
 };
 
+async function ensureRolePermissionsColumn(): Promise<void> {
+  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS role_permissions text`);
+}
+
 router.get("/admin/roles", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
-  res.json(DEFAULT_PERMISSIONS);
+  try {
+    await ensureRolePermissionsColumn();
+    const result = await pool.query<{ role_permissions: string | null }>(`SELECT role_permissions FROM settings LIMIT 1`);
+    const stored = result.rows[0]?.role_permissions;
+    if (stored) {
+      try { res.json(JSON.parse(stored)); return; } catch { /* fall through */ }
+    }
+    res.json(DEFAULT_PERMISSIONS);
+  } catch {
+    res.json(DEFAULT_PERMISSIONS);
+  }
 });
 
 router.put("/admin/roles", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  res.json({ message: "Permissions updated", permissions: req.body });
+  try {
+    await ensureRolePermissionsColumn();
+    await pool.query(`UPDATE settings SET role_permissions = $1`, [JSON.stringify(req.body)]);
+    res.json({ message: "Permissions updated", permissions: req.body });
+  } catch (err) {
+    console.error("Failed to persist permissions:", err);
+    res.status(500).json({ error: "Failed to persist permissions" });
+  }
 });
 
 export default router;

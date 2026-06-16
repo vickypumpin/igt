@@ -197,6 +197,7 @@ function AppRouter() {
           <Route path="/messages" component={BrandMessagesPage} />
 
           <Route path="/billing" component={CreatorBillingPage} />
+          <Route path="/payments" component={EarningsPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />
 

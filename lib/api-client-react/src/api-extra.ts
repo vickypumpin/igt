@@ -120,9 +120,9 @@ export const useBillingBalance = <TData = BillingBalance>(options?: {
   });
 
 export const usePurchaseGems = (
-  options?: UseMutationOptions<{ paymentUrl: string | null; txRef: string }, unknown, { packageId: string; amount: number; gems: number; currency?: string }>
+  options?: UseMutationOptions<{ paymentUrl: string | null; txRef: string }, unknown, { packageId: string; currency?: string }>
 ) =>
-  useMutation<{ paymentUrl: string | null; txRef: string }, unknown, { packageId: string; amount: number; gems: number; currency?: string }>({
+  useMutation<{ paymentUrl: string | null; txRef: string }, unknown, { packageId: string; currency?: string }>({
     mutationFn: (data) =>
       customFetch<{ paymentUrl: string | null; txRef: string }>("/api/billing/purchase", {
         method: "POST",
@@ -254,4 +254,52 @@ export const useAdminMessages = <TData = AdminMessage[]>(options?: {
     queryKey: getAdminMessagesQueryKey(),
     queryFn: () => customFetch<AdminMessage[]>("/api/admin/messages"),
     ...options?.query,
+  });
+
+// ── Account Profile (GET/PUT /api/account/profile) ───────────────────────────
+
+export interface AccountProfile {
+  id: number; firstName: string; lastName: string; userName: string; email: string;
+  phone: string | null; role: string; gender: string | null; badge: string | null;
+  isActive: boolean; isLocked: boolean; bio: string | null; avatarUrl: string | null;
+  dob: string | null; companyName: string | null; companySize: string | null; companyType: string | null;
+  instagramProfile: string | null; facebookProfile: string | null; twitterProfile: string | null;
+  youtubeProfile: string | null; tiktokProfile: string | null; snapchatProfile: string | null;
+  contentCategory: string | null; creatorCategory: string | null;
+  countryId: number | null; stateId: number | null;
+  gems: number; balance: string;
+  instagramDayPostPrice: number | null; instagramWeekPostPrice: number | null;
+  instagramDayStoryPrice: number | null; instagramWeekStoryPrice: number | null;
+  instagramDayReelPrice: number | null; instagramWeekReelPrice: number | null;
+  instagramDayLivePrice: number | null; instagramWeekLivePrice: number | null;
+  fbDayPostPrice: number | null; fbWeekPostPrice: number | null;
+  tiktokDayPostPrice: number | null; tiktokWeekPostPrice: number | null;
+  youtubeDayPostPrice: number | null; youtubeWeekPostPrice: number | null;
+  twitterDayPostPrice: number | null; twitterWeekPostPrice: number | null;
+  snapchatDayStoryPrice: number | null; snapchatWeekStoryPrice: number | null;
+  contentCreatorRate: number | null;
+  createdAt: string;
+}
+
+export const getAccountProfileQueryKey = () => ["/account/profile"] as const;
+
+export const useAccountProfile = <TData = AccountProfile>(options?: {
+  query?: UseQueryOptions<AccountProfile, unknown, TData>;
+}) =>
+  useQuery<AccountProfile, unknown, TData>({
+    queryKey: getAccountProfileQueryKey(),
+    queryFn: () => customFetch<AccountProfile>("/api/account/profile"),
+    ...options?.query,
+  });
+
+export const useUpdateAccountProfile = (
+  options?: UseMutationOptions<AccountProfile, unknown, Partial<AccountProfile>>
+) =>
+  useMutation<AccountProfile, unknown, Partial<AccountProfile>>({
+    mutationFn: (data) =>
+      customFetch<AccountProfile>("/api/account/profile", {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }),
+    ...options,
   });

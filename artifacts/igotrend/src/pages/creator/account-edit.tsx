@@ -1,72 +1,125 @@
 import { useState, useEffect } from "react";
-import { useGetMe, useUpdateProfile, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useAccountProfile, useUpdateAccountProfile, getAccountProfileQueryKey } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { User, Instagram, Twitter, Youtube, Globe, Camera } from "lucide-react";
+import { User, Instagram, Camera, MapPin } from "lucide-react";
+
+type FormState = {
+  firstName: string; lastName: string; userName: string; phone: string;
+  bio: string; dob: string; avatarUrl: string;
+  creatorCategory: string; contentCategory: string;
+  countryId: string; stateId: string;
+  instagramProfile: string; facebookProfile: string; twitterProfile: string;
+  youtubeProfile: string; tiktokProfile: string; snapchatProfile: string;
+  instagramDayPostPrice: string; instagramWeekPostPrice: string;
+  instagramDayStoryPrice: string; instagramWeekStoryPrice: string;
+  instagramDayReelPrice: string; instagramWeekReelPrice: string;
+  instagramDayLivePrice: string; instagramWeekLivePrice: string;
+  tiktokDayPostPrice: string; tiktokWeekPostPrice: string;
+  youtubeDayPostPrice: string; youtubeWeekPostPrice: string;
+  twitterDayPostPrice: string; twitterWeekPostPrice: string;
+  snapchatDayStoryPrice: string; snapchatWeekStoryPrice: string;
+};
+
+const EMPTY: FormState = {
+  firstName: "", lastName: "", userName: "", phone: "", bio: "", dob: "", avatarUrl: "",
+  creatorCategory: "", contentCategory: "", countryId: "", stateId: "",
+  instagramProfile: "", facebookProfile: "", twitterProfile: "",
+  youtubeProfile: "", tiktokProfile: "", snapchatProfile: "",
+  instagramDayPostPrice: "", instagramWeekPostPrice: "",
+  instagramDayStoryPrice: "", instagramWeekStoryPrice: "",
+  instagramDayReelPrice: "", instagramWeekReelPrice: "",
+  instagramDayLivePrice: "", instagramWeekLivePrice: "",
+  tiktokDayPostPrice: "", tiktokWeekPostPrice: "",
+  youtubeDayPostPrice: "", youtubeWeekPostPrice: "",
+  twitterDayPostPrice: "", twitterWeekPostPrice: "",
+  snapchatDayStoryPrice: "", snapchatWeekStoryPrice: "",
+};
+
+const PRICE_KEYS: (keyof FormState)[] = [
+  "instagramDayPostPrice", "instagramWeekPostPrice", "instagramDayStoryPrice", "instagramWeekStoryPrice",
+  "instagramDayReelPrice", "instagramWeekReelPrice", "instagramDayLivePrice", "instagramWeekLivePrice",
+  "tiktokDayPostPrice", "tiktokWeekPostPrice",
+  "youtubeDayPostPrice", "youtubeWeekPostPrice",
+  "twitterDayPostPrice", "twitterWeekPostPrice",
+  "snapchatDayStoryPrice", "snapchatWeekStoryPrice",
+];
 
 export default function CreatorAccountEditPage() {
   const { toast } = useToast();
-  const { data: me, isLoading } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
-  const updateMutation = useUpdateProfile();
-
-  const [form, setForm] = useState({
-    firstName: "", lastName: "", userName: "", phone: "", bio: "", dob: "",
-    instagramProfile: "", facebookProfile: "", twitterProfile: "",
-    youtubeProfile: "", tiktokProfile: "", snapchatProfile: "",
-    creatorCategory: "", contentCategory: "",
-    instagramDayPostPrice: "", instagramWeekPostPrice: "",
-    instagramDayStoryPrice: "", instagramWeekStoryPrice: "",
-    tiktokDayPostPrice: "", tiktokWeekPostPrice: "",
-    youtubeDayPostPrice: "", youtubeWeekPostPrice: "",
-    twitterDayPostPrice: "", twitterWeekPostPrice: "",
-  });
+  const { data: profile, isLoading } = useAccountProfile();
+  const updateMutation = useUpdateAccountProfile();
+  const [form, setForm] = useState<FormState>(EMPTY);
 
   useEffect(() => {
-    if (me) {
+    if (profile) {
       setForm({
-        firstName: me.firstName ?? "", lastName: me.lastName ?? "",
-        userName: me.userName ?? "", phone: me.phone ?? "", bio: me.bio ?? "", dob: (me as Record<string, string>).dob ?? "",
-        instagramProfile: me.instagramProfile ?? "", facebookProfile: me.facebookProfile ?? "",
-        twitterProfile: me.twitterProfile ?? "", youtubeProfile: me.youtubeProfile ?? "",
-        tiktokProfile: me.tiktokProfile ?? "", snapchatProfile: me.snapchatProfile ?? "",
-        creatorCategory: me.creatorCategory ?? "", contentCategory: me.contentCategory ?? "",
-        instagramDayPostPrice: String(me.instagramDayPostPrice ?? ""),
-        instagramWeekPostPrice: String(me.instagramWeekPostPrice ?? ""),
-        instagramDayStoryPrice: String(me.instagramDayStoryPrice ?? ""),
-        instagramWeekStoryPrice: String(me.instagramWeekStoryPrice ?? ""),
-        tiktokDayPostPrice: String(me.tiktokDayPostPrice ?? ""),
-        tiktokWeekPostPrice: String(me.tiktokWeekPostPrice ?? ""),
-        youtubeDayPostPrice: String(me.youtubeDayPostPrice ?? ""),
-        youtubeWeekPostPrice: String(me.youtubeWeekPostPrice ?? ""),
-        twitterDayPostPrice: String(me.twitterDayPostPrice ?? ""),
-        twitterWeekPostPrice: String(me.twitterWeekPostPrice ?? ""),
+        firstName: profile.firstName ?? "", lastName: profile.lastName ?? "",
+        userName: profile.userName ?? "", phone: profile.phone ?? "", bio: profile.bio ?? "",
+        dob: profile.dob ?? "", avatarUrl: profile.avatarUrl ?? "",
+        creatorCategory: profile.creatorCategory ?? "", contentCategory: profile.contentCategory ?? "",
+        countryId: profile.countryId ? String(profile.countryId) : "",
+        stateId: profile.stateId ? String(profile.stateId) : "",
+        instagramProfile: profile.instagramProfile ?? "", facebookProfile: profile.facebookProfile ?? "",
+        twitterProfile: profile.twitterProfile ?? "", youtubeProfile: profile.youtubeProfile ?? "",
+        tiktokProfile: profile.tiktokProfile ?? "", snapchatProfile: profile.snapchatProfile ?? "",
+        instagramDayPostPrice: String(profile.instagramDayPostPrice ?? ""),
+        instagramWeekPostPrice: String(profile.instagramWeekPostPrice ?? ""),
+        instagramDayStoryPrice: String(profile.instagramDayStoryPrice ?? ""),
+        instagramWeekStoryPrice: String(profile.instagramWeekStoryPrice ?? ""),
+        instagramDayReelPrice: String(profile.instagramDayReelPrice ?? ""),
+        instagramWeekReelPrice: String(profile.instagramWeekReelPrice ?? ""),
+        instagramDayLivePrice: String(profile.instagramDayLivePrice ?? ""),
+        instagramWeekLivePrice: String(profile.instagramWeekLivePrice ?? ""),
+        tiktokDayPostPrice: String(profile.tiktokDayPostPrice ?? ""),
+        tiktokWeekPostPrice: String(profile.tiktokWeekPostPrice ?? ""),
+        youtubeDayPostPrice: String(profile.youtubeDayPostPrice ?? ""),
+        youtubeWeekPostPrice: String(profile.youtubeWeekPostPrice ?? ""),
+        twitterDayPostPrice: String(profile.twitterDayPostPrice ?? ""),
+        twitterWeekPostPrice: String(profile.twitterWeekPostPrice ?? ""),
+        snapchatDayStoryPrice: String(profile.snapchatDayStoryPrice ?? ""),
+        snapchatWeekStoryPrice: String(profile.snapchatWeekStoryPrice ?? ""),
       });
     }
-  }, [me]);
+  }, [profile]);
 
-  const field = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const field = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
 
   const handleSave = () => {
-    const payload: Record<string, unknown> = { ...form };
-    const priceKeys = ["instagramDayPostPrice", "instagramWeekPostPrice", "instagramDayStoryPrice", "instagramWeekStoryPrice", "tiktokDayPostPrice", "tiktokWeekPostPrice", "youtubeDayPostPrice", "youtubeWeekPostPrice", "twitterDayPostPrice", "twitterWeekPostPrice"];
-    for (const k of priceKeys) {
-      payload[k] = form[k as keyof typeof form] ? parseInt(form[k as keyof typeof form], 10) : null;
+    const payload: Record<string, unknown> = {
+      firstName: form.firstName, lastName: form.lastName, userName: form.userName,
+      phone: form.phone || null, bio: form.bio || null, dob: form.dob || null,
+      avatarUrl: form.avatarUrl || null,
+      creatorCategory: form.creatorCategory || null, contentCategory: form.contentCategory || null,
+      countryId: form.countryId ? parseInt(form.countryId, 10) : null,
+      stateId: form.stateId ? parseInt(form.stateId, 10) : null,
+      instagramProfile: form.instagramProfile || null, facebookProfile: form.facebookProfile || null,
+      twitterProfile: form.twitterProfile || null, youtubeProfile: form.youtubeProfile || null,
+      tiktokProfile: form.tiktokProfile || null, snapchatProfile: form.snapchatProfile || null,
+    };
+    for (const k of PRICE_KEYS) {
+      payload[k] = form[k] ? parseInt(String(form[k]), 10) : null;
     }
-    updateMutation.mutate({ data: payload } as Parameters<typeof updateMutation.mutate>[0], {
+
+    updateMutation.mutate(payload as Parameters<typeof updateMutation.mutate>[0], {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getAccountProfileQueryKey() });
         toast({ title: "Profile saved ✓" });
       },
       onError: () => toast({ title: "Failed to save profile", variant: "destructive" }),
     });
   };
 
-  if (isLoading) return <CreatorLayout><div className="space-y-4">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div></CreatorLayout>;
+  if (isLoading) return (
+    <CreatorLayout>
+      <div className="space-y-4">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div>
+    </CreatorLayout>
+  );
 
   return (
     <CreatorLayout>
@@ -76,31 +129,56 @@ export default function CreatorAccountEditPage() {
             <h1 className="text-2xl font-extrabold">Edit Account</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Update your creator profile and platform rates</p>
           </div>
-          <Button onClick={handleSave} disabled={updateMutation.isPending} className="rounded-xl font-semibold px-6" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }} data-testid="btn-save-profile">
+          <Button onClick={handleSave} disabled={updateMutation.isPending}
+            className="rounded-xl font-semibold px-6"
+            style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+            data-testid="btn-save-profile">
             {updateMutation.isPending ? "Saving…" : "Save Changes"}
           </Button>
         </div>
 
         <div className="space-y-5">
+          {/* Profile photo */}
+          <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}><Camera className="h-4 w-4" /></div>
+              <div className="text-sm font-bold">Profile Photo</div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1DCFB3] to-[#6B2FCE] flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+                {form.avatarUrl
+                  ? <img src={form.avatarUrl} alt="avatar" className="w-14 h-14 rounded-xl object-cover" />
+                  : (form.firstName[0] ?? "?").toUpperCase()}
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Avatar URL</label>
+                <Input value={form.avatarUrl} onChange={field("avatarUrl")} placeholder="https://…" className="h-10 rounded-xl" data-testid="input-avatarUrl" />
+                <p className="text-xs text-muted-foreground mt-1">Paste a link to your profile photo</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Basic info */}
           <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}><User className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Basic Information</div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: "First name", key: "firstName" as const },
-                { label: "Last name", key: "lastName" as const },
-                { label: "Username", key: "userName" as const },
-                { label: "Phone", key: "phone" as const },
-                { label: "Date of birth", key: "dob" as const },
-                { label: "Creator category", key: "creatorCategory" as const },
-              ].map(({ label, key }) => (
+              {([["First name", "firstName"], ["Last name", "lastName"], ["Username", "userName"], ["Phone", "phone"], ["Date of birth", "dob"]] as [string, keyof FormState][]).map(([label, key]) => (
                 <div key={key}>
                   <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
                   <Input value={form[key]} onChange={field(key)} className="h-10 rounded-xl" data-testid={`input-${key}`} />
                 </div>
               ))}
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Creator category</label>
+                <Input value={form.creatorCategory} onChange={field("creatorCategory")} placeholder="e.g. Fashion, Tech" className="h-10 rounded-xl" data-testid="input-creatorCategory" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Content category</label>
+                <Input value={form.contentCategory} onChange={field("contentCategory")} placeholder="e.g. Lifestyle, Reviews" className="h-10 rounded-xl" data-testid="input-contentCategory" />
+              </div>
               <div className="col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Bio</label>
                 <textarea value={form.bio} onChange={field("bio")} rows={3} className="w-full rounded-xl border border-input px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring" data-testid="input-bio" />
@@ -108,20 +186,39 @@ export default function CreatorAccountEditPage() {
             </div>
           </div>
 
+          {/* Location */}
+          <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #6B2FCE, #5B21B6)" }}><MapPin className="h-4 w-4" /></div>
+              <div className="text-sm font-bold">Location</div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country ID</label>
+                <Input type="number" value={form.countryId} onChange={field("countryId")} placeholder="Country ID" className="h-10 rounded-xl" data-testid="input-countryId" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">State ID</label>
+                <Input type="number" value={form.stateId} onChange={field("stateId")} placeholder="State ID" className="h-10 rounded-xl" data-testid="input-stateId" />
+              </div>
+            </div>
+          </div>
+
+          {/* Social profiles */}
           <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #6B2FCE, #5B21B6)" }}><Instagram className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Social Profiles</div>
             </div>
             <div className="space-y-3">
-              {[
-                { label: "Instagram handle", key: "instagramProfile" as const, placeholder: "@handle" },
-                { label: "TikTok handle", key: "tiktokProfile" as const, placeholder: "@handle" },
-                { label: "YouTube channel", key: "youtubeProfile" as const, placeholder: "Channel URL or handle" },
-                { label: "Twitter/X handle", key: "twitterProfile" as const, placeholder: "@handle" },
-                { label: "Facebook profile", key: "facebookProfile" as const, placeholder: "Profile URL" },
-                { label: "Snapchat handle", key: "snapchatProfile" as const, placeholder: "@handle" },
-              ].map(({ label, key, placeholder }) => (
+              {([
+                ["Instagram handle", "instagramProfile", "@handle"],
+                ["TikTok handle", "tiktokProfile", "@handle"],
+                ["YouTube channel", "youtubeProfile", "Channel URL"],
+                ["Twitter/X handle", "twitterProfile", "@handle"],
+                ["Facebook profile", "facebookProfile", "Profile URL"],
+                ["Snapchat handle", "snapchatProfile", "@handle"],
+              ] as [string, keyof FormState, string][]).map(([label, key, placeholder]) => (
                 <div key={key}>
                   <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
                   <Input value={form[key]} onChange={field(key)} placeholder={placeholder} className="h-10 rounded-xl" data-testid={`input-${key}`} />
@@ -130,26 +227,28 @@ export default function CreatorAccountEditPage() {
             </div>
           </div>
 
+          {/* Platform rates */}
           <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}><Camera className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Platform Rates (₦)</div>
-              <p className="text-xs text-muted-foreground ml-auto">Enter your per-post fee</p>
+              <p className="text-xs text-muted-foreground ml-auto">Your per-post fee</p>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-5">
               {[
-                { platform: "Instagram", keys: [["Post/day", "instagramDayPostPrice"], ["Post/week", "instagramWeekPostPrice"], ["Story/day", "instagramDayStoryPrice"], ["Story/week", "instagramWeekStoryPrice"]] as const },
-                { platform: "TikTok", keys: [["Post/day", "tiktokDayPostPrice"], ["Post/week", "tiktokWeekPostPrice"]] as const },
-                { platform: "YouTube", keys: [["Video/day", "youtubeDayPostPrice"], ["Video/week", "youtubeWeekPostPrice"]] as const },
-                { platform: "Twitter/X", keys: [["Post/day", "twitterDayPostPrice"], ["Post/week", "twitterWeekPostPrice"]] as const },
-              ].map(({ platform, keys }) => (
+                { platform: "Instagram", fields: [["Post/day", "instagramDayPostPrice"], ["Post/week", "instagramWeekPostPrice"], ["Story/day", "instagramDayStoryPrice"], ["Story/week", "instagramWeekStoryPrice"], ["Reel/day", "instagramDayReelPrice"], ["Reel/week", "instagramWeekReelPrice"], ["Live/day", "instagramDayLivePrice"], ["Live/week", "instagramWeekLivePrice"]] as const },
+                { platform: "TikTok", fields: [["Post/day", "tiktokDayPostPrice"], ["Post/week", "tiktokWeekPostPrice"]] as const },
+                { platform: "YouTube", fields: [["Video/day", "youtubeDayPostPrice"], ["Video/week", "youtubeWeekPostPrice"]] as const },
+                { platform: "Twitter/X", fields: [["Post/day", "twitterDayPostPrice"], ["Post/week", "twitterWeekPostPrice"]] as const },
+                { platform: "Snapchat", fields: [["Story/day", "snapchatDayStoryPrice"], ["Story/week", "snapchatWeekStoryPrice"]] as const },
+              ].map(({ platform, fields }) => (
                 <div key={platform}>
                   <div className="text-xs font-bold text-muted-foreground mb-2">{platform}</div>
                   <div className="grid grid-cols-2 gap-3">
-                    {keys.map(([label, key]) => (
+                    {(fields as readonly (readonly [string, keyof FormState])[]).map(([label, key]) => (
                       <div key={key}>
                         <label className="text-xs text-muted-foreground mb-1 block">{label}</label>
-                        <Input type="number" value={form[key as keyof typeof form]} onChange={field(key as keyof typeof form)} placeholder="0" className="h-10 rounded-xl" />
+                        <Input type="number" value={form[key]} onChange={field(key)} placeholder="0" className="h-10 rounded-xl" data-testid={`input-${key}`} />
                       </div>
                     ))}
                   </div>
