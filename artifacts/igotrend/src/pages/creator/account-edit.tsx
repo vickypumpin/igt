@@ -6,15 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { User, Instagram, Camera, MapPin } from "lucide-react";
+import { User, Instagram, Camera, MapPin, DollarSign } from "lucide-react";
 
 type FormState = {
   firstName: string; lastName: string; userName: string; phone: string;
   bio: string; dob: string; avatarUrl: string;
   creatorCategory: string; contentCategory: string;
   countryId: string; stateId: string;
-  instagramProfile: string; facebookProfile: string; twitterProfile: string;
-  youtubeProfile: string; tiktokProfile: string; snapchatProfile: string;
+  instagramProfile: string; instagramFollowers: string;
+  facebookProfile: string; facebookFollowers: string;
+  twitterProfile: string; twitterFollowers: string;
+  youtubeProfile: string; youtubeFollowers: string;
+  tiktokProfile: string; tiktokFollowers: string;
+  snapchatProfile: string; snapchatFollowers: string;
   instagramDayPostPrice: string; instagramWeekPostPrice: string;
   instagramDayStoryPrice: string; instagramWeekStoryPrice: string;
   instagramDayReelPrice: string; instagramWeekReelPrice: string;
@@ -28,8 +32,12 @@ type FormState = {
 const EMPTY: FormState = {
   firstName: "", lastName: "", userName: "", phone: "", bio: "", dob: "", avatarUrl: "",
   creatorCategory: "", contentCategory: "", countryId: "", stateId: "",
-  instagramProfile: "", facebookProfile: "", twitterProfile: "",
-  youtubeProfile: "", tiktokProfile: "", snapchatProfile: "",
+  instagramProfile: "", instagramFollowers: "",
+  facebookProfile: "", facebookFollowers: "",
+  twitterProfile: "", twitterFollowers: "",
+  youtubeProfile: "", youtubeFollowers: "",
+  tiktokProfile: "", tiktokFollowers: "",
+  snapchatProfile: "", snapchatFollowers: "",
   instagramDayPostPrice: "", instagramWeekPostPrice: "",
   instagramDayStoryPrice: "", instagramWeekStoryPrice: "",
   instagramDayReelPrice: "", instagramWeekReelPrice: "",
@@ -49,6 +57,14 @@ const PRICE_KEYS: (keyof FormState)[] = [
   "snapchatDayStoryPrice", "snapchatWeekStoryPrice",
 ];
 
+// Follower count keys are stored as extra properties on the profile (string fields)
+const FOLLOWER_KEYS: (keyof FormState)[] = [
+  "instagramFollowers", "facebookFollowers", "twitterFollowers",
+  "youtubeFollowers", "tiktokFollowers", "snapchatFollowers",
+];
+
+type AnyProfile = Record<string, unknown>;
+
 export default function CreatorAccountEditPage() {
   const { toast } = useToast();
   const { data: profile, isLoading } = useAccountProfile();
@@ -57,6 +73,7 @@ export default function CreatorAccountEditPage() {
 
   useEffect(() => {
     if (profile) {
+      const p = profile as unknown as AnyProfile;
       setForm({
         firstName: profile.firstName ?? "", lastName: profile.lastName ?? "",
         userName: profile.userName ?? "", phone: profile.phone ?? "", bio: profile.bio ?? "",
@@ -64,9 +81,12 @@ export default function CreatorAccountEditPage() {
         creatorCategory: profile.creatorCategory ?? "", contentCategory: profile.contentCategory ?? "",
         countryId: profile.countryId ? String(profile.countryId) : "",
         stateId: profile.stateId ? String(profile.stateId) : "",
-        instagramProfile: profile.instagramProfile ?? "", facebookProfile: profile.facebookProfile ?? "",
-        twitterProfile: profile.twitterProfile ?? "", youtubeProfile: profile.youtubeProfile ?? "",
-        tiktokProfile: profile.tiktokProfile ?? "", snapchatProfile: profile.snapchatProfile ?? "",
+        instagramProfile: profile.instagramProfile ?? "", instagramFollowers: String(p["instagramFollowers"] ?? ""),
+        facebookProfile: profile.facebookProfile ?? "", facebookFollowers: String(p["facebookFollowers"] ?? ""),
+        twitterProfile: profile.twitterProfile ?? "", twitterFollowers: String(p["twitterFollowers"] ?? ""),
+        youtubeProfile: profile.youtubeProfile ?? "", youtubeFollowers: String(p["youtubeFollowers"] ?? ""),
+        tiktokProfile: profile.tiktokProfile ?? "", tiktokFollowers: String(p["tiktokFollowers"] ?? ""),
+        snapchatProfile: profile.snapchatProfile ?? "", snapchatFollowers: String(p["snapchatFollowers"] ?? ""),
         instagramDayPostPrice: String(profile.instagramDayPostPrice ?? ""),
         instagramWeekPostPrice: String(profile.instagramWeekPostPrice ?? ""),
         instagramDayStoryPrice: String(profile.instagramDayStoryPrice ?? ""),
@@ -103,6 +123,9 @@ export default function CreatorAccountEditPage() {
       tiktokProfile: form.tiktokProfile || null, snapchatProfile: form.snapchatProfile || null,
     };
     for (const k of PRICE_KEYS) {
+      payload[k] = form[k] ? parseInt(String(form[k]), 10) : null;
+    }
+    for (const k of FOLLOWER_KEYS) {
       payload[k] = form[k] ? parseInt(String(form[k]), 10) : null;
     }
 
@@ -204,24 +227,30 @@ export default function CreatorAccountEditPage() {
             </div>
           </div>
 
-          {/* Social profiles */}
+          {/* Social profiles + followers */}
           <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #6B2FCE, #5B21B6)" }}><Instagram className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Social Profiles</div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {([
-                ["Instagram handle", "instagramProfile", "@handle"],
-                ["TikTok handle", "tiktokProfile", "@handle"],
-                ["YouTube channel", "youtubeProfile", "Channel URL"],
-                ["Twitter/X handle", "twitterProfile", "@handle"],
-                ["Facebook profile", "facebookProfile", "Profile URL"],
-                ["Snapchat handle", "snapchatProfile", "@handle"],
-              ] as [string, keyof FormState, string][]).map(([label, key, placeholder]) => (
-                <div key={key}>
-                  <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
-                  <Input value={form[key]} onChange={field(key)} placeholder={placeholder} className="h-10 rounded-xl" data-testid={`input-${key}`} />
+                ["Instagram", "instagramProfile", "instagramFollowers", "@handle"],
+                ["TikTok", "tiktokProfile", "tiktokFollowers", "@handle"],
+                ["YouTube", "youtubeProfile", "youtubeFollowers", "Channel URL"],
+                ["Twitter / X", "twitterProfile", "twitterFollowers", "@handle"],
+                ["Facebook", "facebookProfile", "facebookFollowers", "Profile URL"],
+                ["Snapchat", "snapchatProfile", "snapchatFollowers", "@handle"],
+              ] as [string, keyof FormState, keyof FormState, string][]).map(([platform, handleKey, followerKey, placeholder]) => (
+                <div key={platform} className="grid grid-cols-3 gap-3 items-end">
+                  <div className="col-span-2">
+                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">{platform} handle</label>
+                    <Input value={form[handleKey]} onChange={field(handleKey)} placeholder={placeholder} className="h-10 rounded-xl" data-testid={`input-${handleKey}`} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Followers</label>
+                    <Input type="number" value={form[followerKey]} onChange={field(followerKey)} placeholder="0" className="h-10 rounded-xl" data-testid={`input-${followerKey}`} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -230,7 +259,7 @@ export default function CreatorAccountEditPage() {
           {/* Platform rates */}
           <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}><Camera className="h-4 w-4" /></div>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}><DollarSign className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Platform Rates (₦)</div>
               <p className="text-xs text-muted-foreground ml-auto">Your per-post fee</p>
             </div>

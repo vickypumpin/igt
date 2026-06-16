@@ -22,6 +22,16 @@ router.get("/admin/legal", requireAuth, requireRole("admin"), async (_req, res):
   res.json(pages.map(pageShape));
 });
 
+// POST collection — create a new legal page by slug
+router.post("/admin/legal", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const { slug, title, content } = req.body;
+  if (!slug || !title || content == null) { res.status(400).json({ error: "slug, title and content required" }); return; }
+  const [existing] = await db.select({ id: legalPagesTable.id }).from(legalPagesTable).where(eq(legalPagesTable.slug, slug));
+  if (existing) { res.status(409).json({ error: "Page with this slug already exists. Use PUT /admin/legal/:slug to update." }); return; }
+  const [page] = await db.insert(legalPagesTable).values({ slug, title, content }).returning();
+  res.status(201).json(pageShape(page!));
+});
+
 router.put("/admin/legal/:slug", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const { slug } = req.params;
   const { title, content } = req.body;

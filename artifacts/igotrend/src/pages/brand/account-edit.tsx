@@ -11,14 +11,17 @@ import { Building2, Globe, Camera, MapPin } from "lucide-react";
 type FormState = {
   firstName: string; lastName: string; phone: string;
   companyName: string; companySize: string; companyType: string;
-  bio: string; avatarUrl: string; countryId: string; stateId: string;
+  websiteUrl: string; bio: string; avatarUrl: string;
+  countryId: string; stateId: string;
 };
 
 const EMPTY: FormState = {
   firstName: "", lastName: "", phone: "",
   companyName: "", companySize: "", companyType: "",
-  bio: "", avatarUrl: "", countryId: "", stateId: "",
+  websiteUrl: "", bio: "", avatarUrl: "", countryId: "", stateId: "",
 };
+
+type AnyProfile = Record<string, unknown>;
 
 export default function BrandAccountEditPage() {
   const { toast } = useToast();
@@ -28,10 +31,12 @@ export default function BrandAccountEditPage() {
 
   useEffect(() => {
     if (profile) {
+      const p = profile as unknown as AnyProfile;
       setForm({
         firstName: profile.firstName ?? "", lastName: profile.lastName ?? "",
         phone: profile.phone ?? "", companyName: profile.companyName ?? "",
         companySize: profile.companySize ?? "", companyType: profile.companyType ?? "",
+        websiteUrl: String(p["websiteUrl"] ?? ""),
         bio: profile.bio ?? "", avatarUrl: profile.avatarUrl ?? "",
         countryId: profile.countryId ? String(profile.countryId) : "",
         stateId: profile.stateId ? String(profile.stateId) : "",
@@ -46,7 +51,9 @@ export default function BrandAccountEditPage() {
     const payload = {
       firstName: form.firstName, lastName: form.lastName, phone: form.phone || null,
       companyName: form.companyName || null, companySize: form.companySize || null,
-      companyType: form.companyType || null, bio: form.bio || null,
+      companyType: form.companyType || null,
+      websiteUrl: form.websiteUrl || null,
+      bio: form.bio || null,
       avatarUrl: form.avatarUrl || null,
       countryId: form.countryId ? parseInt(form.countryId, 10) : null,
       stateId: form.stateId ? parseInt(form.stateId, 10) : null,
@@ -148,6 +155,10 @@ export default function BrandAccountEditPage() {
                   <Input value={form[key]} onChange={field(key)} placeholder={placeholder} className="h-10 rounded-xl" data-testid={`input-${key}`} />
                 </div>
               ))}
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Website URL</label>
+                <Input value={form.websiteUrl} onChange={field("websiteUrl")} placeholder="https://yourbrand.com" className="h-10 rounded-xl" data-testid="input-websiteUrl" />
+              </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">About / Bio</label>
                 <textarea value={form.bio} onChange={field("bio")} rows={3} placeholder="Tell creators about your brand…"

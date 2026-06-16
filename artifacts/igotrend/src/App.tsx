@@ -137,7 +137,10 @@ function AppRouter() {
           {/* Payments */}
           <Route path="/admin/payouts" component={AdminPayoutsPage} />
 
-          {/* Approval Request sub-pages */}
+          {/* Approval Request sub-pages — /admin/approvals is canonical, /admin/verify-requests is legacy alias */}
+          <Route path="/admin/approvals" component={VerifyRequestsPage} />
+          <Route path="/admin/approvals/approved" component={VerifyRequestsPage} />
+          <Route path="/admin/approvals/declined" component={VerifyRequestsPage} />
           <Route path="/admin/verify-requests" component={VerifyRequestsPage} />
           <Route path="/admin/verify-requests/approved" component={VerifyRequestsPage} />
           <Route path="/admin/verify-requests/declined" component={VerifyRequestsPage} />

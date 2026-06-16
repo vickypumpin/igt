@@ -173,7 +173,7 @@ router.get("/admin/roles", requireAuth, requireRole("admin"), async (_req, res):
   }
 });
 
-router.put("/admin/roles", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+const saveRoles = async (req: import("express").Request, res: import("express").Response): Promise<void> => {
   try {
     await ensureRolePermissionsColumn();
     await pool.query(`UPDATE settings SET role_permissions = $1`, [JSON.stringify(req.body)]);
@@ -182,6 +182,9 @@ router.put("/admin/roles", requireAuth, requireRole("admin"), async (req, res): 
     console.error("Failed to persist permissions:", err);
     res.status(500).json({ error: "Failed to persist permissions" });
   }
-});
+};
+
+router.put("/admin/roles", requireAuth, requireRole("admin"), saveRoles);
+router.post("/admin/roles", requireAuth, requireRole("admin"), saveRoles);
 
 export default router;

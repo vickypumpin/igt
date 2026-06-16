@@ -24,7 +24,9 @@ type Tab = "monitor" | "broadcast";
 
 export default function AdminMessagingPage() {
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("monitor");
+  // Route /admin/messages/broadcast should open the broadcast tab directly
+  const initialTab: Tab = window.location.pathname.endsWith("/broadcast") ? "broadcast" : "monitor";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const { data: messages = [], isLoading: loadingMessages } = useAdminMessages();
   const broadcastMutation = useAdminBroadcast();
   const [broadcastForm, setBroadcastForm] = useState({ message: "", targetRole: "all", link: "" });

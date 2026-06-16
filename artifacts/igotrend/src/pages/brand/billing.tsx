@@ -1,11 +1,12 @@
+import { useEffect } from "react";
 import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useBillingBalance, getBillingBalanceQueryKey, usePurchaseGems } from "@workspace/api-client-react";
+import { useBillingBalance, getBillingBalanceQueryKey, usePurchaseGems, useVerifyGemsPurchase } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import BrandLayout from "@/components/layout/brand-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Gem, Zap, Star, Crown, ArrowDownCircle, ArrowUpCircle, Gift } from "lucide-react";
+import { Gem, Zap, Star, Crown, ArrowDownCircle, ArrowUpCircle, Gift, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const GEM_PACKAGES = [
@@ -22,7 +23,34 @@ export default function BrandBillingPage() {
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const { data: billing, isLoading } = useBillingBalance();
   const purchaseMutation = usePurchaseGems();
+  const verifyMutation = useVerifyGemsPurchase();
   const { toast } = useToast();
+
+  // Auto-verify after Flutterwave redirect (?verify=<txRef>)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const txRef = params.get("verify") ?? params.get("tx_ref");
+    if (!txRef) return;
+    // Clean up the URL so a reload doesn't re-trigger
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, "", cleanUrl);
+    verifyMutation.mutate(
+      { txRef },
+      {
+        onSuccess: (data) => {
+          if (data.success) {
+            toast({ title: `✓ ${data.gemsAdded.toLocaleString()} gems added to your account!` });
+            queryClient.invalidateQueries({ queryKey: getBillingBalanceQueryKey() });
+            queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+          } else {
+            toast({ title: "Payment verification failed", description: "Contact support if gems were not credited.", variant: "destructive" });
+          }
+        },
+        onError: () => toast({ title: "Could not verify payment", variant: "destructive" }),
+      }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleBuy = (pkg: typeof GEM_PACKAGES[0]) => {
     purchaseMutation.mutate(
