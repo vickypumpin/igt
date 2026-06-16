@@ -42,6 +42,24 @@ import AdminPayoutsPage from "@/pages/admin/payouts";
 import AdminSettingsPage from "@/pages/admin/settings";
 
 import SettingsPage from "@/pages/shared/settings";
+import ComingSoonPage from "@/pages/shared/coming-soon";
+
+/* ── Coming-soon wrappers with titles ── */
+const TrendAiPage   = () => <ComingSoonPage title="Trend Ai" description="AI-powered campaign insights are coming soon. Stay tuned!" />;
+const FaqPage       = () => <ComingSoonPage title="FAQ" description="Frequently asked questions will be available here soon." />;
+const BillingPage   = () => <ComingSoonPage title="Billing" description="Billing and subscription management is coming soon." />;
+const AccountPage   = () => <Redirect to="/settings/profile" />;
+
+/* Admin coming-soon pages */
+const AdminMessagesPage        = () => <ComingSoonPage title="Messages" description="Platform messaging is coming soon." />;
+const AdminBroadcastPage       = () => <ComingSoonPage title="Broadcast" description="Broadcast messaging is coming soon." />;
+const AdminFaqsPage            = () => <ComingSoonPage title="FAQs" description="FAQ management is coming soon." />;
+const AdminLegalPage           = () => <ComingSoonPage title="Legal Pages" description="Legal page management is coming soon." />;
+const AdminAccountPage         = () => <Redirect to="/admin/settings" />;
+const AdminSettingsFeesPage    = () => <ComingSoonPage title="Fees & Taxes" description="Fee and tax configuration is coming soon." />;
+const AdminSettingsGatewayPage = () => <ComingSoonPage title="Payment Gateway" description="Payment gateway settings are coming soon." />;
+const AdminSettingsSmtpPage    = () => <ComingSoonPage title="SMTP Settings" description="SMTP email configuration is coming soon." />;
+const AdminSettingsRolesPage   = () => <ComingSoonPage title="Roles & Permissions" description="Role management is coming soon." />;
 
 function AppRouter() {
   const { user, setAuth, isLoading: authLoading } = useAuth();
@@ -82,7 +100,7 @@ function AppRouter() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
 
-      {/* ── Public marketing pages (unauthenticated users only) ── */}
+      {/* ── Public marketing pages (unauthenticated users) ── */}
       {!user && (
         <>
           <Route path="/" component={HomePage} />
@@ -99,12 +117,46 @@ function AppRouter() {
         <>
           <Route path="/" component={() => <Redirect to="/admin" />} />
           <Route path="/admin" component={AdminDashboardPage} />
+
+          {/* Account Mgt sub-pages */}
           <Route path="/admin/users" component={AdminUsersPage} />
+          <Route path="/admin/users/brands" component={() => <AdminUsersPage />} />
+          <Route path="/admin/users/creators" component={() => <AdminUsersPage />} />
+          <Route path="/admin/users/pending" component={() => <AdminUsersPage />} />
+
+          {/* Campaign Mgt sub-pages */}
           <Route path="/admin/campaigns" component={AdminCampaignsPage} />
-          <Route path="/admin/submissions" component={AdminSubmissionsPage} />
-          <Route path="/admin/verify-requests" component={VerifyRequestsPage} />
+          <Route path="/admin/campaigns/active" component={() => <AdminCampaignsPage />} />
+          <Route path="/admin/campaigns/pending" component={() => <AdminCampaignsPage />} />
+
+          {/* Payments */}
           <Route path="/admin/payouts" component={AdminPayoutsPage} />
+
+          {/* Approval Request sub-pages */}
+          <Route path="/admin/verify-requests" component={VerifyRequestsPage} />
+          <Route path="/admin/verify-requests/approved" component={() => <VerifyRequestsPage />} />
+          <Route path="/admin/verify-requests/declined" component={() => <VerifyRequestsPage />} />
+
+          {/* Submissions */}
+          <Route path="/admin/submissions" component={AdminSubmissionsPage} />
+
+          {/* Messaging */}
+          <Route path="/admin/messages" component={AdminMessagesPage} />
+          <Route path="/admin/messages/broadcast" component={AdminBroadcastPage} />
+
+          {/* Settings sub-pages */}
           <Route path="/admin/settings" component={AdminSettingsPage} />
+          <Route path="/admin/settings/fees" component={AdminSettingsFeesPage} />
+          <Route path="/admin/settings/gateway" component={AdminSettingsGatewayPage} />
+          <Route path="/admin/settings/smtp" component={AdminSettingsSmtpPage} />
+          <Route path="/admin/settings/roles" component={AdminSettingsRolesPage} />
+
+          {/* FAQs & Legal */}
+          <Route path="/admin/faqs" component={AdminFaqsPage} />
+          <Route path="/admin/legal" component={AdminLegalPage} />
+
+          {/* Account */}
+          <Route path="/admin/account" component={AdminAccountPage} />
           <Route path="/settings/profile" component={SettingsPage} />
           <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
@@ -115,11 +167,23 @@ function AppRouter() {
       {user && role === "creator" && (
         <>
           <Route path="/" component={CreatorDashboardPage} />
+
+          {/* Campaign Mgt sub-pages */}
           <Route path="/invites" component={InvitesPage} />
           <Route path="/invites/:id" component={InvitesPage} />
+          <Route path="/invites/accepted" component={() => <InvitesPage />} />
+          <Route path="/invites/completed" component={() => <InvitesPage />} />
+          <Route path="/invites/declined" component={() => <InvitesPage />} />
+
           <Route path="/submissions/new" component={SubmitPage} />
           <Route path="/earnings" component={EarningsPage} />
           <Route path="/messages" component={BrandMessagesPage} />
+
+          {/* New nav items */}
+          <Route path="/trend-ai" component={TrendAiPage} />
+          <Route path="/faq" component={FaqPage} />
+          <Route path="/billing" component={BillingPage} />
+
           <Route path="/settings/profile" component={SettingsPage} />
           <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
@@ -130,13 +194,24 @@ function AppRouter() {
       {user && role === "brand" && (
         <>
           <Route path="/" component={BrandDashboardPage} />
+
+          {/* Campaign Mgt sub-pages */}
           <Route path="/campaigns" component={CampaignsPage} />
           <Route path="/campaigns/new" component={CampaignNewPage} />
           <Route path="/campaigns/:id" component={CampaignDetailPage} />
+          <Route path="/campaigns/active" component={() => <CampaignsPage />} />
+          <Route path="/campaigns/completed" component={() => <CampaignsPage />} />
+
           <Route path="/creators" component={CreatorsPage} />
           <Route path="/creators/:id" component={CreatorProfilePage} />
           <Route path="/messages" component={BrandMessagesPage} />
           <Route path="/payments" component={PaymentsPage} />
+
+          {/* New nav items */}
+          <Route path="/trend-ai" component={TrendAiPage} />
+          <Route path="/faq" component={FaqPage} />
+          <Route path="/billing" component={BillingPage} />
+
           <Route path="/settings/profile" component={SettingsPage} />
           <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />

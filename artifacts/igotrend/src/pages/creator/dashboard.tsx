@@ -1,158 +1,232 @@
+import { useState } from "react";
 import { Link } from "wouter";
-import { useGetCreatorDashboard, useListMyInvites, getGetCreatorDashboardQueryKey, getListMyInvitesQueryKey } from "@workspace/api-client-react";
+import { useGetCreatorDashboard, useGetMe, getGetCreatorDashboardQueryKey } from "@workspace/api-client-react";
 import CreatorLayout from "@/components/layout/creator-layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { Inbox, DollarSign, Eye, ThumbsUp, Gem, ArrowRight, CheckCircle2, Megaphone } from "lucide-react";
+import { DollarSign, Star, Inbox, CheckCircle, XCircle, ChevronRight, Eye, Gem } from "lucide-react";
 
-const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string }> = {
-  active:    { bg: "rgba(16,185,129,0.12)", text: "#059669", dot: "#10B981" },
-  pending:   { bg: "rgba(245,158,11,0.12)", text: "#D97706", dot: "#F59E0B" },
-  completed: { bg: "rgba(99,102,241,0.12)", text: "#4F46E5", dot: "#6366F1" },
-  declined:  { bg: "rgba(239,68,68,0.12)",  text: "#DC2626", dot: "#EF4444" },
+const PLATFORM_ROWS = [
+  { key: "instagram", label: "Instagram", emoji: "📸" },
+  { key: "facebook", label: "Facebook", emoji: "👥" },
+  { key: "twitter", label: "Twitter / X", emoji: "🐦" },
+  { key: "youtube", label: "YouTube", emoji: "▶️" },
+  { key: "tiktok", label: "TikTok", emoji: "🎵" },
+  { key: "snapchat", label: "Snapchat", emoji: "👻" },
+] as const;
+
+interface StatBoxProps { label: string; value: number; sub: string; color: string; icon: React.ComponentType<{ className?: string }> }
+function StatBox({ label, value, sub, color, icon: Icon }: StatBoxProps) {
+  return (
+    <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: `${color}15` }}>
+          <Icon className="h-4 w-4" style={{ color }} />
+        </div>
+        <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</span>
+      </div>
+      <div className="text-3xl font-extrabold mb-1" style={{ color }}>{value}</div>
+      <div className="text-xs text-muted-foreground">{sub}</div>
+    </div>
+  );
+}
+
+const STATUS_CONFIG: Record<string, { bg: string; text: string }> = {
+  pending:   { bg: "rgba(245,158,11,0.12)", text: "#D97706" },
+  accepted:  { bg: "rgba(16,185,129,0.12)", text: "#059669" },
+  completed: { bg: "rgba(99,102,241,0.12)", text: "#4F46E5" },
+  declined:  { bg: "rgba(239,68,68,0.12)",  text: "#DC2626" },
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { bg: "#f4f4f5", text: "#71717a", dot: "#a1a1aa" };
+  const cfg = STATUS_CONFIG[status] ?? { bg: "#f4f4f5", text: "#71717a" };
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: cfg.bg, color: cfg.text }}>
-      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
+    <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: cfg.bg, color: cfg.text }}>
       {status}
     </span>
   );
 }
 
-interface StatCardProps { label: string; value: string | number; icon: React.ReactNode; gradient: string; testid?: string }
-function StatCard({ label, value, icon, gradient, testid }: StatCardProps) {
-  return (
-    <Card className="overflow-hidden border-0 shadow-sm hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white mb-3" style={{ background: gradient }}>
-          {icon}
-        </div>
-        <div className="text-2xl font-extrabold text-foreground" data-testid={testid}>{value}</div>
-        <div className="text-xs font-medium text-muted-foreground mt-0.5">{label}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function CreatorDashboardPage() {
   const { data, isLoading } = useGetCreatorDashboard({ query: { queryKey: getGetCreatorDashboardQueryKey() } });
-  const { data: invites = [] } = useListMyInvites({ status: "pending" }, { query: { queryKey: getListMyInvitesQueryKey({ status: "pending" }) } });
+  const { data: user } = useGetMe();
+  const [showEntries, setShowEntries] = useState(10);
+
+  const accepted = (data?.totalInvites ?? 0) - (data?.pendingInvites ?? 0) - (data?.declinedInvites ?? 0) - (data?.completedCampaigns ?? 0);
+  const badgeLabel = user?.badge ?? "Micro";
+
+  const platformHandles: Record<string, string | null | undefined> = {
+    instagram: user?.instagramProfile,
+    facebook: user?.facebookProfile,
+    twitter: user?.twitterProfile,
+    youtube: user?.youtubeProfile,
+    tiktok: user?.tiktokProfile,
+    snapchat: user?.snapchatProfile,
+  };
 
   return (
     <CreatorLayout>
       <div data-testid="page-creator-dashboard">
+        {/* Header */}
         <div className="flex items-center justify-between mb-7">
           <div>
-            <h1 className="text-2xl font-extrabold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Your performance at a glance</p>
+            <h1 className="text-2xl font-extrabold text-foreground">Influencers &amp; Content Creators</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Welcome back, <span className="font-semibold text-foreground">@{user?.userName}</span>
+            </p>
           </div>
-          {invites.length > 0 && (
-            <Link href="/invites">
-              <Button size="sm" className="h-9 rounded-xl font-semibold gap-1.5 animate-pulse" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}>
-                <Inbox className="h-4 w-4" /> {invites.length} new invite{invites.length > 1 ? "s" : ""}
-              </Button>
-            </Link>
-          )}
-        </div>
-
-        {/* Pending invites banner */}
-        {invites.length > 0 && (
-          <Link href="/invites">
-            <div className="mb-5 rounded-2xl p-4 cursor-pointer flex items-center gap-4" style={{ background: "linear-gradient(135deg, rgba(29,207,179,0.12), rgba(29,207,179,0.06))", border: "1px solid rgba(29,207,179,0.3)" }}>
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}>
-                <Inbox className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="font-bold text-sm" style={{ color: "#0FA88E" }}>You have {invites.length} pending campaign invite{invites.length > 1 ? "s" : ""}!</div>
-                <div className="text-xs text-muted-foreground">Review and accept to start earning</div>
-              </div>
-              <ArrowRight className="h-4 w-4" style={{ color: "#1DCFB3" }} />
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{ background: "rgba(29,207,179,0.12)", color: "#1DCFB3", border: "1px solid rgba(29,207,179,0.25)" }}>
+              <DollarSign className="h-3 w-3 inline mr-1" />
+              Earnings: ₦{(data?.totalEarnings ?? 0).toLocaleString()}
             </div>
-          </Link>
-        )}
-
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-          {isLoading ? Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />) : (
-            <>
-              <StatCard label="Total invites" value={data?.totalInvites ?? 0} icon={<Inbox className="h-4 w-4" />} gradient="linear-gradient(135deg, #8B5CF6, #6D28D9)" testid="stat-invites" />
-              <StatCard label="Campaigns done" value={data?.completedCampaigns ?? 0} icon={<CheckCircle2 className="h-4 w-4" />} gradient="linear-gradient(135deg, #1DCFB3, #0FA88E)" testid="stat-completed" />
-              <StatCard label="Total earnings" value={`$${(data?.totalEarnings ?? 0).toLocaleString()}`} icon={<DollarSign className="h-4 w-4" />} gradient="linear-gradient(135deg, #3B82F6, #2563EB)" testid="stat-earnings" />
-              <StatCard label="Gems balance" value={data?.gems ?? 0} icon={<Gem className="h-4 w-4" />} gradient="linear-gradient(135deg, #F59E0B, #D97706)" testid="stat-gems" />
-            </>
-          )}
-        </div>
-
-        {/* Reach & engagement */}
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(29,207,179,0.12)" }}>
-                <Eye className="h-4 w-4" style={{ color: "#1DCFB3" }} />
-              </div>
-              <div>
-                <div className="text-xl font-extrabold">{(data?.totalReach ?? 0).toLocaleString()}</div>
-                <div className="text-xs font-medium text-muted-foreground">Total reach</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(139,92,246,0.12)" }}>
-                <ThumbsUp className="h-4 w-4" style={{ color: "#8B5CF6" }} />
-              </div>
-              <div>
-                <div className="text-xl font-extrabold">{(data?.totalEngagement ?? 0).toLocaleString()}</div>
-                <div className="text-xs font-medium text-muted-foreground">Engagement</div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Recent invitations */}
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2 pt-5 px-5">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-bold">Recent Invitations</CardTitle>
-              <Link href="/invites">
-                <span className="text-xs font-semibold flex items-center gap-1 hover:underline" style={{ color: "#1DCFB3" }}>
-                  View all <ArrowRight className="h-3.5 w-3.5" />
-                </span>
-              </Link>
+            <div className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{ background: "rgba(245,158,11,0.12)", color: "#D97706", border: "1px solid rgba(245,158,11,0.25)" }}>
+              <Star className="h-3 w-3 inline mr-1" />
+              Gems: {data?.gems ?? 0}
             </div>
-          </CardHeader>
-          <CardContent className="px-0 pb-2">
-            {isLoading ? <div className="px-5 space-y-2">{Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12" />)}</div> :
-              !data?.recentInvites?.length ? (
-                <div className="px-5 py-10 text-center">
-                  <Megaphone className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-30" />
-                  <p className="text-sm text-muted-foreground">No invitations yet — stay active and brands will find you.</p>
-                </div>
+            <div className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{ background: "rgba(107,47,206,0.12)", color: "#8B5CF6", border: "1px solid rgba(107,47,206,0.25)" }}>
+              {badgeLabel} Trender
+            </div>
+          </div>
+        </div>
+
+        {/* Overview section: 2×2 stats grid + Platform Handles table */}
+        <div className="mb-7">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Overview</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* 2×2 stat boxes */}
+            <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+              {isLoading ? (
+                Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
               ) : (
-                <div className="divide-y divide-border/60">
-                  {data.recentInvites.map(inv => (
-                    <Link key={inv.id} href={`/invites/${inv.id}`}>
-                      <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 cursor-pointer transition-colors" data-testid={`invite-row-${inv.id}`}>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-white text-xs font-bold" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}>
-                          {inv.campaign?.name?.[0]?.toUpperCase() ?? "C"}
+                <>
+                  <StatBox label="Invitations" value={data?.totalInvites ?? 0} sub="Total Campaigns (All time)" color="#8B5CF6" icon={Inbox} />
+                  <StatBox label="Completed" value={data?.completedCampaigns ?? 0} sub="Total Campaigns (All time)" color="#1DCFB3" icon={CheckCircle} />
+                  <StatBox label="Declined" value={data?.declinedInvites ?? 0} sub="Total Campaigns (All time)" color="#EF4444" icon={XCircle} />
+                  <StatBox label="Accepted" value={Math.max(0, accepted)} sub="Total Campaigns (All time)" color="#10B981" icon={CheckCircle} />
+                </>
+              )}
+            </div>
+
+            {/* Platform Handles table */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h3 className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Platform Handles</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-50 bg-gray-50/50">
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-muted-foreground">Platform</th>
+                      <th className="text-left px-4 py-2 text-xs font-semibold text-muted-foreground">Handle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {PLATFORM_ROWS.map((row) => {
+                      const handle = platformHandles[row.key];
+                      return (
+                        <tr key={row.key} className="border-b border-gray-50">
+                          <td className="px-4 py-2.5 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span>{row.emoji}</span>
+                              <span className="text-muted-foreground">{row.label}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs font-medium">
+                            {handle ? (
+                              <span style={{ color: "#1DCFB3" }}>{handle}</span>
+                            ) : (
+                              <span className="text-muted-foreground">N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Invitations section — paginated table */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Invitations</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Show</span>
+              <select
+                value={showEntries}
+                onChange={e => setShowEntries(Number(e.target.value))}
+                className="text-xs rounded-lg border border-gray-200 px-2 py-1 text-gray-600 bg-white focus:outline-none"
+              >
+                <option>10</option><option>25</option><option>50</option>
+              </select>
+              <span className="text-xs text-muted-foreground">entries</span>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/60">
+                    <th className="text-left px-5 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Campaign Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Sponsor</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Duration</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">End Date</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    Array(3).fill(0).map((_, i) => (
+                      <tr key={i} className="border-b border-gray-50">
+                        <td colSpan={6} className="px-5 py-3"><Skeleton className="h-8 rounded-lg" /></td>
+                      </tr>
+                    ))
+                  ) : !data?.recentInvites?.length ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-12 text-center text-muted-foreground text-sm">
+                        <div className="flex flex-col items-center gap-2">
+                          <Eye className="h-8 w-8 opacity-20" />
+                          <div>No data available in table</div>
+                          <div className="flex items-center gap-4 mt-3">
+                            <button className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">Previous</button>
+                            <button className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50">Next</button>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold truncate">{inv.campaign?.name}</div>
-                          <div className="text-xs text-muted-foreground">{inv.campaign?.sponsor}</div>
-                        </div>
-                        <StatusBadge status={inv.status} />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )
-            }
-          </CardContent>
-        </Card>
+                      </td>
+                    </tr>
+                  ) : (
+                    data.recentInvites.slice(0, showEntries).map((inv) => (
+                      <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors" data-testid={`invite-row-${inv.id}`}>
+                        <td className="px-5 py-3">
+                          <Link href={`/invites/${inv.id}`}>
+                            <span className="text-xs font-semibold text-foreground hover:underline cursor-pointer" style={{ color: "#1DCFB3" }}>
+                              {inv.campaign?.name ?? "—"}
+                            </span>
+                          </Link>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">{inv.campaign?.sponsor ?? "—"}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{inv.campaign?.campaignDuration ?? "—"}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          {inv.campaign?.endDate ? new Date(inv.campaign.endDate).toLocaleDateString("en-GB") : "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={inv.status} />
+                        </td>
+                        <td className="px-4 py-3 text-xs font-semibold text-foreground">
+                          {inv.estimatedPayout ? `₦${Number(inv.estimatedPayout).toLocaleString()}` : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </CreatorLayout>
   );

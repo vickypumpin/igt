@@ -2,20 +2,18 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/auth-context";
 import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
-import { LayoutDashboard, Users, Megaphone, FileCheck, ShieldCheck, Wallet, Settings, LogOut, ChevronDown, Shield } from "lucide-react";
+import {
+  LayoutDashboard, Users, Megaphone, Wallet, Settings, LogOut,
+  ChevronDown, Shield, MessageSquare, HelpCircle, FileText, Bell,
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { IgtLogo } from "@/components/IgtLogo";
+import { NavGroup, NavLink } from "./nav-group";
 
-const navItems = [
-  { href: "/admin", icon: LayoutDashboard, label: "Overview" },
-  { href: "/admin/users", icon: Users, label: "Users" },
-  { href: "/admin/campaigns", icon: Megaphone, label: "Campaigns" },
-  { href: "/admin/submissions", icon: FileCheck, label: "Submissions" },
-  { href: "/admin/verify-requests", icon: ShieldCheck, label: "Verifications" },
-  { href: "/admin/payouts", icon: Wallet, label: "Payouts" },
-  { href: "/admin/settings", icon: Settings, label: "Settings" },
-];
+const ORANGE = "#FF8C42";
+const ORANGE_BG = "rgba(255,140,66,0.18)";
+const ORANGE_BORDER = "rgba(255,140,66,0.28)";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -27,70 +25,140 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     logoutMutation.mutate({}, { onSettled: () => { logout(); queryClient.clear(); } });
   };
 
+  const initials = `${user?.firstName?.[0] ?? "A"}${user?.lastName?.[0] ?? "D"}`;
+
   return (
     <div className="flex h-screen bg-background overflow-hidden" data-testid="layout-admin">
-      <aside className="w-60 flex flex-col flex-shrink-0" style={{ background: "linear-gradient(180deg, #1A1440 0%, #141C35 100%)" }}>
-        {/* Logo */}
+      <aside className="w-64 flex flex-col flex-shrink-0" style={{ background: "linear-gradient(180deg, #1A1440 0%, #141C35 100%)" }}>
+        {/* Logo + Portal title */}
         <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           <IgtLogo size="sm" white />
-          <div className="flex items-center gap-1.5 mt-1">
-            <Shield className="h-3 w-3" style={{ color: "#FF8C42" }} />
-            <div className="text-xs font-semibold" style={{ color: "#FF8C42", letterSpacing: "0.04em" }}>ADMIN PANEL</div>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <Shield className="h-3 w-3" style={{ color: ORANGE }} />
+            <span className="text-xs font-semibold" style={{ color: ORANGE, letterSpacing: "0.04em" }}>IGT Administration &amp; Management</span>
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ href, icon: Icon, label }) => {
-            const active = location === href || (href !== "/admin" && location.startsWith(href));
-            return (
-              <Link key={href} href={href}>
-                <div
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all"
-                  style={active
-                    ? { background: "rgba(255,140,66,0.18)", color: "#FF8C42", border: "1px solid rgba(255,140,66,0.28)" }
-                    : { color: "rgba(255,255,255,0.55)", border: "1px solid transparent" }
-                  }
-                  data-testid={`nav-${label.toLowerCase()}`}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  {label}
-                </div>
-              </Link>
-            );
-          })}
+          <NavLink href="/admin" icon={LayoutDashboard} label="Dashboard" exact activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
+
+          <NavGroup
+            icon={Users}
+            label="Account Mgt"
+            activeColor={ORANGE}
+            activeBg={ORANGE_BG}
+            activeBorder={ORANGE_BORDER}
+            items={[
+              { href: "/admin/users", label: "All Accounts" },
+              { href: "/admin/users/brands", label: "Brand Accounts" },
+              { href: "/admin/users/creators", label: "Creator Accounts" },
+              { href: "/admin/users/pending", label: "Pending Accounts" },
+            ]}
+          />
+
+          <NavGroup
+            icon={Megaphone}
+            label="Campaign Mgt"
+            activeColor={ORANGE}
+            activeBg={ORANGE_BG}
+            activeBorder={ORANGE_BORDER}
+            items={[
+              { href: "/admin/campaigns", label: "All Campaigns" },
+              { href: "/admin/campaigns/active", label: "Active Campaigns" },
+              { href: "/admin/campaigns/pending", label: "Pending Campaigns" },
+            ]}
+          />
+
+          <NavLink href="/admin/payouts" icon={Wallet} label="Payments" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
+
+          <NavGroup
+            icon={Shield}
+            label="Approval Request"
+            activeColor={ORANGE}
+            activeBg={ORANGE_BG}
+            activeBorder={ORANGE_BORDER}
+            items={[
+              { href: "/admin/verify-requests", label: "Pending Requests" },
+              { href: "/admin/verify-requests/approved", label: "Approved" },
+              { href: "/admin/verify-requests/declined", label: "Declined" },
+            ]}
+          />
+
+          <NavGroup
+            icon={MessageSquare}
+            label="Messaging"
+            activeColor={ORANGE}
+            activeBg={ORANGE_BG}
+            activeBorder={ORANGE_BORDER}
+            items={[
+              { href: "/admin/messages", label: "All Messages" },
+              { href: "/admin/messages/broadcast", label: "Broadcast" },
+            ]}
+          />
+
+          <NavGroup
+            icon={Settings}
+            label="Settings"
+            activeColor={ORANGE}
+            activeBg={ORANGE_BG}
+            activeBorder={ORANGE_BORDER}
+            items={[
+              { href: "/admin/settings", label: "General" },
+              { href: "/admin/settings/fees", label: "Fees & Taxes" },
+              { href: "/admin/settings/gateway", label: "Payment Gateway" },
+              { href: "/admin/settings/smtp", label: "SMTP" },
+              { href: "/admin/settings/roles", label: "Roles & Permissions" },
+            ]}
+          />
+
+          <NavLink href="/admin/faqs" icon={HelpCircle} label="FAQs" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
+          <NavLink href="/admin/legal" icon={FileText} label="Legal Pages" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
         </nav>
 
-        {/* User footer */}
+        {/* User footer / account dropdown */}
         <div className="px-3 pb-3 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl transition-colors" data-testid="button-user-menu">
+              <button className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl transition-colors hover:bg-white/5" data-testid="button-user-menu">
                 <Avatar className="h-7 w-7 flex-shrink-0">
-                  <AvatarFallback className="text-xs font-bold" style={{ background: "linear-gradient(135deg, #FF8C42, #E05878)", color: "white" }}>AD</AvatarFallback>
+                  <AvatarFallback className="text-xs font-bold" style={{ background: `linear-gradient(135deg, ${ORANGE}, #E05878)`, color: "white" }}>
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left min-w-0">
                   <div className="text-xs font-semibold text-white truncate">{user?.firstName} {user?.lastName}</div>
-                  <div className="text-xs" style={{ color: "#FF8C42" }}>Administrator</div>
+                  <div className="text-xs font-medium" style={{ color: ORANGE }}>IGT Admin</div>
                 </div>
                 <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: "rgba(255,255,255,0.35)" }} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link href="/admin/account"><span className="cursor-pointer w-full">Edit Account</span></Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
-                <LogOut className="h-4 w-4 mr-2" /> Sign out
+                <LogOut className="h-4 w-4 mr-2" /> Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </aside>
 
+      {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="border-b border-border flex items-center justify-between px-6 bg-white" style={{ height: 52 }}>
-          <div className="text-xs text-muted-foreground font-medium">Admin Dashboard</div>
-          <div className="text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: "rgba(255,140,66,0.12)", color: "#FF8C42" }}>
-            Super Admin
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-semibold uppercase tracking-wide" style={{ color: ORANGE }}>HOME</span>
+            <span>/</span>
+            <span className="uppercase tracking-wide font-medium text-foreground">
+              {location === "/admin" ? "DASHBOARD" : location.replace("/admin/", "").replace(/-/g, " ").toUpperCase()}
+            </span>
           </div>
+          <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <Bell className="h-4 w-4 text-muted-foreground" />
+          </button>
         </header>
         <main className="flex-1 overflow-y-auto p-6 bg-background">{children}</main>
       </div>
