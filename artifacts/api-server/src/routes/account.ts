@@ -66,7 +66,7 @@ router.get("/account/profile", requireAuth, async (req, res): Promise<void> => {
 
 router.put("/account/profile", requireAuth, async (req, res): Promise<void> => {
   const allowed = [
-    "firstName", "lastName", "userName", "phone", "bio", "avatarUrl", "dob",
+    "firstName", "lastName", "userName", "email", "phone", "bio", "avatarUrl", "dob",
     "companyName", "companySize", "companyType", "gender", "countryId", "stateId",
     "instagramProfile", "facebookProfile", "twitterProfile", "youtubeProfile", "tiktokProfile", "snapchatProfile",
     "instagramFollowers", "facebookFollowers", "twitterFollowers", "youtubeFollowers", "tiktokFollowers", "snapchatFollowers",

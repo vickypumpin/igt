@@ -9,14 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Building2, Globe, Camera, MapPin } from "lucide-react";
 
 type FormState = {
-  firstName: string; lastName: string; phone: string;
+  firstName: string; lastName: string; email: string; phone: string;
   companyName: string; companySize: string; companyType: string;
   websiteUrl: string; bio: string; avatarUrl: string;
   countryId: string; stateId: string;
 };
 
 const EMPTY: FormState = {
-  firstName: "", lastName: "", phone: "",
+  firstName: "", lastName: "", email: "", phone: "",
   companyName: "", companySize: "", companyType: "",
   websiteUrl: "", bio: "", avatarUrl: "", countryId: "", stateId: "",
 };
@@ -34,7 +34,8 @@ export default function BrandAccountEditPage() {
       const p = profile as unknown as AnyProfile;
       setForm({
         firstName: profile.firstName ?? "", lastName: profile.lastName ?? "",
-        phone: profile.phone ?? "", companyName: profile.companyName ?? "",
+        email: profile.email ?? "", phone: profile.phone ?? "",
+        companyName: profile.companyName ?? "",
         companySize: profile.companySize ?? "", companyType: profile.companyType ?? "",
         websiteUrl: String(p["websiteUrl"] ?? ""),
         bio: profile.bio ?? "", avatarUrl: profile.avatarUrl ?? "",
@@ -49,7 +50,9 @@ export default function BrandAccountEditPage() {
 
   const handleSave = () => {
     const payload = {
-      firstName: form.firstName, lastName: form.lastName, phone: form.phone || null,
+      firstName: form.firstName, lastName: form.lastName,
+      email: form.email || undefined,
+      phone: form.phone || null,
       companyName: form.companyName || null, companySize: form.companySize || null,
       companyType: form.companyType || null,
       websiteUrl: form.websiteUrl || null,
@@ -120,8 +123,7 @@ export default function BrandAccountEditPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Email address</label>
-                <Input value={profile?.email ?? ""} readOnly className="h-10 rounded-xl bg-muted/50 cursor-not-allowed" data-testid="input-email" />
-                <p className="text-xs text-muted-foreground mt-1">Contact support to change your email</p>
+                <Input value={form.email} onChange={field("email")} type="email" placeholder="you@brand.com" className="h-10 rounded-xl" data-testid="input-email" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {([["First name", "firstName"], ["Last name", "lastName"]] as [string, keyof FormState][]).map(([label, key]) => (

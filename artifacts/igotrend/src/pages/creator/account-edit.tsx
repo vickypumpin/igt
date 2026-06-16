@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User, Instagram, Camera, MapPin, DollarSign } from "lucide-react";
 
 type FormState = {
-  firstName: string; lastName: string; userName: string; phone: string;
+  firstName: string; lastName: string; email: string; userName: string; phone: string;
   bio: string; dob: string; avatarUrl: string;
   creatorCategory: string; contentCategory: string;
   countryId: string; stateId: string;
@@ -30,7 +30,7 @@ type FormState = {
 };
 
 const EMPTY: FormState = {
-  firstName: "", lastName: "", userName: "", phone: "", bio: "", dob: "", avatarUrl: "",
+  firstName: "", lastName: "", email: "", userName: "", phone: "", bio: "", dob: "", avatarUrl: "",
   creatorCategory: "", contentCategory: "", countryId: "", stateId: "",
   instagramProfile: "", instagramFollowers: "",
   facebookProfile: "", facebookFollowers: "",
@@ -76,6 +76,7 @@ export default function CreatorAccountEditPage() {
       const p = profile as unknown as AnyProfile;
       setForm({
         firstName: profile.firstName ?? "", lastName: profile.lastName ?? "",
+        email: profile.email ?? "",
         userName: profile.userName ?? "", phone: profile.phone ?? "", bio: profile.bio ?? "",
         dob: profile.dob ?? "", avatarUrl: profile.avatarUrl ?? "",
         creatorCategory: profile.creatorCategory ?? "", contentCategory: profile.contentCategory ?? "",
@@ -112,7 +113,9 @@ export default function CreatorAccountEditPage() {
 
   const handleSave = () => {
     const payload: Record<string, unknown> = {
-      firstName: form.firstName, lastName: form.lastName, userName: form.userName,
+      firstName: form.firstName, lastName: form.lastName,
+      email: form.email || undefined,
+      userName: form.userName,
       phone: form.phone || null, bio: form.bio || null, dob: form.dob || null,
       avatarUrl: form.avatarUrl || null,
       creatorCategory: form.creatorCategory || null, contentCategory: form.contentCategory || null,
@@ -188,6 +191,10 @@ export default function CreatorAccountEditPage() {
               <div className="text-sm font-bold">Basic Information</div>
             </div>
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Email address</label>
+                <Input value={form.email} onChange={field("email")} type="email" placeholder="you@email.com" className="h-10 rounded-xl" data-testid="input-email" />
+              </div>
               {([["First name", "firstName"], ["Last name", "lastName"], ["Username", "userName"], ["Phone", "phone"], ["Date of birth", "dob"]] as [string, keyof FormState][]).map(([label, key]) => (
                 <div key={key}>
                   <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>

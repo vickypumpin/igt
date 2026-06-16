@@ -155,15 +155,10 @@ const DEFAULT_PERMISSIONS = {
   admin:   { manageUsers: true,     manageCampaigns: true, manageSettings: true,  manageContent: true,      broadcastMessages: true },
 };
 
-async function ensureRolePermissionsColumn(): Promise<void> {
-  await pool.query(`ALTER TABLE settings ADD COLUMN IF NOT EXISTS role_permissions text`);
-}
-
 router.get("/admin/roles", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
   try {
-    await ensureRolePermissionsColumn();
-    const result = await pool.query<{ role_permissions: string | null }>(`SELECT role_permissions FROM settings LIMIT 1`);
-    const stored = result.rows[0]?.role_permissions;
+    const rows = await db.select({ rolePermissions: settingsTable.rolePermissions }).from(settingsTable).limit(1);
+    const stored = rows[0]?.rolePermissions;
     if (stored) {
       try { res.json(JSON.parse(stored)); return; } catch { /* fall through */ }
     }
@@ -175,12 +170,12 @@ router.get("/admin/roles", requireAuth, requireRole("admin"), async (_req, res):
 
 const saveRoles = async (req: import("express").Request, res: import("express").Response): Promise<void> => {
   try {
-    await ensureRolePermissionsColumn();
+    const json = JSON.stringify(req.body);
+    // Upsert: ensure a settings row exists (id=1), then update rolePermissions
     await pool.query(
-      `INSERT INTO settings (id, role_permissions) VALUES (1, $1)
-       ON CONFLICT (id) DO UPDATE SET role_permissions = EXCLUDED.role_permissions`,
-      [JSON.stringify(req.body)]
+      `INSERT INTO settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING`,
     );
+    await db.update(settingsTable).set({ rolePermissions: json }).where(eq(settingsTable.id, 1));
     res.json({ message: "Permissions updated", permissions: req.body });
   } catch (err) {
     console.error("Failed to persist permissions:", err);

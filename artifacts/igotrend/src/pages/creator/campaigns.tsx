@@ -5,7 +5,7 @@ import CreatorLayout from "@/components/layout/creator-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, CheckCircle, Clock, Trophy, XCircle } from "lucide-react";
+import { Briefcase, CheckCircle, Clock, Trophy, XCircle, Gem } from "lucide-react";
 
 type StatusFilter = "all" | "pending" | "active" | "completed" | "declined";
 
@@ -116,9 +116,21 @@ export default function CreatorCampaignsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm">{invite.campaign?.name ?? `Campaign #${invite.campaignId}`}</div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
-                      {invite.campaign?.sponsor && <span>{invite.campaign.sponsor}</span>}
+                      {invite.campaign?.sponsor && <span className="font-medium text-foreground/70">{invite.campaign.sponsor}</span>}
+                      {invite.campaign?.type && (
+                        <span className="px-1.5 py-0.5 rounded-md font-medium capitalize" style={{ background: "rgba(107,47,206,0.08)", color: "#6B2FCE" }}>
+                          {invite.campaign.type.replace("_", " ")}
+                        </span>
+                      )}
+                      {invite.campaign?.campaignDuration && (
+                        <span className="capitalize">{invite.campaign.campaignDuration}</span>
+                      )}
                       {endDate && <span>Ends {endDate}</span>}
-                      {invite.campaign?.type && <span className="capitalize">{invite.campaign.type}</span>}
+                      {invite.estimatedPayout != null && (
+                        <span className="flex items-center gap-0.5 font-semibold" style={{ color: "#F59E0B" }}>
+                          <Gem className="h-3 w-3" />{Number(invite.estimatedPayout).toLocaleString()} gems
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
