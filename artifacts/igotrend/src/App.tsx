@@ -11,6 +11,13 @@ import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
+import ForgotPasswordPage from "@/pages/auth/forgot-password";
+
+import HomePage from "@/pages/public/home";
+import BrandsPage from "@/pages/public/brands";
+import InfluencersCreatorsPage from "@/pages/public/influencers-creators";
+import ServicesPage from "@/pages/public/services";
+import CommunityGuidelinesPage from "@/pages/public/community-guidelines";
 
 import BrandDashboardPage from "@/pages/brand/dashboard";
 import CampaignsPage from "@/pages/brand/campaigns";
@@ -70,13 +77,24 @@ function AppRouter() {
 
   return (
     <Switch>
+      {/* ── Auth pages (always accessible) ── */}
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
 
+      {/* ── Public marketing pages (unauthenticated users only) ── */}
       {!user && (
-        <Route>{() => <Redirect to="/login" />}</Route>
+        <>
+          <Route path="/" component={HomePage} />
+          <Route path="/brands" component={BrandsPage} />
+          <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
+          <Route path="/services" component={ServicesPage} />
+          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
+          <Route component={NotFound} />
+        </>
       )}
 
+      {/* ── Admin routes ── */}
       {user && role === "admin" && (
         <>
           <Route path="/" component={() => <Redirect to="/admin" />} />
@@ -88,10 +106,12 @@ function AppRouter() {
           <Route path="/admin/payouts" component={AdminPayoutsPage} />
           <Route path="/admin/settings" component={AdminSettingsPage} />
           <Route path="/settings/profile" component={SettingsPage} />
+          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}
 
+      {/* ── Creator routes ── */}
       {user && role === "creator" && (
         <>
           <Route path="/" component={CreatorDashboardPage} />
@@ -101,10 +121,12 @@ function AppRouter() {
           <Route path="/earnings" component={EarningsPage} />
           <Route path="/messages" component={BrandMessagesPage} />
           <Route path="/settings/profile" component={SettingsPage} />
+          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}
 
+      {/* ── Brand routes ── */}
       {user && role === "brand" && (
         <>
           <Route path="/" component={BrandDashboardPage} />
@@ -116,6 +138,7 @@ function AppRouter() {
           <Route path="/messages" component={BrandMessagesPage} />
           <Route path="/payments" component={PaymentsPage} />
           <Route path="/settings/profile" component={SettingsPage} />
+          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}

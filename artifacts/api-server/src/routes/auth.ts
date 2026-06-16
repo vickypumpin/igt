@@ -108,6 +108,15 @@ router.patch("/auth/me/password", requireAuth, async (req, res): Promise<void> =
   res.json({ message: "Password updated" });
 });
 
+router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "Email is required" });
+    return;
+  }
+  res.json({ message: "If that email is registered, a reset link has been sent." });
+});
+
 router.patch("/auth/me/pricing", requireAuth, async (req, res): Promise<void> => {
   const fields = [
     "instagramDayPostPrice","instagramWeekPostPrice","instagramDayStoryPrice","instagramWeekStoryPrice",

@@ -139,8 +139,20 @@ export default function LoginPage() {
             <Link href="/register" className="font-semibold hover:underline" style={{ color: "#1DCFB3" }} data-testid="link-register">Create one</Link>
           </p>
 
-          <div className="mt-8 pt-6 border-t border-border/60">
+          <p className="mt-3 text-center text-sm">
+            <Link href="/forgot-password" className="text-muted-foreground hover:text-foreground transition-colors text-sm">
+              Forgot your password?
+            </Link>
+          </p>
+
+          <div className="mt-8 pt-6 border-t border-border/60 space-y-3">
             <p className="text-xs text-muted-foreground text-center">Demo: admin@igotrend.com / password</p>
+            <div className="text-center">
+              <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                Back to Home
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -188,6 +188,13 @@ export default function RegisterPage() {
             Already have an account?{" "}
             <Link href="/login" className="font-semibold hover:underline" style={{ color: "#1DCFB3" }} data-testid="link-login">Sign in</Link>
           </p>
+
+          <div className="mt-4 text-center">
+            <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              Back to Home
+            </Link>
+          </div>
         </div>
       </div>
     </div>
