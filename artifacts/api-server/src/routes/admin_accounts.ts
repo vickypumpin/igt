@@ -17,6 +17,7 @@ const userShape = (u: typeof usersTable.$inferSelect) => ({
   commissionRate: u.commissionRate != null ? parseFloat(String(u.commissionRate)) : null,
   billingAmount: u.billingAmount != null ? parseFloat(String(u.billingAmount)) : null,
   subscriptionStatus: u.subscriptionStatus ?? null,
+  billingNotes: u.billingNotes ?? null,
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
 });
 
@@ -81,19 +82,25 @@ router.get("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), asy
   const [user] = await db.select({
     id: usersTable.id, billingMode: usersTable.billingMode, billingAmount: usersTable.billingAmount,
     commissionRate: usersTable.commissionRate, subscriptionStatus: usersTable.subscriptionStatus,
+    billingNotes: usersTable.billingNotes, agencyId: usersTable.agencyId,
   }).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(user);
+  res.json({
+    ...user,
+    commissionRate: user.commissionRate != null ? parseFloat(String(user.commissionRate)) : null,
+    billingAmount: user.billingAmount != null ? parseFloat(String(user.billingAmount)) : null,
+  });
 });
 
 router.put("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
-  const { billingMode, billingAmount, commissionRate, subscriptionStatus } = req.body;
+  const { billingMode, billingAmount, commissionRate, subscriptionStatus, billingNotes } = req.body;
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (billingMode !== undefined) updates.billingMode = billingMode;
   if (billingAmount !== undefined) updates.billingAmount = String(billingAmount);
   if (commissionRate !== undefined) updates.commissionRate = String(commissionRate);
   if (subscriptionStatus !== undefined) updates.subscriptionStatus = subscriptionStatus;
+  if (billingNotes !== undefined) updates.billingNotes = billingNotes;
   await db.update(usersTable).set(updates).where(eq(usersTable.id, id));
   res.json({ message: "Billing updated" });
 });
@@ -168,11 +175,16 @@ router.put("/admin/settings/general", requireAuth, requireRole("admin"), async (
 
 router.get("/admin/settings/fees", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
   const s = await getOrCreateSettings();
-  res.json({ gemPrice: s.gemPrice ?? null, gemServiceFee: s.gemServiceFee ?? null, creatorServiceFee: s.creatorServiceFee ?? null, brandServiceFee: s.brandServiceFee ?? null });
+  res.json({
+    gemPrice: s.gemPrice ?? null, gemServiceFee: s.gemServiceFee ?? null,
+    creatorServiceFee: s.creatorServiceFee ?? null, brandServiceFee: s.brandServiceFee ?? null,
+    defaultBillingMode: s.defaultBillingMode ?? "commission",
+    defaultCommissionRate: s.defaultCommissionRate ?? "5.00",
+  });
 });
 
 router.put("/admin/settings/fees", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const fields = ["gemPrice", "gemServiceFee", "creatorServiceFee", "brandServiceFee"];
+  const fields = ["gemPrice", "gemServiceFee", "creatorServiceFee", "brandServiceFee", "defaultBillingMode", "defaultCommissionRate"];
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   for (const f of fields) { if (req.body[f] !== undefined) updates[f] = req.body[f]; }
   const s = await getOrCreateSettings();

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq, and, ilike, sql } from "drizzle-orm";
 import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable } from "@workspace/db";
+import { resolveBilling } from "../lib/billing";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
 import type { IRouter } from "express";
@@ -138,49 +139,49 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
 
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
 
-  // Commission hook: trace creator → recent campaign submission → brand → agency
-  // A payout is a creator cash withdrawal; we find the most recent campaign they
-  // submitted to, resolve that campaign's brand owner, and apply the brand's
-  // commission billing settings (set by admin via the billing modal).
+  // Commission hook: trace creator submissions → campaign brands → billing resolver
+  // We find all campaigns this creator submitted to, resolve each brand's effective
+  // billing config (agency-inherited when brand.agencyId is set, or standalone),
+  // and record a commission deduction for each commission-mode brand.
+  // campaignId attribution is best-effort (payout table has no campaignId FK).
   try {
-    const [recentSub] = await db
+    const subs = await db
       .select({ campaignId: submissionsTable.campaignId })
       .from(submissionsTable)
-      .where(eq(submissionsTable.creatorId, payout.creatorId))
+      .where(and(
+        eq(submissionsTable.creatorId, payout.creatorId),
+        eq(submissionsTable.status, "approved"),
+      ))
       .orderBy(sql`submissions.created_at desc`)
-      .limit(1);
+      .limit(5);
 
-    if (recentSub?.campaignId) {
+    const payoutAmount = parseFloat(String(payout.amount));
+    const deductedBrands = new Set<number>();
+
+    for (const sub of subs) {
+      if (!sub.campaignId) continue;
       const [campaign] = await db
         .select({ brandId: campaignsTable.brandId })
         .from(campaignsTable)
-        .where(eq(campaignsTable.id, recentSub.campaignId));
+        .where(eq(campaignsTable.id, sub.campaignId));
 
-      if (campaign?.brandId) {
-        const [brand] = await db
-          .select({
-            agencyId: usersTable.agencyId,
-            billingMode: usersTable.billingMode,
-            commissionRate: usersTable.commissionRate,
-          })
-          .from(usersTable)
-          .where(eq(usersTable.id, campaign.brandId));
+      if (!campaign?.brandId || deductedBrands.has(campaign.brandId)) continue;
 
-        if (brand?.billingMode === "commission" && brand.agencyId && brand.commissionRate) {
-          const rate = parseFloat(String(brand.commissionRate));
-          const amount = parseFloat(String(payout.amount));
-          if (rate > 0 && amount > 0) {
-            const deductionAmount = (amount * rate) / 100;
-            await db.insert(commissionDeductionsTable).values({
-              userId: campaign.brandId,
-              agencyId: brand.agencyId,
-              campaignId: recentSub.campaignId,
-              deductionPercent: String(rate),
-              deductionAmount: String(deductionAmount.toFixed(2)),
-            });
-          }
-        }
-      }
+      const billing = await resolveBilling(campaign.brandId);
+      if (!billing || billing.billingMode !== "commission" || billing.commissionRate <= 0) continue;
+
+      const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
+      if (deductionAmount <= 0) continue;
+
+      await db.insert(commissionDeductionsTable).values({
+        payoutId: payout.id,
+        userId: campaign.brandId,
+        agencyId: billing.agencyId,
+        campaignId: sub.campaignId,
+        deductionPercent: String(billing.commissionRate),
+        deductionAmount: String(deductionAmount.toFixed(2)),
+      });
+      deductedBrands.add(campaign.brandId);
     }
   } catch (e) {
     console.error("Commission hook error:", e);

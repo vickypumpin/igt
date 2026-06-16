@@ -23,8 +23,9 @@ interface User {
 }
 
 interface BillingInfo {
-  id: number; billingMode: string | null; billingAmount: string | null;
-  commissionRate: string | null; subscriptionStatus: string | null;
+  id: number; billingMode: string | null; billingAmount: number | null;
+  commissionRate: number | null; subscriptionStatus: string | null;
+  billingNotes: string | null;
 }
 
 interface AccountsResponse { data: User[]; total: number; page: number; limit: number; }
@@ -47,7 +48,7 @@ export default function AdminAccountsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [billingUser, setBillingUser] = useState<User | null>(null);
-  const [billingForm, setBillingForm] = useState({ billingMode: "commission", commissionRate: "5.00", billingAmount: "0", subscriptionStatus: "active" });
+  const [billingForm, setBillingForm] = useState({ billingMode: "commission", commissionRate: "5.00", billingAmount: "0", subscriptionStatus: "active", billingNotes: "" });
   const qc = useQueryClient();
 
   const activeTab: Tab = location.endsWith("/brands") ? "brands"
@@ -97,12 +98,13 @@ export default function AdminAccountsPage() {
       const info = await customFetch<BillingInfo>(`/api/admin/accounts/${u.id}/billing`);
       setBillingForm({
         billingMode: info.billingMode ?? "commission",
-        commissionRate: info.commissionRate ?? "5.00",
-        billingAmount: info.billingAmount ?? "0",
+        commissionRate: String(info.commissionRate ?? "5.00"),
+        billingAmount: String(info.billingAmount ?? "0"),
         subscriptionStatus: info.subscriptionStatus ?? "active",
+        billingNotes: info.billingNotes ?? "",
       });
     } catch {
-      setBillingForm({ billingMode: "commission", commissionRate: "5.00", billingAmount: "0", subscriptionStatus: "active" });
+      setBillingForm({ billingMode: "commission", commissionRate: "5.00", billingAmount: "0", subscriptionStatus: "active", billingNotes: "" });
     }
   };
 
@@ -295,6 +297,17 @@ export default function AdminAccountsPage() {
                   </div>
                 </>
               )}
+              <div>
+                <label className="text-xs font-semibold block mb-1.5">Internal Notes</label>
+                <textarea
+                  rows={3}
+                  value={billingForm.billingNotes}
+                  onChange={e => setBillingForm(f => ({ ...f, billingNotes: e.target.value }))}
+                  placeholder="Optional notes visible only to admins…"
+                  className="flex w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none"
+                  data-testid="input-billing-notes"
+                />
+              </div>
               <Button
                 className="w-full h-10 rounded-xl font-semibold"
                 style={{ background: "linear-gradient(135deg, #FF8C42, #E47128)", border: "none", color: "white" }}

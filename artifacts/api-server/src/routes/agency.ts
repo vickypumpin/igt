@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable } from "@workspace/db";
+import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -44,11 +44,20 @@ router.get("/agency/clients", requireAuth, requireRole("agency"), async (req, re
       isActive: usersTable.isActive,
       billingMode: usersTable.billingMode,
       commissionRate: usersTable.commissionRate,
+      activeCampaigns: sql<number>`(select count(*) from campaigns where brand_id = ${agencyClientsTable.brandUserId} and status = 'active')`,
+      totalCampaigns: sql<number>`(select count(*) from campaigns where brand_id = ${agencyClientsTable.brandUserId})`,
+      totalSpend: sql<number>`(select coalesce(sum(amount),0) from payments where user_id = ${agencyClientsTable.brandUserId} and payment_status = true)`,
     })
     .from(agencyClientsTable)
     .leftJoin(usersTable, eq(agencyClientsTable.brandUserId, usersTable.id))
     .where(eq(agencyClientsTable.agencyId, agency.id));
-  res.json(clients);
+  res.json(clients.map(c => ({
+    ...c,
+    commissionRate: c.commissionRate != null ? parseFloat(String(c.commissionRate)) : null,
+    totalSpend: parseFloat(String(c.totalSpend ?? 0)),
+    activeCampaigns: Number(c.activeCampaigns ?? 0),
+    totalCampaigns: Number(c.totalCampaigns ?? 0),
+  })));
 });
 
 router.post("/agency/clients/invite", requireAuth, requireRole("agency"), async (req, res): Promise<void> => {
@@ -161,14 +170,26 @@ router.get("/agency/dashboard", requireAuth, requireRole("agency"), async (req, 
 
   let activeCampaigns = 0;
   let totalCampaigns = 0;
+  let monthlySpend = 0;
+  let totalCommissionOwed = 0;
+
   if (clientIds.length) {
+    const idList = sql.raw(clientIds.join(","));
     const [activeRow] = await db.select({ count: sql<number>`count(*)` }).from(campaignsTable)
-      .where(sql`campaigns.brand_id = ANY(ARRAY[${sql.raw(clientIds.join(","))}]::int[]) AND campaigns.status = 'active'`);
+      .where(sql`campaigns.brand_id = ANY(ARRAY[${idList}]::int[]) AND campaigns.status = 'active'`);
     const [totalRow] = await db.select({ count: sql<number>`count(*)` }).from(campaignsTable)
-      .where(sql`campaigns.brand_id = ANY(ARRAY[${sql.raw(clientIds.join(","))}]::int[])`);
+      .where(sql`campaigns.brand_id = ANY(ARRAY[${idList}]::int[])`);
+    const [spendRow] = await db.select({ total: sql<number>`coalesce(sum(amount),0)` }).from(paymentsTable)
+      .where(sql`payments.user_id = ANY(ARRAY[${idList}]::int[]) AND payments.payment_status = true AND date_trunc('month', payments.created_at) = date_trunc('month', now())`);
     activeCampaigns = Number(activeRow?.count ?? 0);
     totalCampaigns = Number(totalRow?.count ?? 0);
+    monthlySpend = parseFloat(String(spendRow?.total ?? 0));
   }
+
+  const [commissionRow] = await db.select({ total: sql<number>`coalesce(sum(deduction_amount),0)` })
+    .from(commissionDeductionsTable)
+    .where(eq(commissionDeductionsTable.agencyId, agency.id));
+  totalCommissionOwed = parseFloat(String(commissionRow?.total ?? 0));
 
   res.json({
     agency,
@@ -176,6 +197,8 @@ router.get("/agency/dashboard", requireAuth, requireRole("agency"), async (req, 
     pendingInvites: Number(pendingCountRow?.count ?? 0),
     activeCampaigns,
     totalCampaigns,
+    monthlySpend,
+    totalCommissionOwed,
   });
 });
 

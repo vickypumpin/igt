@@ -6,6 +6,7 @@ import { campaignsTable } from "./campaigns";
 
 export const commissionDeductionsTable = pgTable("commission_deductions", {
   id: serial("id").primaryKey(),
+  payoutId: integer("payout_id"),
   campaignId: integer("campaign_id").references(() => campaignsTable.id),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   agencyId: integer("agency_id"),

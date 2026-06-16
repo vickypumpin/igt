@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Trash2, Clock, CheckCircle, Mail } from "lucide-react";
+import { Users, UserPlus, Trash2, Clock, CheckCircle, Mail, Megaphone, DollarSign } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Client {
@@ -14,6 +14,8 @@ interface Client {
   invitedAt: string; joinedAt: string | null;
   firstName: string | null; lastName: string | null;
   email: string | null; companyName: string | null; isActive: boolean | null;
+  billingMode: string | null; commissionRate: number | null;
+  activeCampaigns: number; totalCampaigns: number; totalSpend: number;
 }
 
 const PURPLE = "#6B2FCE";
@@ -81,12 +83,14 @@ export default function AgencyClientsPage() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[750px]">
               <thead style={{ background: "#fafbfd", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
                 <tr>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Client</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Email</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Campaigns</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Total Spend</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Billing</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Invited</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Actions</th>
                 </tr>
@@ -94,7 +98,8 @@ export default function AgencyClientsPage() {
               <tbody className="divide-y divide-border/60">
                 {clients.map(c => {
                   const st = statusStyle(c.inviteStatus);
-                  const fullName = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim(); const name = c.companyName ?? (fullName || "—");
+                  const fullName = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim();
+                  const name = c.companyName ?? (fullName || "—");
                   return (
                     <tr key={c.id} className="hover:bg-muted/30 transition-colors" data-testid={`client-row-${c.id}`}>
                       <td className="px-5 py-3.5">
@@ -102,12 +107,12 @@ export default function AgencyClientsPage() {
                           <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: PURPLE }}>
                             {(name[0] ?? "?").toUpperCase()}
                           </div>
-                          <div className="font-semibold">{name}</div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <Mail className="h-3 w-3" />{c.email ?? "—"}
+                          <div>
+                            <div className="font-semibold">{name}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Mail className="h-3 w-3" />{c.email ?? "—"}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
@@ -115,6 +120,29 @@ export default function AgencyClientsPage() {
                           {c.inviteStatus === "accepted" ? <CheckCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                           {c.inviteStatus}
                         </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Megaphone className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-medium">{c.activeCampaigns}</span>
+                          <span className="text-muted-foreground">active / {c.totalCampaigns} total</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs">
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          <span className="font-medium">₦{c.totalSpend.toLocaleString()}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs">
+                        {c.billingMode ? (
+                          <span className="px-2 py-0.5 rounded-full font-semibold capitalize"
+                            style={c.billingMode === "commission"
+                              ? { background: "rgba(107,47,206,0.1)", color: PURPLE }
+                              : { background: "rgba(29,207,179,0.12)", color: "#0FA88E" }}>
+                            {c.billingMode === "commission" ? `${c.commissionRate ?? 0}% comm.` : "subscription"}
+                          </span>
+                        ) : <span className="text-muted-foreground/60">—</span>}
                       </td>
                       <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(c.invitedAt).toLocaleDateString()}</td>
                       <td className="px-5 py-3.5">

@@ -130,6 +130,19 @@ export default function AdminSettingsPage() {
               </div>
             </Section>
           )}
+          {activeTab === "fees" && (
+            <Section icon={DollarSign} title="Default Billing for New Brands">
+              <Field label="Default billing mode">
+                <select {...register("defaultBillingMode")} className="mt-1.5 flex h-10 w-full rounded-xl border border-input bg-transparent px-3 text-sm shadow-sm" data-testid="select-default-billing-mode">
+                  <option value="commission">Commission</option>
+                  <option value="subscription">Subscription</option>
+                </select>
+              </Field>
+              <Field label="Default commission rate (%)">
+                <Input {...register("defaultCommissionRate", { valueAsNumber: true })} type="number" step="0.01" min="0" max="100" className="mt-1.5 h-10 rounded-xl" data-testid="input-default-commission-rate" />
+              </Field>
+            </Section>
+          )}
 
           {activeTab === "gateway" && (
             <Section icon={CreditCard} title="Flutterwave Payment Gateway" desc={<>Get your keys from <a href="https://dashboard.flutterwave.com/dashboard/settings/apis" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#1DCFB3" }}>dashboard.flutterwave.com</a></>}>

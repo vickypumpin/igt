@@ -22,6 +22,8 @@ export const settingsTable = pgTable("settings", {
   flutterwaveEncryptionKey: text("flutterwave_encryption_key"),
   flutterwaveLive: boolean("flutterwave_live").notNull().default(false),
   rolePermissions: text("role_permissions"),
+  defaultBillingMode: text("default_billing_mode").default("commission"),
+  defaultCommissionRate: text("default_commission_rate").default("5.00"),
   twilioAccountSid: text("twilio_account_sid"),
   twilioAuthToken: text("twilio_auth_token"),
   twilioPhoneNumber: text("twilio_phone_number"),

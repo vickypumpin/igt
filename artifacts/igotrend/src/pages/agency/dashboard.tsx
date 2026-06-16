@@ -13,6 +13,8 @@ interface DashboardData {
   pendingInvites: number;
   activeCampaigns: number;
   totalCampaigns: number;
+  monthlySpend: number;
+  totalCommissionOwed: number;
 }
 
 const PURPLE = "#6B2FCE";
@@ -23,11 +25,12 @@ export default function AgencyDashboardPage() {
     queryFn: () => customFetch("/api/agency/dashboard"),
   });
 
+  const fmt = (n: number) => n >= 1000 ? `₦${(n/1000).toFixed(1)}k` : `₦${n.toLocaleString()}`;
   const stats = data ? [
     { label: "Active Clients", value: data.clientCount, icon: Users, gradient: "linear-gradient(135deg, #6B2FCE, #8B5CF6)" },
     { label: "Pending Invites", value: data.pendingInvites, icon: Clock, gradient: "linear-gradient(135deg, #F59E0B, #D97706)" },
     { label: "Active Campaigns", value: data.activeCampaigns, icon: Megaphone, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
-    { label: "Total Campaigns", value: data.totalCampaigns, icon: TrendingUp, gradient: "linear-gradient(135deg, #EF4444, #DC2626)" },
+    { label: "Monthly Spend", value: fmt(data.monthlySpend), icon: TrendingUp, gradient: "linear-gradient(135deg, #EF4444, #DC2626)" },
   ] : [];
 
   return (
