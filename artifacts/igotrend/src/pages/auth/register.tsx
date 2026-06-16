@@ -14,6 +14,8 @@ import { GeomDecor } from "@/components/GeomDecor";
 import { CheckCircle2, Zap, Users } from "lucide-react";
 import type { AuthResponse } from "@workspace/api-client-react";
 
+type Role = "brand" | "creator" | "agency";
+
 const schema = z.object({
   firstName: z.string().min(1, "Required"),
   lastName: z.string().min(1, "Required"),
@@ -21,23 +23,30 @@ const schema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(6, "Min 6 characters"),
   phone: z.string().optional(),
-  role: z.enum(["brand", "creator"]),
+  role: z.enum(["brand", "creator", "agency"]),
   gender: z.enum(["male", "female"]),
   countryId: z.number().default(1),
+  companyName: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
+
+const ROLES: { key: Role; label: string }[] = [
+  { key: "brand",   label: "🏢 Brand"   },
+  { key: "agency",  label: "🏛️ Agency"  },
+  { key: "creator", label: "🎬 Creator" },
+];
 
 export default function RegisterPage() {
   const [, setLocation] = useLocation();
   const { setAuth } = useAuth();
   const { toast } = useToast();
-  const [role, setRole] = useState<"brand" | "creator">("brand");
+  const [role, setRole] = useState<Role>("brand");
   const registerMutation = useRegister();
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { firstName: "", lastName: "", userName: "", email: "", password: "", phone: "", role: "brand", gender: "male", countryId: 1 },
+    defaultValues: { firstName: "", lastName: "", userName: "", email: "", password: "", phone: "", role: "brand", gender: "male", countryId: 1, companyName: "" },
   });
 
   const onSubmit = (values: FormData) => {
@@ -116,23 +125,28 @@ export default function RegisterPage() {
             <p className="text-muted-foreground text-sm">Join iGoTrend — West Africa's influencer platform</p>
           </div>
 
-          {/* Role selector */}
-          <div className="flex gap-2 mb-6 p-1 rounded-xl" style={{ background: "#f3f4f8" }}>
-            <button
-              onClick={() => { setRole("brand"); form.setValue("role", "brand"); }}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${role === "brand" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              data-testid="button-role-brand"
-            >🏢 Brand / Agency</button>
-            <button
-              onClick={() => { setRole("creator"); form.setValue("role", "creator"); }}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${role === "creator" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              data-testid="button-role-creator"
-            >🎬 Creator</button>
+          {/* Role selector — 3 options */}
+          <div className="flex gap-1.5 mb-5 p-1 rounded-xl" style={{ background: "#f3f4f8" }}>
+            {ROLES.map(r => (
+              <button
+                key={r.key}
+                onClick={() => { setRole(r.key); form.setValue("role", r.key); }}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all ${role === r.key ? "bg-white shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                data-testid={`button-role-${r.key}`}
+              >
+                {r.label}
+              </button>
+            ))}
           </div>
 
           {role === "creator" && (
             <div className="mb-4 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: "rgba(29,207,179,0.1)", color: "#0FA88E", border: "1px solid rgba(29,207,179,0.3)" }}>
               💡 Creators must have at least 5k followers on Instagram, TikTok, YouTube or Twitter.
+            </div>
+          )}
+          {role === "agency" && (
+            <div className="mb-4 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: "rgba(107,47,206,0.08)", color: "#6B2FCE", border: "1px solid rgba(107,47,206,0.25)" }}>
+              🏛️ Agencies manage multiple brand clients and earn via commission or subscription billing.
             </div>
           )}
 
@@ -146,6 +160,18 @@ export default function RegisterPage() {
                   <FormItem><FormLabel className="font-semibold">Last name</FormLabel><FormControl><Input {...field} className="h-10 rounded-xl" data-testid="input-last-name" /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
+              {(role === "brand" || role === "agency") && (
+                <FormField control={form.control} name="companyName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="font-semibold">
+                      {role === "agency" ? "Agency name" : "Company name"}{" "}
+                      <span className="font-normal text-muted-foreground">(opt.)</span>
+                    </FormLabel>
+                    <FormControl><Input {...field} className="h-10 rounded-xl" data-testid="input-company-name" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
               <FormField control={form.control} name="userName" render={({ field }) => (
                 <FormItem><FormLabel className="font-semibold">Username</FormLabel><FormControl><Input {...field} placeholder="@yourname" className="h-10 rounded-xl" data-testid="input-username" /></FormControl><FormMessage /></FormItem>
               )} />

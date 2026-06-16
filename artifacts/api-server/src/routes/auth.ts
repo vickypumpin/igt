@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, agenciesTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -26,10 +26,17 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   const passwordHash = await bcrypt.hash(password, 10);
   const [user] = await db.insert(usersTable).values({
     firstName, lastName, userName, email, passwordHash, phone: phone ?? null,
-    role: role === "creator" ? "creator" : "brand",
+    role: role === "creator" ? "creator" : role === "agency" ? "agency" : "brand",
     gender: gender ?? null, countryId: countryId ?? null, stateId: stateId ?? null,
     companyName: companyName ?? null, companySize: companySize ?? null, companyType: companyType ?? null,
   }).returning();
+  if (user.role === "agency") {
+    const agencyName = companyName ?? `${firstName} ${lastName} Agency`;
+    await db.insert(agenciesTable).values({
+      userId: user.id, name: agencyName, contactName: `${firstName} ${lastName}`,
+      contactEmail: email, billingMode: "commission", commissionRate: "5.00",
+    });
+  }
   const token = signToken(user.id);
   res.status(201).json({ token, user: formatUser(user as unknown as Record<string, unknown>) });
 });

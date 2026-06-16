@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, ilike, sql } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable } from "@workspace/db";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
 import type { IRouter } from "express";
@@ -132,7 +132,26 @@ router.get("/admin/payouts", requireAuth, requireRole("admin"), async (req, res)
 router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+
+  const [payout] = await db.select({ id: payoutsTable.id, creatorId: payoutsTable.creatorId, amount: payoutsTable.amount }).from(payoutsTable).where(eq(payoutsTable.id, id));
+  if (!payout) { res.status(404).json({ error: "Payout not found" }); return; }
+
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
+
+  const [creator] = await db.select({ billingMode: usersTable.billingMode, commissionRate: usersTable.commissionRate }).from(usersTable).where(eq(usersTable.id, payout.creatorId));
+  if (creator?.billingMode === "commission" && creator.commissionRate) {
+    const rate = parseFloat(String(creator.commissionRate));
+    const amount = parseFloat(String(payout.amount));
+    if (rate > 0 && amount > 0) {
+      const deductionAmount = (amount * rate) / 100;
+      await db.insert(commissionDeductionsTable).values({
+        userId: payout.creatorId,
+        deductionPercent: String(rate),
+        deductionAmount: String(deductionAmount.toFixed(2)),
+      });
+    }
+  }
+
   res.json({ message: "Approved" });
 });
 

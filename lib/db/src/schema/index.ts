@@ -1,4 +1,7 @@
 export * from "./users";
+export * from "./agencies";
+export * from "./agency_clients";
+export * from "./commission_deductions";
 export * from "./campaigns";
 export * from "./campaign_invites";
 export * from "./submissions";

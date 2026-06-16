@@ -16,11 +16,13 @@ import legalRouter from "./legal";
 import accountRouter from "./account";
 import adminMessagesRouter from "./admin_messages";
 import adminAccountsRouter from "./admin_accounts";
+import agencyRouter from "./agency";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(agencyRouter);
 router.use(creatorsRouter);
 router.use(campaignsRouter);
 router.use(invitesRouter);

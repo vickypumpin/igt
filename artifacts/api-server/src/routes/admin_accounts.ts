@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, pool, usersTable, settingsTable } from "@workspace/db";
+import { db, pool, usersTable, settingsTable, commissionDeductionsTable } from "@workspace/db";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
@@ -69,6 +69,67 @@ router.delete("/admin/accounts/:id", requireAuth, requireRole("admin"), async (r
   const id = parseInt(req.params.id as string, 10);
   await db.delete(usersTable).where(eq(usersTable.id, id));
   res.json({ message: "Deleted" });
+});
+
+router.get("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const [user] = await db.select({
+    id: usersTable.id, billingMode: usersTable.billingMode, billingAmount: usersTable.billingAmount,
+    commissionRate: usersTable.commissionRate, subscriptionStatus: usersTable.subscriptionStatus,
+  }).from(usersTable).where(eq(usersTable.id, id));
+  if (!user) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(user);
+});
+
+router.put("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const { billingMode, billingAmount, commissionRate, subscriptionStatus } = req.body;
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (billingMode !== undefined) updates.billingMode = billingMode;
+  if (billingAmount !== undefined) updates.billingAmount = String(billingAmount);
+  if (commissionRate !== undefined) updates.commissionRate = String(commissionRate);
+  if (subscriptionStatus !== undefined) updates.subscriptionStatus = subscriptionStatus;
+  await db.update(usersTable).set(updates).where(eq(usersTable.id, id));
+  res.json({ message: "Billing updated" });
+});
+
+router.get("/admin/payments/subscriptions", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
+  const users = await db.select({
+    id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName,
+    email: usersTable.email, role: usersTable.role, companyName: usersTable.companyName,
+    billingMode: usersTable.billingMode, billingAmount: usersTable.billingAmount,
+    subscriptionStatus: usersTable.subscriptionStatus, createdAt: usersTable.createdAt,
+  }).from(usersTable)
+    .where(eq(usersTable.billingMode, "subscription"))
+    .orderBy(usersTable.createdAt);
+  res.json(users.map(u => ({
+    ...u,
+    billingAmount: parseFloat(String(u.billingAmount ?? "0")),
+    createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+  })));
+});
+
+router.get("/admin/payments/commissions", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
+  const rows = await db.select({
+    id: commissionDeductionsTable.id,
+    campaignId: commissionDeductionsTable.campaignId,
+    userId: commissionDeductionsTable.userId,
+    agencyId: commissionDeductionsTable.agencyId,
+    deductionPercent: commissionDeductionsTable.deductionPercent,
+    deductionAmount: commissionDeductionsTable.deductionAmount,
+    createdAt: commissionDeductionsTable.createdAt,
+    firstName: usersTable.firstName,
+    lastName: usersTable.lastName,
+    email: usersTable.email,
+  }).from(commissionDeductionsTable)
+    .leftJoin(usersTable, eq(commissionDeductionsTable.userId, usersTable.id))
+    .orderBy(commissionDeductionsTable.createdAt);
+  res.json(rows.map(r => ({
+    ...r,
+    deductionPercent: parseFloat(String(r.deductionPercent ?? "0")),
+    deductionAmount: parseFloat(String(r.deductionAmount ?? "0")),
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+  })));
 });
 
 // ── Settings sub-sections ─────────────────────────────────────────────────────

@@ -58,6 +58,10 @@ import SettingsPage from "@/pages/shared/settings";
 import FaqPage from "@/pages/shared/faq";
 import TrendAiPage from "@/pages/shared/trend-ai";
 
+import AgencyDashboardPage from "@/pages/agency/dashboard";
+import AgencyClientsPage from "@/pages/agency/clients";
+import AgencyCampaignsPage from "@/pages/agency/campaigns";
+
 function AppRouter() {
   const { user, setAuth, isLoading: authLoading } = useAuth();
   const hasToken = !!getToken();
@@ -125,6 +129,7 @@ function AppRouter() {
           <Route path="/admin/accounts" component={AdminAccountsPage} />
           <Route path="/admin/accounts/brands" component={AdminAccountsPage} />
           <Route path="/admin/accounts/creators" component={AdminAccountsPage} />
+          <Route path="/admin/accounts/agencies" component={AdminAccountsPage} />
           <Route path="/admin/accounts/pending" component={AdminAccountsPage} />
           {/* Legacy users route */}
           <Route path="/admin/users" component={() => <Redirect to="/admin/accounts" />} />
@@ -236,6 +241,21 @@ function AppRouter() {
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />
 
+          <Route path="/settings/profile" component={SettingsPage} />
+          <Route component={NotFound} />
+        </>
+      )}
+
+      {/* ── Agency routes ── */}
+      {user && role === "agency" && (
+        <>
+          <Route path="/" component={AgencyDashboardPage} />
+          <Route path="/clients" component={AgencyClientsPage} />
+          <Route path="/campaigns" component={AgencyCampaignsPage} />
+          <Route path="/billing" component={AgencyDashboardPage} />
+          <Route path="/trend-ai" component={TrendAiPage} />
+          <Route path="/faq" component={FaqPage} />
+          <Route path="/account/edit" component={AgencyDashboardPage} />
           <Route path="/settings/profile" component={SettingsPage} />
           <Route component={NotFound} />
         </>

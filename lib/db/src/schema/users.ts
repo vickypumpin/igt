@@ -2,7 +2,7 @@ import { pgTable, serial, text, integer, boolean, numeric, timestamp, pgEnum } f
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const userRoleEnum = pgEnum("user_role", ["brand", "creator", "admin"]);
+export const userRoleEnum = pgEnum("user_role", ["brand", "creator", "admin", "agency"]);
 export const badgeTierEnum = pgEnum("badge_tier", ["nano", "micro", "mid_tier", "macro", "mega", "elite"]);
 export const genderEnum = pgEnum("gender", ["male", "female"]);
 
@@ -68,6 +68,12 @@ export const usersTable = pgTable("users", {
   youtubeFollowers: integer("youtube_followers"),
   tiktokFollowers: integer("tiktok_followers"),
   snapchatFollowers: integer("snapchat_followers"),
+  // Agency relationship + billing mode
+  agencyId: integer("agency_id"),
+  billingMode: text("billing_mode").default("commission"),
+  billingAmount: numeric("billing_amount", { precision: 12, scale: 2 }).default("0"),
+  commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
+  subscriptionStatus: text("subscription_status").default("active"),
   // Brand website
   websiteUrl: text("website_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
