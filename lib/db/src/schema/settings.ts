@@ -17,6 +17,18 @@ export const settingsTable = pgTable("settings", {
   instagramUrl: text("instagram_url"),
   youtubeUrl: text("youtube_url"),
   contactEmail: text("contact_email"),
+  flutterwavePublicKey: text("flutterwave_public_key"),
+  flutterwaveSecretKey: text("flutterwave_secret_key"),
+  flutterwaveEncryptionKey: text("flutterwave_encryption_key"),
+  flutterwaveLive: boolean("flutterwave_live").notNull().default(false),
+  twilioAccountSid: text("twilio_account_sid"),
+  twilioAuthToken: text("twilio_auth_token"),
+  twilioPhoneNumber: text("twilio_phone_number"),
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port"),
+  smtpUser: text("smtp_user"),
+  smtpPassword: text("smtp_password"),
+  smtpFromEmail: text("smtp_from_email"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

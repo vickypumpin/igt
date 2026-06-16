@@ -30,4 +30,25 @@ export interface PlatformSettings {
   youtubeUrl?: string | null;
   /** @nullable */
   contactEmail?: string | null;
+  /** @nullable */
+  flutterwavePublicKey?: string | null;
+  /** @nullable */
+  flutterwaveSecretKey?: string | null;
+  /** @nullable */
+  flutterwaveEncryptionKey?: string | null;
+  flutterwaveLive?: boolean;
+  /** @nullable */
+  twilioAccountSid?: string | null;
+  /** @nullable */
+  twilioAuthToken?: string | null;
+  /** @nullable */
+  twilioPhoneNumber?: string | null;
+  /** @nullable */
+  smtpHost?: string | null;
+  /** @nullable */
+  smtpPort?: number | null;
+  /** @nullable */
+  smtpUser?: string | null;
+  /** @nullable */
+  smtpFromEmail?: string | null;
 }

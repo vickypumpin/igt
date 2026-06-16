@@ -33,4 +33,28 @@ export interface SettingsUpdate {
   youtubeUrl?: string | null;
   /** @nullable */
   contactEmail?: string | null;
+  /** @nullable */
+  flutterwavePublicKey?: string | null;
+  /** @nullable */
+  flutterwaveSecretKey?: string | null;
+  /** @nullable */
+  flutterwaveEncryptionKey?: string | null;
+  /** @nullable */
+  flutterwaveLive?: boolean | null;
+  /** @nullable */
+  twilioAccountSid?: string | null;
+  /** @nullable */
+  twilioAuthToken?: string | null;
+  /** @nullable */
+  twilioPhoneNumber?: string | null;
+  /** @nullable */
+  smtpHost?: string | null;
+  /** @nullable */
+  smtpPort?: number | null;
+  /** @nullable */
+  smtpUser?: string | null;
+  /** @nullable */
+  smtpPassword?: string | null;
+  /** @nullable */
+  smtpFromEmail?: string | null;
 }

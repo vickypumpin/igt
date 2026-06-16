@@ -591,7 +591,14 @@ export interface InviteInput {
 
 export interface SubmissionInput {
   campaignId: number;
-  screenshotUrl: string;
+  /** @nullable */
+  screenshotUrl?: string | null;
+  /** @nullable */
+  fileData?: string | null;
+  /** @nullable */
+  fileName?: string | null;
+  /** @nullable */
+  fileType?: string | null;
   platform: string;
   /** @nullable */
   views?: number | null;
@@ -634,7 +641,14 @@ export interface Submission {
   id: number;
   campaignId: number;
   creatorId: number;
-  screenshotUrl?: string;
+  /** @nullable */
+  screenshotUrl?: string | null;
+  /** @nullable */
+  fileData?: string | null;
+  /** @nullable */
+  fileName?: string | null;
+  /** @nullable */
+  fileType?: string | null;
   /** @nullable */
   platform?: string | null;
   status: SubmissionStatus;
@@ -829,6 +843,27 @@ export interface PlatformSettings {
   youtubeUrl?: string | null;
   /** @nullable */
   contactEmail?: string | null;
+  /** @nullable */
+  flutterwavePublicKey?: string | null;
+  /** @nullable */
+  flutterwaveSecretKey?: string | null;
+  /** @nullable */
+  flutterwaveEncryptionKey?: string | null;
+  flutterwaveLive?: boolean;
+  /** @nullable */
+  twilioAccountSid?: string | null;
+  /** @nullable */
+  twilioAuthToken?: string | null;
+  /** @nullable */
+  twilioPhoneNumber?: string | null;
+  /** @nullable */
+  smtpHost?: string | null;
+  /** @nullable */
+  smtpPort?: number | null;
+  /** @nullable */
+  smtpUser?: string | null;
+  /** @nullable */
+  smtpFromEmail?: string | null;
 }
 
 export interface SettingsUpdate {
@@ -858,6 +893,30 @@ export interface SettingsUpdate {
   youtubeUrl?: string | null;
   /** @nullable */
   contactEmail?: string | null;
+  /** @nullable */
+  flutterwavePublicKey?: string | null;
+  /** @nullable */
+  flutterwaveSecretKey?: string | null;
+  /** @nullable */
+  flutterwaveEncryptionKey?: string | null;
+  /** @nullable */
+  flutterwaveLive?: boolean | null;
+  /** @nullable */
+  twilioAccountSid?: string | null;
+  /** @nullable */
+  twilioAuthToken?: string | null;
+  /** @nullable */
+  twilioPhoneNumber?: string | null;
+  /** @nullable */
+  smtpHost?: string | null;
+  /** @nullable */
+  smtpPort?: number | null;
+  /** @nullable */
+  smtpUser?: string | null;
+  /** @nullable */
+  smtpPassword?: string | null;
+  /** @nullable */
+  smtpFromEmail?: string | null;
 }
 
 export interface VerifyRequest {

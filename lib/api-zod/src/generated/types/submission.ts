@@ -13,7 +13,14 @@ export interface Submission {
   id: number;
   campaignId: number;
   creatorId: number;
-  screenshotUrl?: string;
+  /** @nullable */
+  screenshotUrl?: string | null;
+  /** @nullable */
+  fileData?: string | null;
+  /** @nullable */
+  fileName?: string | null;
+  /** @nullable */
+  fileType?: string | null;
   /** @nullable */
   platform?: string | null;
   status: SubmissionStatus;

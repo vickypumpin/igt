@@ -1387,10 +1387,13 @@ components:
     # ─── Submission ───────────────────────────────────────────────────────────
     SubmissionInput:
       type: object
-      required: [campaignId, screenshotUrl, platform]
+      required: [campaignId, platform]
       properties:
         campaignId: { type: integer }
-        screenshotUrl: { type: string }
+        screenshotUrl: { type: ["string", "null"] }
+        fileData: { type: ["string", "null"] }
+        fileName: { type: ["string", "null"] }
+        fileType: { type: ["string", "null"] }
         platform: { type: string }
         views: { type: ["integer", "null"] }
         likes: { type: ["integer", "null"] }
@@ -1413,7 +1416,10 @@ components:
         id: { type: integer }
         campaignId: { type: integer }
         creatorId: { type: integer }
-        screenshotUrl: { type: string }
+        screenshotUrl: { type: ["string", "null"] }
+        fileData: { type: ["string", "null"] }
+        fileName: { type: ["string", "null"] }
+        fileType: { type: ["string", "null"] }
         platform: { type: ["string", "null"] }
         status: { type: string, enum: [pending, approved, rejected] }
         views: { type: ["integer", "null"] }
@@ -1611,6 +1617,17 @@ components:
         instagramUrl: { type: ["string", "null"] }
         youtubeUrl: { type: ["string", "null"] }
         contactEmail: { type: ["string", "null"] }
+        flutterwavePublicKey: { type: ["string", "null"] }
+        flutterwaveSecretKey: { type: ["string", "null"] }
+        flutterwaveEncryptionKey: { type: ["string", "null"] }
+        flutterwaveLive: { type: boolean }
+        twilioAccountSid: { type: ["string", "null"] }
+        twilioAuthToken: { type: ["string", "null"] }
+        twilioPhoneNumber: { type: ["string", "null"] }
+        smtpHost: { type: ["string", "null"] }
+        smtpPort: { type: ["integer", "null"] }
+        smtpUser: { type: ["string", "null"] }
+        smtpFromEmail: { type: ["string", "null"] }
 
     SettingsUpdate:
       type: object
@@ -1628,6 +1645,18 @@ components:
         instagramUrl: { type: ["string", "null"] }
         youtubeUrl: { type: ["string", "null"] }
         contactEmail: { type: ["string", "null"] }
+        flutterwavePublicKey: { type: ["string", "null"] }
+        flutterwaveSecretKey: { type: ["string", "null"] }
+        flutterwaveEncryptionKey: { type: ["string", "null"] }
+        flutterwaveLive: { type: ["boolean", "null"] }
+        twilioAccountSid: { type: ["string", "null"] }
+        twilioAuthToken: { type: ["string", "null"] }
+        twilioPhoneNumber: { type: ["string", "null"] }
+        smtpHost: { type: ["string", "null"] }
+        smtpPort: { type: ["integer", "null"] }
+        smtpUser: { type: ["string", "null"] }
+        smtpPassword: { type: ["string", "null"] }
+        smtpFromEmail: { type: ["string", "null"] }
 
     VerifyRequest:
       type: object

@@ -677,7 +677,10 @@ export const GetCampaignSubmissionsResponseItem = zod.object({
   "id": zod.number(),
   "campaignId": zod.number(),
   "creatorId": zod.number(),
-  "screenshotUrl": zod.string().optional(),
+  "screenshotUrl": zod.string().nullish(),
+  "fileData": zod.string().nullish(),
+  "fileName": zod.string().nullish(),
+  "fileType": zod.string().nullish(),
   "platform": zod.string().nullish(),
   "status": zod.enum(['pending', 'approved', 'rejected']),
   "views": zod.number().nullish(),
@@ -838,7 +841,10 @@ export const DeclineInviteParams = zod.object({
  */
 export const CreateSubmissionBody = zod.object({
   "campaignId": zod.number(),
-  "screenshotUrl": zod.string(),
+  "screenshotUrl": zod.string().nullish(),
+  "fileData": zod.string().nullish(),
+  "fileName": zod.string().nullish(),
+  "fileType": zod.string().nullish(),
   "platform": zod.string(),
   "views": zod.number().nullish(),
   "likes": zod.number().nullish(),
@@ -865,7 +871,10 @@ export const ReviewSubmissionResponse = zod.object({
   "id": zod.number(),
   "campaignId": zod.number(),
   "creatorId": zod.number(),
-  "screenshotUrl": zod.string().optional(),
+  "screenshotUrl": zod.string().nullish(),
+  "fileData": zod.string().nullish(),
+  "fileName": zod.string().nullish(),
+  "fileType": zod.string().nullish(),
   "platform": zod.string().nullish(),
   "status": zod.enum(['pending', 'approved', 'rejected']),
   "views": zod.number().nullish(),
@@ -1431,7 +1440,10 @@ export const AdminListSubmissionsResponseItem = zod.object({
   "id": zod.number(),
   "campaignId": zod.number(),
   "creatorId": zod.number(),
-  "screenshotUrl": zod.string().optional(),
+  "screenshotUrl": zod.string().nullish(),
+  "fileData": zod.string().nullish(),
+  "fileName": zod.string().nullish(),
+  "fileType": zod.string().nullish(),
   "platform": zod.string().nullish(),
   "status": zod.enum(['pending', 'approved', 'rejected']),
   "views": zod.number().nullish(),
@@ -1556,7 +1568,18 @@ export const GetSettingsResponse = zod.object({
   "facebookUrl": zod.string().nullish(),
   "instagramUrl": zod.string().nullish(),
   "youtubeUrl": zod.string().nullish(),
-  "contactEmail": zod.string().nullish()
+  "contactEmail": zod.string().nullish(),
+  "flutterwavePublicKey": zod.string().nullish(),
+  "flutterwaveSecretKey": zod.string().nullish(),
+  "flutterwaveEncryptionKey": zod.string().nullish(),
+  "flutterwaveLive": zod.boolean().optional(),
+  "twilioAccountSid": zod.string().nullish(),
+  "twilioAuthToken": zod.string().nullish(),
+  "twilioPhoneNumber": zod.string().nullish(),
+  "smtpHost": zod.string().nullish(),
+  "smtpPort": zod.number().nullish(),
+  "smtpUser": zod.string().nullish(),
+  "smtpFromEmail": zod.string().nullish()
 })
 
 
@@ -1576,7 +1599,19 @@ export const UpdateSettingsBody = zod.object({
   "facebookUrl": zod.string().nullish(),
   "instagramUrl": zod.string().nullish(),
   "youtubeUrl": zod.string().nullish(),
-  "contactEmail": zod.string().nullish()
+  "contactEmail": zod.string().nullish(),
+  "flutterwavePublicKey": zod.string().nullish(),
+  "flutterwaveSecretKey": zod.string().nullish(),
+  "flutterwaveEncryptionKey": zod.string().nullish(),
+  "flutterwaveLive": zod.boolean().nullish(),
+  "twilioAccountSid": zod.string().nullish(),
+  "twilioAuthToken": zod.string().nullish(),
+  "twilioPhoneNumber": zod.string().nullish(),
+  "smtpHost": zod.string().nullish(),
+  "smtpPort": zod.number().nullish(),
+  "smtpUser": zod.string().nullish(),
+  "smtpPassword": zod.string().nullish(),
+  "smtpFromEmail": zod.string().nullish()
 })
 
 export const UpdateSettingsResponse = zod.object({
@@ -1592,7 +1627,18 @@ export const UpdateSettingsResponse = zod.object({
   "facebookUrl": zod.string().nullish(),
   "instagramUrl": zod.string().nullish(),
   "youtubeUrl": zod.string().nullish(),
-  "contactEmail": zod.string().nullish()
+  "contactEmail": zod.string().nullish(),
+  "flutterwavePublicKey": zod.string().nullish(),
+  "flutterwaveSecretKey": zod.string().nullish(),
+  "flutterwaveEncryptionKey": zod.string().nullish(),
+  "flutterwaveLive": zod.boolean().optional(),
+  "twilioAccountSid": zod.string().nullish(),
+  "twilioAuthToken": zod.string().nullish(),
+  "twilioPhoneNumber": zod.string().nullish(),
+  "smtpHost": zod.string().nullish(),
+  "smtpPort": zod.number().nullish(),
+  "smtpUser": zod.string().nullish(),
+  "smtpFromEmail": zod.string().nullish()
 })
 
 

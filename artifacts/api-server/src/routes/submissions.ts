@@ -7,15 +7,22 @@ import type { IRouter } from "express";
 const router: IRouter = Router();
 
 router.post("/submissions", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
-  const { campaignId, screenshotUrl, platform, views, likes, caption } = req.body;
-  if (!campaignId || !screenshotUrl) { res.status(400).json({ error: "Missing required fields" }); return; }
+  const { campaignId, screenshotUrl, fileData, fileName, fileType, platform, views, likes, caption } = req.body;
+  if (!campaignId) { res.status(400).json({ error: "Missing campaignId" }); return; }
+  if (!screenshotUrl && !fileData) { res.status(400).json({ error: "Provide either a URL or upload a file" }); return; }
   const [sub] = await db.insert(submissionsTable).values({
-    campaignId, creatorId: req.userId!, screenshotUrl,
-    platform: platform ?? null, views: views ?? null, likes: likes ?? null, caption: caption ?? null,
+    campaignId, creatorId: req.userId!,
+    screenshotUrl: screenshotUrl ?? "",
+    fileData: fileData ?? null,
+    fileName: fileName ?? null,
+    fileType: fileType ?? null,
+    platform: platform ?? null,
+    views: views ?? null, likes: likes ?? null, caption: caption ?? null,
   }).returning();
   res.status(201).json({
     id: sub.id, campaignId: sub.campaignId, creatorId: sub.creatorId,
-    screenshotUrl: sub.screenshotUrl, platform: sub.platform, status: sub.status,
+    screenshotUrl: sub.screenshotUrl, fileData: null, fileName: sub.fileName,
+    fileType: sub.fileType, platform: sub.platform, status: sub.status,
     views: sub.views, likes: sub.likes, rating: sub.rating,
     createdAt: sub.createdAt instanceof Date ? sub.createdAt.toISOString() : String(sub.createdAt),
   });

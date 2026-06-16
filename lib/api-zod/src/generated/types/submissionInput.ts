@@ -8,7 +8,14 @@
 
 export interface SubmissionInput {
   campaignId: number;
-  screenshotUrl: string;
+  /** @nullable */
+  screenshotUrl?: string | null;
+  /** @nullable */
+  fileData?: string | null;
+  /** @nullable */
+  fileName?: string | null;
+  /** @nullable */
+  fileType?: string | null;
   platform: string;
   /** @nullable */
   views?: number | null;

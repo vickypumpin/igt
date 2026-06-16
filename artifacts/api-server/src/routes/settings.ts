@@ -17,8 +17,13 @@ router.get("/settings", requireAuth, requireRole("admin"), async (req, res): Pro
 });
 
 router.patch("/settings", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const fields = ["siteName","siteDescription","gemPrice","gemServiceFee","creatorServiceFee","brandServiceFee",
-    "registrationStatus","loginStatus","smsNotify","facebookUrl","instagramUrl","youtubeUrl","contactEmail"];
+  const fields = [
+    "siteName","siteDescription","gemPrice","gemServiceFee","creatorServiceFee","brandServiceFee",
+    "registrationStatus","loginStatus","smsNotify","facebookUrl","instagramUrl","youtubeUrl","contactEmail",
+    "flutterwavePublicKey","flutterwaveSecretKey","flutterwaveEncryptionKey","flutterwaveLive",
+    "twilioAccountSid","twilioAuthToken","twilioPhoneNumber",
+    "smtpHost","smtpPort","smtpUser","smtpPassword","smtpFromEmail",
+  ];
   const updates: Record<string, unknown> = {};
   for (const f of fields) {
     if (req.body[f] != null) updates[f] = req.body[f];
