@@ -123,7 +123,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
                 <Link href="/billing"><span className="cursor-pointer w-full">Billing</span></Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/earnings"><span className="cursor-pointer w-full">Payments</span></Link>
+                <Link href="/payments"><span className="cursor-pointer w-full">Payments</span></Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
                 <LogOut className="h-4 w-4 mr-2" /> Logout

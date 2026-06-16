@@ -36,7 +36,7 @@ router.post("/bank-accounts", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.patch("/bank-accounts/:id/set-default", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [account] = await db.select().from(bankAccountsTable).where(
     and(eq(bankAccountsTable.id, id), eq(bankAccountsTable.userId, req.userId!))
   );
@@ -47,7 +47,7 @@ router.patch("/bank-accounts/:id/set-default", requireAuth, async (req, res): Pr
 });
 
 router.delete("/bank-accounts/:id", requireAuth, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await db.delete(bankAccountsTable).where(
     and(eq(bankAccountsTable.id, id), eq(bankAccountsTable.userId, req.userId!))
   );

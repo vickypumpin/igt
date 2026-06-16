@@ -33,7 +33,7 @@ router.post("/admin/faqs", requireAuth, requireRole("admin"), async (req, res): 
 });
 
 router.patch("/admin/faqs/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const { question, answer, category, isActive, sortOrder } = req.body;
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (question != null) updates.question = question;
@@ -47,7 +47,7 @@ router.patch("/admin/faqs/:id", requireAuth, requireRole("admin"), async (req, r
 });
 
 router.delete("/admin/faqs/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await db.delete(faqsTable).where(eq(faqsTable.id, id));
   res.json({ message: "Deleted" });
 });

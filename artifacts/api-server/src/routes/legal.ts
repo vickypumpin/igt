@@ -12,7 +12,8 @@ const pageShape = (p: typeof legalPagesTable.$inferSelect) => ({
 });
 
 router.get("/legal/:slug", async (req, res): Promise<void> => {
-  const [page] = await db.select().from(legalPagesTable).where(eq(legalPagesTable.slug, req.params.slug));
+  const slug = String(req.params.slug);
+  const [page] = await db.select().from(legalPagesTable).where(eq(legalPagesTable.slug, slug));
   if (!page) { res.status(404).json({ error: "Page not found" }); return; }
   res.json(pageShape(page));
 });
@@ -33,7 +34,7 @@ router.post("/admin/legal", requireAuth, requireRole("admin"), async (req, res):
 });
 
 router.put("/admin/legal/:slug", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
-  const { slug } = req.params;
+  const slug = String(req.params.slug);
   const { title, content } = req.body;
   if (!title || content == null) { res.status(400).json({ error: "title and content required" }); return; }
   const [existing] = await db.select({ id: legalPagesTable.id }).from(legalPagesTable).where(eq(legalPagesTable.slug, slug));

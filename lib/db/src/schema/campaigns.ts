@@ -24,6 +24,7 @@ export const campaignsTable = pgTable("campaigns", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   noOfCreators: integer("no_of_creators").notNull().default(1),
+  gemsPerCreator: integer("gems_per_creator").notNull().default(0),
   noOfDay: integer("no_of_day"),
   noOfWeek: integer("no_of_week"),
   brandDescription: text("brand_description"),

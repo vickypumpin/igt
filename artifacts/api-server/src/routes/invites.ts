@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, campaignInvitesTable, campaignsTable, usersTable } from "@workspace/db";
+import { eq, and, sql } from "drizzle-orm";
+import { db, campaignInvitesTable, campaignsTable, usersTable, gemsTransactionsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -48,11 +48,61 @@ router.get("/invites", requireAuth, requireRole("creator"), async (req, res): Pr
 });
 
 router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-  await db.update(campaignInvitesTable).set({ status: "active", updatedAt: new Date() })
-    .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)));
-  res.json({ message: "Accepted" });
+  const id = parseInt(String(req.params.id), 10);
+
+  // Load invite + campaign together to get gems cost
+  const [inv] = await db.select({
+    inviteId: campaignInvitesTable.id,
+    status: campaignInvitesTable.status,
+    campaignId: campaignInvitesTable.campaignId,
+    brandId: campaignsTable.brandId,
+    campaignName: campaignsTable.name,
+    gemsPerCreator: campaignsTable.gemsPerCreator,
+  }).from(campaignInvitesTable)
+    .leftJoin(campaignsTable, eq(campaignInvitesTable.campaignId, campaignsTable.id))
+    .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)))
+    .limit(1);
+
+  if (!inv) { res.status(404).json({ error: "Invite not found" }); return; }
+  if (inv.status !== "pending") { res.status(409).json({ error: "Invite already responded to" }); return; }
+
+  const gemsRequired = inv.gemsPerCreator ?? 0;
+  const brandId = inv.brandId!;
+
+  try {
+    await db.transaction(async (tx) => {
+      if (gemsRequired > 0) {
+        // Guard: brand must have sufficient gems
+        const [brand] = await tx.select({ gems: usersTable.gems })
+          .from(usersTable).where(eq(usersTable.id, brandId)).limit(1);
+        if (!brand || brand.gems < gemsRequired) {
+          throw Object.assign(new Error("INSUFFICIENT_GEMS"), { code: "INSUFFICIENT_GEMS" });
+        }
+        // Atomically debit brand gems
+        await tx.update(usersTable)
+          .set({ gems: sql`gems - ${gemsRequired}` })
+          .where(eq(usersTable.id, brandId));
+        // Record gems transaction for brand
+        await tx.insert(gemsTransactionsTable).values({
+          userId: brandId,
+          gemsDelta: -gemsRequired,
+          type: "reward",
+          description: `Gems held for invite – Campaign: ${inv.campaignName ?? inv.campaignId}`,
+        });
+      }
+      // Accept the invite
+      await tx.update(campaignInvitesTable)
+        .set({ status: "active", updatedAt: new Date() })
+        .where(eq(campaignInvitesTable.id, id));
+    });
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "INSUFFICIENT_GEMS") {
+      res.status(402).json({ error: "Brand has insufficient gems to accept this invite" }); return;
+    }
+    throw err;
+  }
+
+  res.json({ message: "Accepted", gemsDebited: gemsRequired });
 });
 
 router.post("/invites/:id/decline", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
