@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { db, pool, usersTable, settingsTable, commissionDeductionsTable } from "@workspace/db";
+import { db, pool, usersTable, agenciesTable, settingsTable, commissionDeductionsTable } from "@workspace/db";
+import { resolveBilling } from "../lib/billing";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
@@ -80,21 +81,66 @@ router.delete("/admin/accounts/:id", requireAuth, requireRole("admin"), async (r
 router.get("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   const [user] = await db.select({
-    id: usersTable.id, billingMode: usersTable.billingMode, billingAmount: usersTable.billingAmount,
+    id: usersTable.id, role: usersTable.role,
+    billingMode: usersTable.billingMode, billingAmount: usersTable.billingAmount,
     commissionRate: usersTable.commissionRate, subscriptionStatus: usersTable.subscriptionStatus,
     billingNotes: usersTable.billingNotes, agencyId: usersTable.agencyId,
   }).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
+
+  // For agency accounts read billing from agenciesTable (source of truth for inherited billing)
+  if (user.role === "agency") {
+    const [agency] = await db.select({
+      billingMode: agenciesTable.billingMode, commissionRate: agenciesTable.commissionRate,
+    }).from(agenciesTable).where(eq(agenciesTable.userId, id));
+    return res.json({
+      id: user.id, role: user.role, billingNotes: user.billingNotes,
+      billingMode: agency?.billingMode ?? user.billingMode,
+      commissionRate: parseFloat(String(agency?.commissionRate ?? user.commissionRate ?? "0")),
+      billingAmount: user.billingAmount != null ? parseFloat(String(user.billingAmount)) : null,
+      subscriptionStatus: user.subscriptionStatus,
+      inherited: false,
+    }) as unknown as void;
+  }
+
+  // For brand sub-accounts resolve effective billing (may inherit from parent agency)
+  const effective = await resolveBilling(id);
   res.json({
-    ...user,
-    commissionRate: user.commissionRate != null ? parseFloat(String(user.commissionRate)) : null,
+    id: user.id, role: user.role,
+    billingMode: effective?.billingMode ?? user.billingMode,
+    commissionRate: effective?.commissionRate ?? (user.commissionRate != null ? parseFloat(String(user.commissionRate)) : null),
     billingAmount: user.billingAmount != null ? parseFloat(String(user.billingAmount)) : null,
+    subscriptionStatus: user.subscriptionStatus,
+    billingNotes: user.billingNotes,
+    inherited: effective?.source === "agency",
+    agencyId: effective?.agencyId ?? null,
   });
 });
 
 router.put("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   const { billingMode, billingAmount, commissionRate, subscriptionStatus, billingNotes } = req.body;
+
+  const [user] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id));
+  if (!user) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Agency accounts: write commission/billingMode to agenciesTable (that's what resolveBilling reads)
+  if (user.role === "agency") {
+    const agencyUpdates: Record<string, unknown> = {};
+    if (billingMode !== undefined) agencyUpdates.billingMode = billingMode;
+    if (commissionRate !== undefined) agencyUpdates.commissionRate = String(commissionRate);
+    if (Object.keys(agencyUpdates).length) {
+      await db.update(agenciesTable).set(agencyUpdates).where(eq(agenciesTable.userId, id));
+    }
+    // billingNotes/subscriptionStatus still stored on user row
+    const userUpdates: Record<string, unknown> = { updatedAt: new Date() };
+    if (billingNotes !== undefined) userUpdates.billingNotes = billingNotes;
+    if (subscriptionStatus !== undefined) userUpdates.subscriptionStatus = subscriptionStatus;
+    await db.update(usersTable).set(userUpdates).where(eq(usersTable.id, id));
+    return res.json({ message: "Agency billing updated" }) as unknown as void;
+  }
+
+  // Brand/creator accounts: write to usersTable (explicit admin override, breaks agency inheritance)
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (billingMode !== undefined) updates.billingMode = billingMode;
   if (billingAmount !== undefined) updates.billingAmount = String(billingAmount);

@@ -19,6 +19,7 @@ export const rewardsTable = pgTable("rewards", {
 export const payoutsTable = pgTable("payouts", {
   id: serial("id").primaryKey(),
   creatorId: integer("creator_id").notNull().references(() => usersTable.id),
+  campaignId: integer("campaign_id"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"),
   bankCode: text("bank_code"),

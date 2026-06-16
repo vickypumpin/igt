@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { db, usersTable, agenciesTable } from "@workspace/db";
+import { db, usersTable, agenciesTable, settingsTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -24,17 +24,28 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     return;
   }
   const passwordHash = await bcrypt.hash(password, 10);
+  // Load platform defaults for new account billing
+  let [platformSettings] = await db.select({
+    defaultBillingMode: settingsTable.defaultBillingMode,
+    defaultCommissionRate: settingsTable.defaultCommissionRate,
+  }).from(settingsTable).limit(1);
+  const defaultBillingMode = platformSettings?.defaultBillingMode ?? "commission";
+  const defaultCommissionRate = platformSettings?.defaultCommissionRate ?? "5.00";
+
+  const normalizedRole = role === "creator" ? "creator" : role === "agency" ? "agency" : "brand";
   const [user] = await db.insert(usersTable).values({
     firstName, lastName, userName, email, passwordHash, phone: phone ?? null,
-    role: role === "creator" ? "creator" : role === "agency" ? "agency" : "brand",
+    role: normalizedRole,
     gender: gender ?? null, countryId: countryId ?? null, stateId: stateId ?? null,
     companyName: companyName ?? null, companySize: companySize ?? null, companyType: companyType ?? null,
+    billingMode: normalizedRole === "brand" ? defaultBillingMode : null,
+    commissionRate: normalizedRole === "brand" ? defaultCommissionRate : null,
   }).returning();
   if (user.role === "agency") {
     const agencyName = companyName ?? `${firstName} ${lastName} Agency`;
     await db.insert(agenciesTable).values({
       userId: user.id, name: agencyName, contactName: `${firstName} ${lastName}`,
-      contactEmail: email, billingMode: "commission", commissionRate: "5.00",
+      contactEmail: email, billingMode: defaultBillingMode, commissionRate: defaultCommissionRate,
     });
   }
   const token = signToken(user.id);
