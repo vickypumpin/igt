@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
@@ -167,6 +167,17 @@ router.post("/rewards", requireAuth, requireRole("brand"), async (req, res): Pro
     });
   }
   res.json({ paymentUrl, txRef });
+});
+
+router.get("/payouts", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+  const payouts = await db.select().from(payoutsTable)
+    .where(eq(payoutsTable.creatorId, req.userId!))
+    .orderBy(sql`created_at desc`);
+  res.json(payouts.map(p => ({
+    id: p.id, amount: p.amount, status: p.status,
+    bankCode: p.bankCode ?? null, accountNumber: p.accountNumber ?? null,
+    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
+  })));
 });
 
 router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import type { IRouter } from "express";
@@ -257,23 +257,39 @@ router.post("/billing/verify", requireAuth, async (req, res): Promise<void> => {
         return;
       }
 
-      // Final race-condition guard: re-check pending status before updating
-      const [recheck] = await db.select({ type: gemsTransactionsTable.type })
-        .from(gemsTransactionsTable)
-        .where(and(eq(gemsTransactionsTable.reference, txRef as string), eq(gemsTransactionsTable.userId, req.userId!)))
-        .limit(1);
-      if (!recheck || recheck.type !== "pending") {
-        res.status(409).json({ error: "Transaction already processed", alreadyProcessed: true }); return;
+      // Atomic credit inside a DB transaction — conditional UPDATE guards against concurrent verify
+      let gemsAdded = 0;
+      try {
+        await db.transaction(async (tx) => {
+          // Atomically mark as 'purchase' ONLY if still 'pending' — returns 0 rows if already processed
+          const updated = await tx.update(gemsTransactionsTable)
+            .set({ type: "purchase", description: `Purchased ${expectedGems} gems` })
+            .where(and(
+              eq(gemsTransactionsTable.id, pendingRecord.id),
+              eq(gemsTransactionsTable.type, "pending"),
+            ))
+            .returning({ id: gemsTransactionsTable.id });
+
+          if (!updated.length) {
+            // Another concurrent request already processed this txRef
+            throw Object.assign(new Error("ALREADY_PROCESSED"), { code: "ALREADY_PROCESSED" });
+          }
+
+          // Atomically credit gems (sql template avoids read-modify-write race)
+          await tx.update(usersTable)
+            .set({ gems: sql`gems + ${expectedGems}` })
+            .where(eq(usersTable.id, req.userId!));
+
+          gemsAdded = expectedGems;
+        });
+      } catch (txErr: unknown) {
+        if ((txErr as { code?: string }).code === "ALREADY_PROCESSED") {
+          res.status(409).json({ error: "Transaction already processed", alreadyProcessed: true }); return;
+        }
+        throw txErr;
       }
 
-      // Credit gems and mark transaction as complete — using server-stored gem value
-      const [u] = await db.select({ gems: usersTable.gems }).from(usersTable).where(eq(usersTable.id, req.userId!));
-      await db.update(usersTable).set({ gems: (u?.gems ?? 0) + expectedGems }).where(eq(usersTable.id, req.userId!));
-      await db.update(gemsTransactionsTable)
-        .set({ type: "purchase", description: `Purchased ${expectedGems} gems` })
-        .where(eq(gemsTransactionsTable.id, pendingRecord.id));
-
-      res.json({ success: true, gemsAdded: expectedGems });
+      res.json({ success: true, gemsAdded });
     } else {
       res.status(400).json({ error: "Payment not successful" });
     }

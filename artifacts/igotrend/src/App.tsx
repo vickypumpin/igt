@@ -31,6 +31,7 @@ import PaymentsPage from "@/pages/brand/payments";
 import BrandBillingPage from "@/pages/brand/billing";
 import BrandAccountEditPage from "@/pages/brand/account-edit";
 import BrandRewardsPage from "@/pages/brand/rewards";
+import CreatorPaymentsPage from "@/pages/creator/payments";
 
 import CreatorDashboardPage from "@/pages/creator/dashboard";
 import InvitesPage from "@/pages/creator/invites";
@@ -201,7 +202,7 @@ function AppRouter() {
           <Route path="/messages" component={BrandMessagesPage} />
 
           <Route path="/billing" component={CreatorBillingPage} />
-          <Route path="/payments" component={EarningsPage} />
+          <Route path="/payments" component={CreatorPaymentsPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />
 
