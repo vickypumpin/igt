@@ -158,7 +158,8 @@ router.get("/billing/balance", requireAuth, async (req, res): Promise<void> => {
 // ── Billing Purchase — uses server-authoritative package catalog ───────────────
 
 router.post("/billing/purchase", requireAuth, async (req, res): Promise<void> => {
-  const { packageId, currency = "NGN" } = req.body;
+  const { packageId } = req.body;
+  const currency = "NGN"; // Server-enforced — client currency input is ignored
 
   // Validate against server-side package catalog
   const pkg = packageId ? GEMS_PACKAGES[packageId as string] : null;
@@ -250,6 +251,13 @@ router.post("/billing/verify", requireAuth, async (req, res): Promise<void> => {
 
     if (data.status === "success" && data.data?.status === "successful") {
       const fwAmount = data.data.charged_amount ?? data.data.amount ?? 0;
+      const fwCurrency = data.data.currency ?? "";
+
+      // Validate currency — must be NGN; any other currency indicates underpayment abuse
+      if (fwCurrency !== "NGN") {
+        res.status(400).json({ error: `Payment currency mismatch: expected NGN, received ${fwCurrency}` });
+        return;
+      }
 
       // Verify the paid amount matches what was promised (allow small tolerance for FW fees)
       if (fwAmount < expectedAmount * 0.99) {

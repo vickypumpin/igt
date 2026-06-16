@@ -72,16 +72,14 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
   try {
     await db.transaction(async (tx) => {
       if (gemsRequired > 0) {
-        // Guard: brand must have sufficient gems
-        const [brand] = await tx.select({ gems: usersTable.gems })
-          .from(usersTable).where(eq(usersTable.id, brandId)).limit(1);
-        if (!brand || brand.gems < gemsRequired) {
+        // Atomic conditional debit: only updates when gems >= required, returns 0 rows if insufficient
+        const debited = await tx.update(usersTable)
+          .set({ gems: sql`gems - ${gemsRequired}` })
+          .where(and(eq(usersTable.id, brandId), sql`gems >= ${gemsRequired}`))
+          .returning({ id: usersTable.id });
+        if (!debited.length) {
           throw Object.assign(new Error("INSUFFICIENT_GEMS"), { code: "INSUFFICIENT_GEMS" });
         }
-        // Atomically debit brand gems
-        await tx.update(usersTable)
-          .set({ gems: sql`gems - ${gemsRequired}` })
-          .where(eq(usersTable.id, brandId));
         // Record gems transaction for brand
         await tx.insert(gemsTransactionsTable).values({
           userId: brandId,
