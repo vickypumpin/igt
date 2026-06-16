@@ -29,6 +29,7 @@ import CreatorProfilePage from "@/pages/brand/creator-profile";
 import BrandMessagesPage from "@/pages/brand/messages";
 import PaymentsPage from "@/pages/brand/payments";
 import BrandBillingPage from "@/pages/brand/billing";
+import BrandAccountEditPage from "@/pages/brand/account-edit";
 
 import CreatorDashboardPage from "@/pages/creator/dashboard";
 import InvitesPage from "@/pages/creator/invites";
@@ -36,9 +37,11 @@ import SubmitPage from "@/pages/creator/submit";
 import EarningsPage from "@/pages/creator/earnings";
 import CreatorBillingPage from "@/pages/creator/billing";
 import CreatorCampaignsPage from "@/pages/creator/campaigns";
+import CreatorAccountEditPage from "@/pages/creator/account-edit";
 
 import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminUsersPage from "@/pages/admin/users";
+import AdminAccountsPage from "@/pages/admin/accounts";
 import AdminCampaignsPage from "@/pages/admin/campaigns";
 import AdminSubmissionsPage from "@/pages/admin/submissions";
 import VerifyRequestsPage from "@/pages/admin/verify-requests";
@@ -47,16 +50,11 @@ import AdminSettingsPage from "@/pages/admin/settings";
 import AdminFaqsPage from "@/pages/admin/faqs";
 import AdminLegalPage from "@/pages/admin/legal";
 import AdminMessagingPage from "@/pages/admin/messaging";
+import AdminRolesPage from "@/pages/admin/roles";
 
 import SettingsPage from "@/pages/shared/settings";
 import FaqPage from "@/pages/shared/faq";
 import TrendAiPage from "@/pages/shared/trend-ai";
-import ComingSoonPage from "@/pages/shared/coming-soon";
-
-const AdminSettingsFeesPage    = () => <AdminSettingsPage />;
-const AdminSettingsGatewayPage = () => <AdminSettingsPage />;
-const AdminSettingsSmtpPage    = () => <AdminSettingsPage />;
-const AdminSettingsRolesPage   = () => <ComingSoonPage title="Roles & Permissions" description="Fine-grained role management is coming soon." />;
 
 function AppRouter() {
   const { user, setAuth, isLoading: authLoading } = useAuth();
@@ -122,23 +120,27 @@ function AppRouter() {
           <Route path="/admin" component={AdminDashboardPage} />
 
           {/* Account Mgt sub-pages */}
-          <Route path="/admin/users" component={AdminUsersPage} />
-          <Route path="/admin/users/brands" component={() => <AdminUsersPage />} />
-          <Route path="/admin/users/creators" component={() => <AdminUsersPage />} />
-          <Route path="/admin/users/pending" component={() => <AdminUsersPage />} />
+          <Route path="/admin/accounts" component={AdminAccountsPage} />
+          <Route path="/admin/accounts/brands" component={AdminAccountsPage} />
+          <Route path="/admin/accounts/creators" component={AdminAccountsPage} />
+          <Route path="/admin/accounts/pending" component={AdminAccountsPage} />
+          {/* Legacy users route */}
+          <Route path="/admin/users" component={() => <Redirect to="/admin/accounts" />} />
 
           {/* Campaign Mgt sub-pages */}
           <Route path="/admin/campaigns" component={AdminCampaignsPage} />
-          <Route path="/admin/campaigns/active" component={() => <AdminCampaignsPage />} />
-          <Route path="/admin/campaigns/pending" component={() => <AdminCampaignsPage />} />
+          <Route path="/admin/campaigns/active" component={AdminCampaignsPage} />
+          <Route path="/admin/campaigns/pending" component={AdminCampaignsPage} />
+          <Route path="/admin/campaigns/completed" component={AdminCampaignsPage} />
+          <Route path="/admin/campaigns/declined" component={AdminCampaignsPage} />
 
           {/* Payments */}
           <Route path="/admin/payouts" component={AdminPayoutsPage} />
 
           {/* Approval Request sub-pages */}
           <Route path="/admin/verify-requests" component={VerifyRequestsPage} />
-          <Route path="/admin/verify-requests/approved" component={() => <VerifyRequestsPage />} />
-          <Route path="/admin/verify-requests/declined" component={() => <VerifyRequestsPage />} />
+          <Route path="/admin/verify-requests/approved" component={VerifyRequestsPage} />
+          <Route path="/admin/verify-requests/declined" component={VerifyRequestsPage} />
 
           {/* Submissions */}
           <Route path="/admin/submissions" component={AdminSubmissionsPage} />
@@ -149,16 +151,19 @@ function AppRouter() {
 
           {/* Settings sub-pages */}
           <Route path="/admin/settings" component={AdminSettingsPage} />
-          <Route path="/admin/settings/fees" component={AdminSettingsFeesPage} />
-          <Route path="/admin/settings/gateway" component={AdminSettingsGatewayPage} />
-          <Route path="/admin/settings/smtp" component={AdminSettingsSmtpPage} />
-          <Route path="/admin/settings/roles" component={AdminSettingsRolesPage} />
+          <Route path="/admin/settings/general" component={AdminSettingsPage} />
+          <Route path="/admin/settings/fees" component={AdminSettingsPage} />
+          <Route path="/admin/settings/gateway" component={AdminSettingsPage} />
+          <Route path="/admin/settings/smtp" component={AdminSettingsPage} />
+
+          {/* Roles & Permissions */}
+          <Route path="/admin/roles" component={AdminRolesPage} />
 
           {/* FAQs & Legal */}
           <Route path="/admin/faqs" component={AdminFaqsPage} />
           <Route path="/admin/legal" component={AdminLegalPage} />
 
-          {/* Account */}
+          {/* Account / Profile */}
           <Route path="/admin/account" component={() => <Redirect to="/settings/profile" />} />
           <Route path="/settings/profile" component={SettingsPage} />
           <Route component={NotFound} />
@@ -170,16 +175,22 @@ function AppRouter() {
         <>
           <Route path="/" component={CreatorDashboardPage} />
 
-          {/* Campaign Mgt sub-pages */}
+          {/* Account Edit */}
+          <Route path="/account/edit" component={CreatorAccountEditPage} />
+
+          {/* Campaign Management — URL-driven filter tabs */}
           <Route path="/campaigns" component={CreatorCampaignsPage} />
-          <Route path="/campaigns/accepted" component={() => <CreatorCampaignsPage />} />
-          <Route path="/campaigns/completed" component={() => <CreatorCampaignsPage />} />
-          <Route path="/campaigns/declined" component={() => <CreatorCampaignsPage />} />
+          <Route path="/campaigns/pending" component={CreatorCampaignsPage} />
+          <Route path="/campaigns/accepted" component={CreatorCampaignsPage} />
+          <Route path="/campaigns/active" component={CreatorCampaignsPage} />
+          <Route path="/campaigns/completed" component={CreatorCampaignsPage} />
+          <Route path="/campaigns/declined" component={CreatorCampaignsPage} />
+
           <Route path="/invites" component={InvitesPage} />
           <Route path="/invites/:id" component={InvitesPage} />
-          <Route path="/invites/accepted" component={() => <InvitesPage />} />
-          <Route path="/invites/completed" component={() => <InvitesPage />} />
-          <Route path="/invites/declined" component={() => <InvitesPage />} />
+          <Route path="/invites/accepted" component={InvitesPage} />
+          <Route path="/invites/completed" component={InvitesPage} />
+          <Route path="/invites/declined" component={InvitesPage} />
 
           <Route path="/submissions/new" component={SubmitPage} />
           <Route path="/earnings" component={EarningsPage} />
@@ -199,12 +210,15 @@ function AppRouter() {
         <>
           <Route path="/" component={BrandDashboardPage} />
 
+          {/* Account Edit */}
+          <Route path="/account/edit" component={BrandAccountEditPage} />
+
           {/* Campaign Mgt sub-pages */}
           <Route path="/campaigns" component={CampaignsPage} />
           <Route path="/campaigns/new" component={CampaignNewPage} />
           <Route path="/campaigns/:id" component={CampaignDetailPage} />
-          <Route path="/campaigns/active" component={() => <CampaignsPage />} />
-          <Route path="/campaigns/completed" component={() => <CampaignsPage />} />
+          <Route path="/campaigns/active" component={CampaignsPage} />
+          <Route path="/campaigns/completed" component={CampaignsPage} />
 
           <Route path="/creators" component={CreatorsPage} />
           <Route path="/creators/:id" component={CreatorProfilePage} />

@@ -50,10 +50,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             activeBg={ORANGE_BG}
             activeBorder={ORANGE_BORDER}
             items={[
-              { href: "/admin/users", label: "All Accounts" },
-              { href: "/admin/users/brands", label: "Brand Accounts" },
-              { href: "/admin/users/creators", label: "Creator Accounts" },
-              { href: "/admin/users/pending", label: "Pending Accounts" },
+              { href: "/admin/accounts", label: "All Accounts" },
+              { href: "/admin/accounts/brands", label: "Brand Accounts" },
+              { href: "/admin/accounts/creators", label: "Creator Accounts" },
+              { href: "/admin/accounts/pending", label: "Pending Accounts" },
             ]}
           />
 
@@ -108,10 +108,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               { href: "/admin/settings/fees", label: "Fees & Taxes" },
               { href: "/admin/settings/gateway", label: "Payment Gateway" },
               { href: "/admin/settings/smtp", label: "SMTP" },
-              { href: "/admin/settings/roles", label: "Roles & Permissions" },
             ]}
           />
 
+          <NavLink href="/admin/roles" icon={Shield} label="Roles & Permissions" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/faqs" icon={HelpCircle} label="FAQs" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/legal" icon={FileText} label="Legal Pages" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
         </nav>

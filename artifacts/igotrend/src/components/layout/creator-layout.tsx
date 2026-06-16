@@ -117,7 +117,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
-                <Link href="/settings/profile"><span className="cursor-pointer w-full">Edit Account</span></Link>
+                <Link href="/account/edit"><span className="cursor-pointer w-full">Edit Account</span></Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/billing"><span className="cursor-pointer w-full">Billing</span></Link>

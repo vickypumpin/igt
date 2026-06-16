@@ -12,6 +12,59 @@ const accountShape = (a: typeof bankAccountsTable.$inferSelect) => ({
   createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt),
 });
 
+const userProfileShape = (u: typeof usersTable.$inferSelect) => ({
+  id: u.id, firstName: u.firstName, lastName: u.lastName, userName: u.userName, email: u.email,
+  phone: u.phone ?? null, role: u.role, gender: u.gender ?? null, badge: u.badge ?? null,
+  isActive: u.isActive, isLocked: u.isLocked, bio: u.bio ?? null, avatarUrl: u.avatarUrl ?? null,
+  dob: u.dob ?? null, companyName: u.companyName ?? null, companySize: u.companySize ?? null, companyType: u.companyType ?? null,
+  instagramProfile: u.instagramProfile ?? null, facebookProfile: u.facebookProfile ?? null,
+  twitterProfile: u.twitterProfile ?? null, youtubeProfile: u.youtubeProfile ?? null,
+  tiktokProfile: u.tiktokProfile ?? null, snapchatProfile: u.snapchatProfile ?? null,
+  contentCategory: u.contentCategory ?? null, creatorCategory: u.creatorCategory ?? null,
+  countryId: u.countryId ?? null, stateId: u.stateId ?? null,
+  gems: u.gems, balance: u.balance,
+  instagramDayPostPrice: u.instagramDayPostPrice ?? null, instagramWeekPostPrice: u.instagramWeekPostPrice ?? null,
+  instagramDayStoryPrice: u.instagramDayStoryPrice ?? null, instagramWeekStoryPrice: u.instagramWeekStoryPrice ?? null,
+  instagramDayReelPrice: u.instagramDayReelPrice ?? null, instagramWeekReelPrice: u.instagramWeekReelPrice ?? null,
+  fbDayPostPrice: u.fbDayPostPrice ?? null, fbWeekPostPrice: u.fbWeekPostPrice ?? null,
+  tiktokDayPostPrice: u.tiktokDayPostPrice ?? null, tiktokWeekPostPrice: u.tiktokWeekPostPrice ?? null,
+  youtubeDayPostPrice: u.youtubeDayPostPrice ?? null, youtubeWeekPostPrice: u.youtubeWeekPostPrice ?? null,
+  twitterDayPostPrice: u.twitterDayPostPrice ?? null, twitterWeekPostPrice: u.twitterWeekPostPrice ?? null,
+  createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+});
+
+// ── Profile ─────────────────────────────────────────────────────────────────
+
+router.get("/account/profile", requireAuth, async (req, res): Promise<void> => {
+  const [u] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!u) { res.status(404).json({ error: "User not found" }); return; }
+  res.json(userProfileShape(u));
+});
+
+router.put("/account/profile", requireAuth, async (req, res): Promise<void> => {
+  const allowed = [
+    "firstName", "lastName", "userName", "phone", "bio", "avatarUrl", "dob",
+    "companyName", "companySize", "companyType", "gender",
+    "instagramProfile", "facebookProfile", "twitterProfile", "youtubeProfile", "tiktokProfile", "snapchatProfile",
+    "contentCategory", "creatorCategory", "countryId", "stateId",
+    "instagramDayPostPrice", "instagramWeekPostPrice", "instagramDayStoryPrice", "instagramWeekStoryPrice",
+    "instagramDayReelPrice", "instagramWeekReelPrice",
+    "fbDayPostPrice", "fbWeekPostPrice",
+    "tiktokDayPostPrice", "tiktokWeekPostPrice",
+    "youtubeDayPostPrice", "youtubeWeekPostPrice",
+    "twitterDayPostPrice", "twitterWeekPostPrice",
+  ];
+  const updates: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (req.body[key] !== undefined) updates[key] = req.body[key];
+  }
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No valid fields to update" }); return; }
+  const [u] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
+  res.json(userProfileShape(u));
+});
+
+// ── Bank Accounts ─────────────────────────────────────────────────────────────
+
 router.get("/account/bank-accounts", requireAuth, async (req, res): Promise<void> => {
   const accounts = await db.select().from(bankAccountsTable)
     .where(eq(bankAccountsTable.userId, req.userId!))
@@ -22,8 +75,7 @@ router.get("/account/bank-accounts", requireAuth, async (req, res): Promise<void
 router.post("/account/bank-accounts", requireAuth, async (req, res): Promise<void> => {
   const { bankName, bankCode, accountNumber, accountName, isDefault } = req.body;
   if (!bankName || !accountNumber || !accountName) {
-    res.status(400).json({ error: "bankName, accountNumber, and accountName are required" });
-    return;
+    res.status(400).json({ error: "bankName, accountNumber, and accountName are required" }); return;
   }
   if (isDefault) {
     await db.update(bankAccountsTable).set({ isDefault: false }).where(eq(bankAccountsTable.userId, req.userId!));
@@ -53,6 +105,8 @@ router.delete("/account/bank-accounts/:id", requireAuth, async (req, res): Promi
   );
   res.json({ message: "Deleted" });
 });
+
+// ── Billing Balance ────────────────────────────────────────────────────────────
 
 router.get("/billing/balance", requireAuth, async (req, res): Promise<void> => {
   const [user] = await db.select({ gems: usersTable.gems, balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, req.userId!));
@@ -112,6 +166,16 @@ router.post("/billing/verify", requireAuth, async (req, res): Promise<void> => {
   const { txRef } = req.body;
   if (!txRef) { res.status(400).json({ error: "txRef is required" }); return; }
 
+  // Idempotency: check if this txRef has already been processed
+  const existing = await db.select({ id: gemsTransactionsTable.id })
+    .from(gemsTransactionsTable)
+    .where(eq(gemsTransactionsTable.reference, txRef))
+    .limit(1);
+  if (existing.length > 0) {
+    res.status(409).json({ error: "Transaction already processed", alreadyProcessed: true });
+    return;
+  }
+
   const [settings] = await db.select({ secretKey: settingsTable.flutterwaveSecretKey }).from(settingsTable).limit(1);
   if (!settings?.secretKey) { res.status(503).json({ error: "Payment gateway not configured" }); return; }
 
@@ -123,8 +187,15 @@ router.post("/billing/verify", requireAuth, async (req, res): Promise<void> => {
 
     if (data.status === "success" && data.data?.status === "successful") {
       const gems = data.data.meta?.gems ?? 0;
-      const userId = data.data.meta?.userId ?? req.userId!;
+      const userId = req.userId!; // Always use authenticated user, not meta (prevents user ID spoofing)
       const amount = data.data.amount ?? 0;
+
+      // Final idempotency guard (race condition protection)
+      const doubleCheck = await db.select({ id: gemsTransactionsTable.id })
+        .from(gemsTransactionsTable).where(eq(gemsTransactionsTable.reference, txRef)).limit(1);
+      if (doubleCheck.length > 0) {
+        res.status(409).json({ error: "Transaction already processed", alreadyProcessed: true }); return;
+      }
 
       const [user] = await db.select({ gems: usersTable.gems }).from(usersTable).where(eq(usersTable.id, userId));
       await db.update(usersTable).set({ gems: (user?.gems ?? 0) + gems }).where(eq(usersTable.id, userId));

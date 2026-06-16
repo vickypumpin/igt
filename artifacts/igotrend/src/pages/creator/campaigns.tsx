@@ -1,3 +1,4 @@
+import { useRoute, useLocation } from "wouter";
 import { useListMyInvites, useAcceptInvite, useDeclineInvite, getListMyInvitesQueryKey } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
@@ -5,9 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Briefcase, CheckCircle, Clock, Trophy, XCircle } from "lucide-react";
-import { useState } from "react";
 
-type FilterType = "all" | "pending" | "active" | "completed" | "declined";
+type StatusFilter = "all" | "pending" | "active" | "completed" | "declined";
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string; Icon: React.ElementType }> = {
   pending:   { bg: "rgba(245,158,11,0.12)",  color: "#D97706", label: "Pending",   Icon: Clock },
@@ -16,18 +16,35 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; label: string; 
   declined:  { bg: "rgba(239,68,68,0.12)",   color: "#DC2626", label: "Declined",  Icon: XCircle },
 };
 
-const FILTER_LABELS: Record<FilterType, string> = {
+const FILTER_LABELS: Record<StatusFilter, string> = {
   all: "All", pending: "Pending", active: "Accepted", completed: "Completed", declined: "Declined",
 };
 
+const FILTER_TO_HREF: Record<StatusFilter, string> = {
+  all: "/campaigns", pending: "/campaigns/pending", active: "/campaigns/accepted",
+  completed: "/campaigns/completed", declined: "/campaigns/declined",
+};
+
+function getFilterFromPath(path: string): StatusFilter {
+  if (path.endsWith("/campaigns/accepted") || path.endsWith("/campaigns/active")) return "active";
+  if (path.endsWith("/campaigns/pending")) return "pending";
+  if (path.endsWith("/campaigns/completed")) return "completed";
+  if (path.endsWith("/campaigns/declined")) return "declined";
+  return "all";
+}
+
 export default function CreatorCampaignsPage() {
   const { toast } = useToast();
+  const [location] = useLocation();
+  const filter = getFilterFromPath(location);
+
   const { data: invites = [], isLoading } = useListMyInvites({ query: { queryKey: getListMyInvitesQueryKey() } });
   const acceptMutation = useAcceptInvite();
   const declineMutation = useDeclineInvite();
-  const [filter, setFilter] = useState<FilterType>("all");
 
-  const filtered = filter === "all" ? invites : invites.filter(i => i.status === filter);
+  const filtered = filter === "all" ? invites : invites.filter(i =>
+    filter === "active" ? i.status === "active" : i.status === filter
+  );
 
   const handleAccept = (id: number) => {
     acceptMutation.mutate({ id }, {
@@ -42,7 +59,7 @@ export default function CreatorCampaignsPage() {
     });
   };
 
-  const counts: Record<FilterType, number> = {
+  const counts: Record<StatusFilter, number> = {
     all: invites.length,
     pending: invites.filter(i => i.status === "pending").length,
     active: invites.filter(i => i.status === "active").length,
@@ -59,16 +76,16 @@ export default function CreatorCampaignsPage() {
         </div>
 
         <div className="flex gap-2 mb-5 flex-wrap">
-          {(["all", "pending", "active", "completed", "declined"] as FilterType[]).map(f => (
-            <button
+          {(["all", "pending", "active", "completed", "declined"] as StatusFilter[]).map(f => (
+            <a
               key={f}
-              onClick={() => setFilter(f)}
+              href={FILTER_TO_HREF[f]}
               className="px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all"
               style={filter === f ? { background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", color: "#fff", border: "none" } : { background: "white", borderColor: "rgba(0,0,0,0.12)" }}
               data-testid={`filter-${f}`}
             >
               {FILTER_LABELS[f]} ({counts[f]})
-            </button>
+            </a>
           ))}
         </div>
 
@@ -85,9 +102,12 @@ export default function CreatorCampaignsPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map(invite => {
-              const s = STATUS_STYLES[invite.status] ?? STATUS_STYLES.pending;
+              const statusKey = invite.status === "active" ? "active" : invite.status;
+              const s = STATUS_STYLES[statusKey] ?? STATUS_STYLES.pending;
               const { Icon } = s;
-              const endDate = invite.campaign?.endDate ? new Date(invite.campaign.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : null;
+              const endDate = invite.campaign?.endDate
+                ? new Date(invite.campaign.endDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                : null;
               return (
                 <div key={invite.id} className="bg-white rounded-2xl border border-border/60 shadow-sm p-5 flex items-center gap-4" data-testid={`invite-row-${invite.id}`}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}>

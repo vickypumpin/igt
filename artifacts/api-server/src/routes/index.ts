@@ -15,6 +15,7 @@ import faqsRouter from "./faqs";
 import legalRouter from "./legal";
 import accountRouter from "./account";
 import adminMessagesRouter from "./admin_messages";
+import adminAccountsRouter from "./admin_accounts";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(faqsRouter);
 router.use(legalRouter);
 router.use(accountRouter);
 router.use(adminMessagesRouter);
+router.use(adminAccountsRouter);
 
 export default router;
