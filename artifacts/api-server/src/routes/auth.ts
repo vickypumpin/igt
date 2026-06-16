@@ -1,0 +1,128 @@
+import { Router } from "express";
+import bcrypt from "bcryptjs";
+import { eq } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
+import { signToken, requireAuth, formatUser } from "../lib/auth";
+import type { IRouter } from "express";
+
+const router: IRouter = Router();
+
+router.post("/auth/register", async (req, res): Promise<void> => {
+  const { firstName, lastName, userName, email, password, phone, role, gender, countryId, stateId, companyName, companySize, companyType } = req.body;
+  if (!firstName || !lastName || !userName || !email || !password || !role) {
+    res.status(400).json({ error: "Missing required fields" });
+    return;
+  }
+  const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
+  if (existing) {
+    res.status(400).json({ error: "Email already registered" });
+    return;
+  }
+  const [existingUser] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.userName, userName));
+  if (existingUser) {
+    res.status(400).json({ error: "Username already taken" });
+    return;
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [user] = await db.insert(usersTable).values({
+    firstName, lastName, userName, email, passwordHash, phone: phone ?? null,
+    role: role === "creator" ? "creator" : "brand",
+    gender: gender ?? null, countryId: countryId ?? null, stateId: stateId ?? null,
+    companyName: companyName ?? null, companySize: companySize ?? null, companyType: companyType ?? null,
+  }).returning();
+  const token = signToken(user.id);
+  res.status(201).json({ token, user: formatUser(user as unknown as Record<string, unknown>) });
+});
+
+router.post("/auth/login", async (req, res): Promise<void> => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    res.status(400).json({ error: "Missing email or password" });
+    return;
+  }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  if (!user) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+  if (!user.isActive || user.isLocked) {
+    res.status(401).json({ error: "Account is not available" });
+    return;
+  }
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+  const token = signToken(user.id);
+  res.json({ token, user: formatUser(user as unknown as Record<string, unknown>) });
+});
+
+router.post("/auth/logout", (_req, res): void => {
+  res.json({ message: "Logged out" });
+});
+
+router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  res.json(formatUser(user as unknown as Record<string, unknown>));
+});
+
+router.patch("/auth/me/profile", requireAuth, async (req, res): Promise<void> => {
+  const { firstName, lastName, phone, gender, countryId, stateId, companyName, companySize, companyType,
+    instagramProfile, facebookProfile, twitterProfile, youtubeProfile, tiktokProfile, snapchatProfile,
+    dob, contentCategory, creatorCategory, bio } = req.body;
+  const updates: Record<string, unknown> = {};
+  if (firstName != null) updates.firstName = firstName;
+  if (lastName != null) updates.lastName = lastName;
+  if (phone != null) updates.phone = phone;
+  if (gender != null) updates.gender = gender;
+  if (countryId != null) updates.countryId = countryId;
+  if (stateId != null) updates.stateId = stateId;
+  if (companyName != null) updates.companyName = companyName;
+  if (companySize != null) updates.companySize = companySize;
+  if (companyType != null) updates.companyType = companyType;
+  if (instagramProfile != null) updates.instagramProfile = instagramProfile;
+  if (facebookProfile != null) updates.facebookProfile = facebookProfile;
+  if (twitterProfile != null) updates.twitterProfile = twitterProfile;
+  if (youtubeProfile != null) updates.youtubeProfile = youtubeProfile;
+  if (tiktokProfile != null) updates.tiktokProfile = tiktokProfile;
+  if (snapchatProfile != null) updates.snapchatProfile = snapchatProfile;
+  if (dob != null) updates.dob = dob;
+  if (contentCategory != null) updates.contentCategory = contentCategory;
+  if (creatorCategory != null) updates.creatorCategory = creatorCategory;
+  if (bio != null) updates.bio = bio;
+  updates.updatedAt = new Date();
+  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
+  res.json(formatUser(user as unknown as Record<string, unknown>));
+});
+
+router.patch("/auth/me/password", requireAuth, async (req, res): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) { res.status(400).json({ error: "Missing passwords" }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) { res.status(400).json({ error: "Current password is incorrect" }); return; }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
+  res.json({ message: "Password updated" });
+});
+
+router.patch("/auth/me/pricing", requireAuth, async (req, res): Promise<void> => {
+  const fields = [
+    "instagramDayPostPrice","instagramWeekPostPrice","instagramDayStoryPrice","instagramWeekStoryPrice",
+    "instagramDayReelPrice","instagramWeekReelPrice","instagramDayLivePrice","instagramWeekLivePrice",
+    "fbDayPostPrice","fbWeekPostPrice","fbDayStoryPrice","fbWeekStoryPrice","fbDayReelPrice","fbWeekReelPrice",
+    "tiktokDayPostPrice","tiktokWeekPostPrice","youtubeDayPostPrice","youtubeWeekPostPrice",
+    "twitterDayPostPrice","twitterWeekPostPrice","snapchatDayStoryPrice","snapchatWeekStoryPrice","contentCreatorRate",
+  ];
+  const updates: Record<string, unknown> = {};
+  for (const f of fields) {
+    if (req.body[f] != null) updates[f] = req.body[f];
+  }
+  updates.updatedAt = new Date();
+  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
+  res.json(formatUser(user as unknown as Record<string, unknown>));
+});
+
+export default router;

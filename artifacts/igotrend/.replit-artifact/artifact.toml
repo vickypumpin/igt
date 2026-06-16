@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "iGoTrend SaaS"
+version = "1.0.0"
+id = "artifacts/igotrend"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23464
+
+[services.development]
+run = "pnpm --filter @workspace/igotrend run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/igotrend", "run", "build" ]
+publicDir = "artifacts/igotrend/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23464"
+BASE_PATH = "/"

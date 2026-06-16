@@ -1,22 +1,43 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: iGoTrend SaaS - Influencer Marketing Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: creators
+    description: Creator discovery and profiles
+  - name: campaigns
+    description: Campaign management
+  - name: invites
+    description: Campaign invitations
+  - name: submissions
+    description: Content submissions
+  - name: rewards
+    description: Gems and rewards
+  - name: messages
+    description: Messaging
+  - name: notifications
+    description: Notifications
+  - name: dashboard
+    description: Dashboard stats
+  - name: admin
+    description: Admin operations
+  - name: settings
+    description: Platform settings
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +45,958 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Auth ──────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user (brand or creator)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/me/profile:
+    patch:
+      operationId: updateProfile
+      tags: [auth]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/me/password:
+    patch:
+      operationId: updatePassword
+      tags: [auth]
+      summary: Update password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordUpdate"
+      responses:
+        "200":
+          description: Password updated
+
+  /auth/me/pricing:
+    patch:
+      operationId: updatePricing
+      tags: [auth]
+      summary: Update creator platform pricing rates
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PricingUpdate"
+      responses:
+        "200":
+          description: Pricing updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  # ─── Creators ──────────────────────────────────────────────────────────────
+  /creators:
+    get:
+      operationId: listCreators
+      tags: [creators]
+      summary: Discover and search creators
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: platform
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [instagram, facebook, tiktok, youtube, twitter, snapchat, null]
+        - name: content_category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: creator_category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: badge
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [nano, micro, mid_tier, macro, mega, elite, null]
+        - name: country
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: List of creators
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorListResponse"
+
+  /creators/{id}:
+    get:
+      operationId: getCreator
+      tags: [creators]
+      summary: Get creator profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Creator profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorProfile"
+
+  /creators/stats:
+    get:
+      operationId: getCreatorStats
+      tags: [creators]
+      summary: Get current creator's performance stats
+      responses:
+        "200":
+          description: Creator stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorStats"
+
+  # ─── Campaigns ─────────────────────────────────────────────────────────────
+  /campaigns:
+    get:
+      operationId: listCampaigns
+      tags: [campaigns]
+      summary: List brand's campaigns
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, active, completed, declined, null]
+      responses:
+        "200":
+          description: Campaigns list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+    post:
+      operationId: createCampaign
+      tags: [campaigns]
+      summary: Create a new campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignInput"
+      responses:
+        "201":
+          description: Campaign created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+
+  /campaigns/{id}:
+    get:
+      operationId: getCampaign
+      tags: [campaigns]
+      summary: Get campaign details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignDetail"
+    patch:
+      operationId: updateCampaign
+      tags: [campaigns]
+      summary: Update campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+    delete:
+      operationId: deleteCampaign
+      tags: [campaigns]
+      summary: Delete a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+
+  /campaigns/{id}/invites:
+    get:
+      operationId: getCampaignInvites
+      tags: [campaigns]
+      summary: List invited creators for a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignInvite"
+    post:
+      operationId: inviteCreator
+      tags: [campaigns]
+      summary: Invite a creator to a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteInput"
+      responses:
+        "201":
+          description: Invited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignInvite"
+
+  /campaigns/{id}/invites/{inviteId}:
+    delete:
+      operationId: removeInvite
+      tags: [campaigns]
+      summary: Remove a creator from a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: inviteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+
+  /campaigns/{id}/submissions:
+    get:
+      operationId: getCampaignSubmissions
+      tags: [campaigns]
+      summary: List submissions for a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+
+  /campaigns/{id}/budget:
+    get:
+      operationId: getCampaignBudget
+      tags: [campaigns]
+      summary: Get estimated and actual budget for a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Budget breakdown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignBudget"
+
+  # ─── Invites (Creator side) ────────────────────────────────────────────────
+  /invites:
+    get:
+      operationId: listMyInvites
+      tags: [invites]
+      summary: List creator's campaign invitations
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, active, completed, declined, null]
+      responses:
+        "200":
+          description: Invites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignInvite"
+
+  /invites/{id}/accept:
+    post:
+      operationId: acceptInvite
+      tags: [invites]
+      summary: Accept a campaign invitation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Accepted
+
+  /invites/{id}/decline:
+    post:
+      operationId: declineInvite
+      tags: [invites]
+      summary: Decline a campaign invitation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Declined
+
+  # ─── Submissions ──────────────────────────────────────────────────────────
+  /submissions:
+    post:
+      operationId: createSubmission
+      tags: [submissions]
+      summary: Submit content proof for a campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  /submissions/{id}:
+    patch:
+      operationId: reviewSubmission
+      tags: [submissions]
+      summary: Approve or reject a submission (brand/admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionReview"
+      responses:
+        "200":
+          description: Reviewed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  # ─── Payments ─────────────────────────────────────────────────────────────
+  /payments:
+    get:
+      operationId: listPayments
+      tags: [rewards]
+      summary: List payment history
+      responses:
+        "200":
+          description: Payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+
+  /payments/campaign:
+    post:
+      operationId: initiateCampaignPayment
+      tags: [rewards]
+      summary: Initiate payment for a campaign (Flutterwave)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignPaymentInput"
+      responses:
+        "200":
+          description: Payment link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLink"
+
+  # ─── Rewards ──────────────────────────────────────────────────────────────
+  /rewards:
+    get:
+      operationId: listRewards
+      tags: [rewards]
+      summary: List rewards sent/received
+      responses:
+        "200":
+          description: Rewards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reward"
+    post:
+      operationId: sendReward
+      tags: [rewards]
+      summary: Send gems or airtime to creators
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RewardInput"
+      responses:
+        "200":
+          description: Reward initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentLink"
+
+  /rewards/payout:
+    post:
+      operationId: requestPayout
+      tags: [rewards]
+      summary: Creator requests a cash payout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayoutInput"
+      responses:
+        "200":
+          description: Payout requested
+
+  # ─── Messages ─────────────────────────────────────────────────────────────
+  /messages:
+    get:
+      operationId: listConversations
+      tags: [messages]
+      summary: List all conversations
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /messages/{userId}:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get message thread with a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  # ─── Notifications ────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/read:
+    post:
+      operationId: markNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: Marked read
+
+  # ─── Dashboard stats ──────────────────────────────────────────────────────
+  /dashboard/brand:
+    get:
+      operationId: getBrandDashboard
+      tags: [dashboard]
+      summary: Brand dashboard summary stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandDashboard"
+
+  /dashboard/creator:
+    get:
+      operationId: getCreatorDashboard
+      tags: [dashboard]
+      summary: Creator dashboard summary stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreatorDashboard"
+
+  /dashboard/admin:
+    get:
+      operationId: getAdminDashboard
+      tags: [dashboard]
+      summary: Admin dashboard summary stats
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDashboard"
+
+  # ─── Admin ────────────────────────────────────────────────────────────────
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [brand, creator, null]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [active, inactive, locked, null]
+        - name: search
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: page
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserListResponse"
+
+  /admin/users/{id}/status:
+    patch:
+      operationId: adminUpdateUserStatus
+      tags: [admin]
+      summary: Activate, deactivate, or lock a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserStatusUpdate"
+      responses:
+        "200":
+          description: Updated
+
+  /admin/campaigns:
+    get:
+      operationId: adminListCampaigns
+      tags: [admin]
+      summary: List all campaigns
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, active, completed, declined, null]
+      responses:
+        "200":
+          description: Campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+
+  /admin/campaigns/{id}/status:
+    patch:
+      operationId: adminUpdateCampaignStatus
+      tags: [admin]
+      summary: Approve or decline a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignStatusUpdate"
+      responses:
+        "200":
+          description: Updated
+
+  /admin/verify-requests:
+    get:
+      operationId: adminListVerifyRequests
+      tags: [admin]
+      summary: List pending bank verification requests
+      responses:
+        "200":
+          description: Verify requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VerifyRequest"
+
+  /admin/verify-requests/{id}/approve:
+    post:
+      operationId: adminApproveVerifyRequest
+      tags: [admin]
+      summary: Approve a bank detail verification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Approved
+
+  /admin/verify-requests/{id}/reject:
+    post:
+      operationId: adminRejectVerifyRequest
+      tags: [admin]
+      summary: Reject a bank detail verification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected
+
+  /admin/submissions:
+    get:
+      operationId: adminListSubmissions
+      tags: [admin]
+      summary: List all content submissions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, approved, rejected, null]
+      responses:
+        "200":
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+
+  /admin/payouts:
+    get:
+      operationId: adminListPayouts
+      tags: [admin]
+      summary: List payout requests
+      responses:
+        "200":
+          description: Payouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PayoutRequest"
+
+  /admin/payouts/{id}/approve:
+    post:
+      operationId: adminApprovePayout
+      tags: [admin]
+      summary: Approve and process a payout
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Approved
+
+  # ─── Settings ─────────────────────────────────────────────────────────────
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get platform settings (admin)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update platform settings (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformSettings"
+
+  /content-categories:
+    get:
+      operationId: listContentCategories
+      tags: [settings]
+      summary: List content categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /creator-categories:
+    get:
+      operationId: listCreatorCategories
+      tags: [settings]
+      summary: List creator categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +1004,649 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ─── Auth ────────────────────────────────────────────────────────────────
+    RegisterInput:
+      type: object
+      required: [firstName, lastName, userName, email, password, phone, role, gender, countryId]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string }
+        password: { type: string }
+        phone: { type: string }
+        role: { type: string, enum: [brand, creator] }
+        gender: { type: string, enum: [male, female] }
+        countryId: { type: integer }
+        stateId: { type: ["integer", "null"] }
+        companyName: { type: ["string", "null"] }
+        companySize: { type: ["string", "null"] }
+        companyType: { type: ["string", "null"] }
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token: { type: string }
+        user:
+          $ref: "#/components/schemas/User"
+
+    ProfileUpdate:
+      type: object
+      properties:
+        firstName: { type: ["string", "null"] }
+        lastName: { type: ["string", "null"] }
+        phone: { type: ["string", "null"] }
+        gender: { type: ["string", "null"] }
+        countryId: { type: ["integer", "null"] }
+        stateId: { type: ["integer", "null"] }
+        companyName: { type: ["string", "null"] }
+        companySize: { type: ["string", "null"] }
+        companyType: { type: ["string", "null"] }
+        instagramProfile: { type: ["string", "null"] }
+        facebookProfile: { type: ["string", "null"] }
+        twitterProfile: { type: ["string", "null"] }
+        youtubeProfile: { type: ["string", "null"] }
+        tiktokProfile: { type: ["string", "null"] }
+        snapchatProfile: { type: ["string", "null"] }
+        dob: { type: ["string", "null"] }
+        contentCategory: { type: ["string", "null"] }
+        creatorCategory: { type: ["string", "null"] }
+        bio: { type: ["string", "null"] }
+
+    PasswordUpdate:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string }
+        newPassword: { type: string }
+
+    PricingUpdate:
+      type: object
+      properties:
+        instagramDayPostPrice: { type: ["integer", "null"] }
+        instagramWeekPostPrice: { type: ["integer", "null"] }
+        instagramDayStoryPrice: { type: ["integer", "null"] }
+        instagramWeekStoryPrice: { type: ["integer", "null"] }
+        instagramDayReelPrice: { type: ["integer", "null"] }
+        instagramWeekReelPrice: { type: ["integer", "null"] }
+        instagramDayLivePrice: { type: ["integer", "null"] }
+        instagramWeekLivePrice: { type: ["integer", "null"] }
+        fbDayPostPrice: { type: ["integer", "null"] }
+        fbWeekPostPrice: { type: ["integer", "null"] }
+        fbDayStoryPrice: { type: ["integer", "null"] }
+        fbWeekStoryPrice: { type: ["integer", "null"] }
+        fbDayReelPrice: { type: ["integer", "null"] }
+        fbWeekReelPrice: { type: ["integer", "null"] }
+        tiktokDayPostPrice: { type: ["integer", "null"] }
+        tiktokWeekPostPrice: { type: ["integer", "null"] }
+        youtubeDayPostPrice: { type: ["integer", "null"] }
+        youtubeWeekPostPrice: { type: ["integer", "null"] }
+        twitterDayPostPrice: { type: ["integer", "null"] }
+        twitterWeekPostPrice: { type: ["integer", "null"] }
+        snapchatDayStoryPrice: { type: ["integer", "null"] }
+        snapchatWeekStoryPrice: { type: ["integer", "null"] }
+        contentCreatorRate: { type: ["integer", "null"] }
+
+    # ─── User ─────────────────────────────────────────────────────────────────
+    User:
+      type: object
+      required: [id, firstName, lastName, userName, email, role]
+      properties:
+        id: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: string }
+        phone: { type: ["string", "null"] }
+        role: { type: string, enum: [brand, creator] }
+        gender: { type: ["string", "null"] }
+        badge: { type: ["string", "null"], enum: [nano, micro, mid_tier, macro, mega, elite, null] }
+        isActive: { type: boolean }
+        isLocked: { type: boolean }
+        countryId: { type: ["integer", "null"] }
+        stateId: { type: ["integer", "null"] }
+        companyName: { type: ["string", "null"] }
+        companySize: { type: ["string", "null"] }
+        companyType: { type: ["string", "null"] }
+        instagramProfile: { type: ["string", "null"] }
+        facebookProfile: { type: ["string", "null"] }
+        twitterProfile: { type: ["string", "null"] }
+        youtubeProfile: { type: ["string", "null"] }
+        tiktokProfile: { type: ["string", "null"] }
+        snapchatProfile: { type: ["string", "null"] }
+        contentCategory: { type: ["string", "null"] }
+        creatorCategory: { type: ["string", "null"] }
+        gems: { type: integer }
+        balance: { type: number }
+        bio: { type: ["string", "null"] }
+        avatarUrl: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    UserListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+
+    UserStatusUpdate:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [activate, deactivate, lock, unlock] }
+
+    # ─── Creator ──────────────────────────────────────────────────────────────
+    CreatorListResponse:
+      type: object
+      required: [data, total, page, limit]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatorProfile"
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+
+    CreatorProfile:
+      type: object
+      required: [id, firstName, lastName, userName, badge]
+      properties:
+        id: { type: integer }
+        firstName: { type: string }
+        lastName: { type: string }
+        userName: { type: string }
+        email: { type: ["string", "null"] }
+        badge: { type: ["string", "null"] }
+        avatarUrl: { type: ["string", "null"] }
+        bio: { type: ["string", "null"] }
+        contentCategoryNames: { type: ["string", "null"] }
+        creatorCategoryNames: { type: ["string", "null"] }
+        instagramProfile: { type: ["string", "null"] }
+        facebookProfile: { type: ["string", "null"] }
+        twitterProfile: { type: ["string", "null"] }
+        youtubeProfile: { type: ["string", "null"] }
+        tiktokProfile: { type: ["string", "null"] }
+        snapchatProfile: { type: ["string", "null"] }
+        country: { type: ["string", "null"] }
+        totalReach: { type: integer }
+        totalEngagement: { type: integer }
+        avgRating: { type: ["number", "null"] }
+        campaignsCompleted: { type: integer }
+        instagramDayPostPrice: { type: ["integer", "null"] }
+        instagramWeekPostPrice: { type: ["integer", "null"] }
+        tiktokDayPostPrice: { type: ["integer", "null"] }
+        tiktokWeekPostPrice: { type: ["integer", "null"] }
+        youtubeDayPostPrice: { type: ["integer", "null"] }
+        youtubeWeekPostPrice: { type: ["integer", "null"] }
+        gems: { type: integer }
+
+    CreatorStats:
+      type: object
+      required: [totalInvites, completedCampaigns, declinedInvites, totalEarnings, totalGemsReceived, totalReach, totalEngagement]
+      properties:
+        totalInvites: { type: integer }
+        completedCampaigns: { type: integer }
+        declinedInvites: { type: integer }
+        totalEarnings: { type: number }
+        totalGemsReceived: { type: integer }
+        totalReach: { type: integer }
+        totalEngagement: { type: integer }
+
+    # ─── Campaign ─────────────────────────────────────────────────────────────
+    Campaign:
+      type: object
+      required: [id, name, sponsor, status, startDate, endDate, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sponsor: { type: string }
+        description: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, active, completed, declined] }
+        type: { type: string, enum: [influencer, content_creator] }
+        campaignDuration: { type: string, enum: [day, weekly] }
+        startDate: { type: string }
+        endDate: { type: string }
+        noOfCreators: { type: integer }
+        estimatedBudget: { type: ["number", "null"] }
+        coverImageUrl: { type: ["string", "null"] }
+        invitesCount: { type: integer }
+        submissionsCount: { type: integer }
+        createdAt: { type: string }
+
+    CampaignDetail:
+      type: object
+      required: [id, name, sponsor, status]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        sponsor: { type: string }
+        description: { type: ["string", "null"] }
+        kpis: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, active, completed, declined] }
+        type: { type: string, enum: [influencer, content_creator] }
+        mood: { type: ["string", "null"] }
+        ageRange: { type: ["string", "null"] }
+        campaignDuration: { type: string, enum: [day, weekly] }
+        campaignCategoryId: { type: ["integer", "null"] }
+        creatorCategoryId: { type: ["integer", "null"] }
+        startDate: { type: string }
+        endDate: { type: string }
+        noOfCreators: { type: integer }
+        noOfDay: { type: ["integer", "null"] }
+        noOfWeek: { type: ["integer", "null"] }
+        brandDescription: { type: ["string", "null"] }
+        postCaptionText: { type: ["string", "null"] }
+        handlesHash: { type: ["string", "null"] }
+        dos: { type: ["string", "null"] }
+        donts: { type: ["string", "null"] }
+        coverImageUrl: { type: ["string", "null"] }
+        dailyInstagramPost: { type: integer }
+        dailyInstagramStoryPost: { type: integer }
+        dailyInstagramReel: { type: integer }
+        dailyInstagramLive: { type: integer }
+        dailyFbPost: { type: integer }
+        dailyFbStoryPost: { type: integer }
+        dailyTiktokPost: { type: integer }
+        dailyYoutubePost: { type: integer }
+        dailyYoutubeVideo: { type: integer }
+        dailyYoutubeShort: { type: integer }
+        dailyTwitterPost: { type: integer }
+        dailySnapchatStory: { type: integer }
+        weeklyInstagramPost: { type: integer }
+        weeklyInstagramStoryPost: { type: integer }
+        weeklyInstagramReel: { type: integer }
+        weeklyFbPost: { type: integer }
+        weeklyTiktokPost: { type: integer }
+        weeklyYoutubePost: { type: integer }
+        weeklyTwitterPost: { type: integer }
+        weeklySnapchatStory: { type: integer }
+        invites:
+          type: array
+          items:
+            $ref: "#/components/schemas/CampaignInvite"
+        estimatedBudget: { type: ["number", "null"] }
+        createdAt: { type: string }
+
+    CampaignInput:
+      type: object
+      required: [name, sponsor, description, kpis, type, campaignDuration, startDate, endDate, noOfCreators]
+      properties:
+        name: { type: string }
+        sponsor: { type: string }
+        description: { type: string }
+        kpis: { type: string }
+        type: { type: string, enum: [influencer, content_creator] }
+        mood: { type: ["string", "null"] }
+        ageRange: { type: ["string", "null"] }
+        campaignDuration: { type: string, enum: [day, weekly] }
+        campaignCategoryId: { type: ["integer", "null"] }
+        creatorCategoryId: { type: ["integer", "null"] }
+        startDate: { type: string }
+        endDate: { type: string }
+        noOfCreators: { type: integer }
+        noOfDay: { type: ["integer", "null"] }
+        noOfWeek: { type: ["integer", "null"] }
+        brandDescription: { type: ["string", "null"] }
+        postCaptionText: { type: ["string", "null"] }
+        handlesHash: { type: ["string", "null"] }
+        dos: { type: ["string", "null"] }
+        donts: { type: ["string", "null"] }
+        dailyInstagramPost: { type: integer }
+        dailyInstagramStoryPost: { type: integer }
+        dailyInstagramReel: { type: integer }
+        dailyInstagramLive: { type: integer }
+        dailyFbPost: { type: integer }
+        dailyFbStoryPost: { type: integer }
+        dailyTiktokPost: { type: integer }
+        dailyYoutubePost: { type: integer }
+        dailyYoutubeVideo: { type: integer }
+        dailyYoutubeShort: { type: integer }
+        dailyTwitterPost: { type: integer }
+        dailySnapchatStory: { type: integer }
+        weeklyInstagramPost: { type: integer }
+        weeklyInstagramStoryPost: { type: integer }
+        weeklyInstagramReel: { type: integer }
+        weeklyFbPost: { type: integer }
+        weeklyTiktokPost: { type: integer }
+        weeklyYoutubePost: { type: integer }
+        weeklyTwitterPost: { type: integer }
+        weeklySnapchatStory: { type: integer }
+
+    CampaignUpdate:
+      type: object
+      properties:
+        name: { type: ["string", "null"] }
+        sponsor: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        kpis: { type: ["string", "null"] }
+        endDate: { type: ["string", "null"] }
+        postCaptionText: { type: ["string", "null"] }
+        handlesHash: { type: ["string", "null"] }
+        dos: { type: ["string", "null"] }
+        donts: { type: ["string", "null"] }
+
+    CampaignStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [active, declined] }
+
+    CampaignBudget:
+      type: object
+      required: [estimated, perCreator]
+      properties:
+        estimated: { type: number }
+        perCreator:
+          type: array
+          items:
+            type: object
+            required: [creatorId, name, amount]
+            properties:
+              creatorId: { type: integer }
+              name: { type: string }
+              amount: { type: number }
+
+    # ─── Invite ───────────────────────────────────────────────────────────────
+    InviteInput:
+      type: object
+      required: [creatorId]
+      properties:
+        creatorId: { type: integer }
+
+    CampaignInvite:
+      type: object
+      required: [id, campaignId, creatorId, status, createdAt]
+      properties:
+        id: { type: integer }
+        campaignId: { type: integer }
+        creatorId: { type: integer }
+        status: { type: string, enum: [pending, active, completed, declined] }
+        campaign:
+          $ref: "#/components/schemas/Campaign"
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        estimatedPayout: { type: ["number", "null"] }
+        createdAt: { type: string }
+
+    # ─── Submission ───────────────────────────────────────────────────────────
+    SubmissionInput:
+      type: object
+      required: [campaignId, screenshotUrl, platform]
+      properties:
+        campaignId: { type: integer }
+        screenshotUrl: { type: string }
+        platform: { type: string }
+        views: { type: ["integer", "null"] }
+        likes: { type: ["integer", "null"] }
+        caption: { type: ["string", "null"] }
+
+    SubmissionReview:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [approved, rejected] }
+        views: { type: ["integer", "null"] }
+        likes: { type: ["integer", "null"] }
+        rating: { type: ["integer", "null"] }
+        note: { type: ["string", "null"] }
+
+    Submission:
+      type: object
+      required: [id, campaignId, creatorId, status, createdAt]
+      properties:
+        id: { type: integer }
+        campaignId: { type: integer }
+        creatorId: { type: integer }
+        screenshotUrl: { type: string }
+        platform: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, approved, rejected] }
+        views: { type: ["integer", "null"] }
+        likes: { type: ["integer", "null"] }
+        rating: { type: ["integer", "null"] }
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        campaign:
+          $ref: "#/components/schemas/Campaign"
+        createdAt: { type: string }
+
+    # ─── Payment ──────────────────────────────────────────────────────────────
+    Payment:
+      type: object
+      required: [id, amount, paymentType, createdAt]
+      properties:
+        id: { type: integer }
+        campaignId: { type: ["integer", "null"] }
+        amount: { type: number }
+        taxAmount: { type: number }
+        paymentType: { type: string }
+        paymentStatus: { type: boolean }
+        txRef: { type: string }
+        campaignName: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    CampaignPaymentInput:
+      type: object
+      required: [campaignId]
+      properties:
+        campaignId: { type: integer }
+
+    PaymentLink:
+      type: object
+      required: [paymentUrl]
+      properties:
+        paymentUrl: { type: string }
+        txRef: { type: ["string", "null"] }
+
+    # ─── Reward ───────────────────────────────────────────────────────────────
+    RewardInput:
+      type: object
+      required: [creatorIds, amount, rewardType]
+      properties:
+        creatorIds:
+          type: array
+          items:
+            type: integer
+        amount: { type: number }
+        rewardType: { type: string, enum: [gems, airtime] }
+        campaignId: { type: ["integer", "null"] }
+
+    Reward:
+      type: object
+      required: [id, type, amount, status, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [gems, airtime] }
+        amount: { type: number }
+        status: { type: boolean }
+        fromUser: { type: ["string", "null"] }
+        toUser: { type: ["string", "null"] }
+        campaignId: { type: ["integer", "null"] }
+        createdAt: { type: string }
+
+    PayoutInput:
+      type: object
+      required: [amount]
+      properties:
+        amount: { type: number }
+        bankCode: { type: ["string", "null"] }
+        accountNumber: { type: ["string", "null"] }
+
+    PayoutRequest:
+      type: object
+      required: [id, creatorId, amount, status, createdAt]
+      properties:
+        id: { type: integer }
+        creatorId: { type: integer }
+        amount: { type: number }
+        status: { type: string, enum: [pending, approved, rejected] }
+        creator:
+          $ref: "#/components/schemas/CreatorProfile"
+        createdAt: { type: string }
+
+    # ─── Message ──────────────────────────────────────────────────────────────
+    MessageInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string }
+
+    Message:
+      type: object
+      required: [id, fromUserId, toUserId, body, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        fromUserId: { type: integer }
+        toUserId: { type: integer }
+        body: { type: string }
+        isRead: { type: boolean }
+        fromUser:
+          $ref: "#/components/schemas/User"
+        createdAt: { type: string }
+
+    Conversation:
+      type: object
+      required: [userId, lastMessage, unreadCount]
+      properties:
+        userId: { type: integer }
+        user:
+          $ref: "#/components/schemas/User"
+        lastMessage: { type: string }
+        unreadCount: { type: integer }
+        updatedAt: { type: string }
+
+    # ─── Notification ────────────────────────────────────────────────────────
+    Notification:
+      type: object
+      required: [id, type, message, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string }
+        message: { type: string }
+        isRead: { type: boolean }
+        link: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    # ─── Dashboard ────────────────────────────────────────────────────────────
+    BrandDashboard:
+      type: object
+      required: [activeCampaigns, pendingCampaigns, completedCampaigns, declinedCampaigns, totalCreatorsInvited, totalSpend, recentCampaigns, topCreators]
+      properties:
+        activeCampaigns: { type: integer }
+        pendingCampaigns: { type: integer }
+        completedCampaigns: { type: integer }
+        declinedCampaigns: { type: integer }
+        totalCreatorsInvited: { type: integer }
+        totalSpend: { type: number }
+        recentCampaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+        topCreators:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreatorProfile"
+
+    CreatorDashboard:
+      type: object
+      required: [totalInvites, pendingInvites, completedCampaigns, declinedInvites, totalEarnings, gems, totalReach, totalEngagement, recentInvites]
+      properties:
+        totalInvites: { type: integer }
+        pendingInvites: { type: integer }
+        completedCampaigns: { type: integer }
+        declinedInvites: { type: integer }
+        totalEarnings: { type: number }
+        gems: { type: integer }
+        totalReach: { type: integer }
+        totalEngagement: { type: integer }
+        recentInvites:
+          type: array
+          items:
+            $ref: "#/components/schemas/CampaignInvite"
+
+    AdminDashboard:
+      type: object
+      required: [totalBrands, totalCreators, activeCampaigns, completedCampaigns, totalRevenue, currentMonthRevenue, totalPayout, pendingVerifications, pendingCampaigns, pendingSubmissions]
+      properties:
+        totalBrands: { type: integer }
+        totalCreators: { type: integer }
+        activeCampaigns: { type: integer }
+        completedCampaigns: { type: integer }
+        totalRevenue: { type: number }
+        currentMonthRevenue: { type: number }
+        totalPayout: { type: number }
+        pendingVerifications: { type: integer }
+        pendingCampaigns: { type: integer }
+        pendingSubmissions: { type: integer }
+
+    # ─── Settings ────────────────────────────────────────────────────────────
+    PlatformSettings:
+      type: object
+      properties:
+        siteName: { type: ["string", "null"] }
+        siteDescription: { type: ["string", "null"] }
+        gemPrice: { type: ["integer", "null"] }
+        gemServiceFee: { type: ["integer", "null"] }
+        creatorServiceFee: { type: ["integer", "null"] }
+        brandServiceFee: { type: ["integer", "null"] }
+        registrationStatus: { type: boolean }
+        loginStatus: { type: boolean }
+        smsNotify: { type: boolean }
+        facebookUrl: { type: ["string", "null"] }
+        instagramUrl: { type: ["string", "null"] }
+        youtubeUrl: { type: ["string", "null"] }
+        contactEmail: { type: ["string", "null"] }
+
+    SettingsUpdate:
+      type: object
+      properties:
+        siteName: { type: ["string", "null"] }
+        siteDescription: { type: ["string", "null"] }
+        gemPrice: { type: ["integer", "null"] }
+        gemServiceFee: { type: ["integer", "null"] }
+        creatorServiceFee: { type: ["integer", "null"] }
+        brandServiceFee: { type: ["integer", "null"] }
+        registrationStatus: { type: ["boolean", "null"] }
+        loginStatus: { type: ["boolean", "null"] }
+        smsNotify: { type: ["boolean", "null"] }
+        facebookUrl: { type: ["string", "null"] }
+        instagramUrl: { type: ["string", "null"] }
+        youtubeUrl: { type: ["string", "null"] }
+        contactEmail: { type: ["string", "null"] }
+
+    VerifyRequest:
+      type: object
+      required: [id, userId, accountNumber, bankId, isApproved, createdAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        accountNumber: { type: string }
+        bankId: { type: integer }
+        bankName: { type: ["string", "null"] }
+        isApproved: { type: boolean }
+        user:
+          $ref: "#/components/schemas/User"
+        createdAt: { type: string }
+
+    Category:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        slug: { type: ["string", "null"] }

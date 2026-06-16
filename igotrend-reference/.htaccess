@@ -1,0 +1,84 @@
+### Rewrite Rules Added by CyberPanel Rewrite Rule Generator
+
+RewriteEngine On
+RewriteCond %{HTTP_HOST} ^www.(.*)$
+RewriteRule ^(.*)$ http://%1/$1 [L,R=301]
+
+### End CyberPanel Generated Rules.
+
+
+### Rewrite Rules Added by CyberPanel Rewrite Rule Generator
+
+RewriteEngine On
+RewriteCond %{HTTPS}  !=on
+RewriteRule ^/?(.*) https://%{SERVER_NAME}/$1 [R,L]
+
+### End CyberPanel Generated Rules.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+
+
+
+
+<IfModule LiteSpeed>
+    CacheEnable public/
+    CacheLookup on
+    RewriteEngine On
+    
+    # Redirect https://igotrend.com to https://www.igotrend.com
+    RewriteCond %{HTTP_HOST} ^igotrend\.com$ [NC]
+    RewriteRule ^ https://www.igotrend.com%{REQUEST_URI} [L,R=301]
+    
+    
+    RewriteCond %{REQUEST_METHOD} ^HEAD|GET$
+    RewriteRule .* - [E=Cache-Control:max-age=120]
+
+    # Add extra file types to the static file list
+    RewriteCond %{ORG_REQ_URI} \.(gif|jpe?g|png|css|js|ico|html|xml|txt|xsl) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=604800]
+
+    # Cache CSS/JS files
+    RewriteCond %{ORG_REQ_URI} \.(css|js) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=604800]
+
+    # Cache images
+    RewriteCond %{ORG_REQ_URI} \.(jpe?g|png|gif) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=604800]
+
+    # Cache font files
+    RewriteCond %{ORG_REQ_URI} \.(ttf|otf|woff|woff2) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=604800]
+
+    # Cache XML/HTML files
+    RewriteCond %{ORG_REQ_URI} \.(xml|html|txt|xsl) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=600]
+
+    # Cache certain file types
+    RewriteCond %{ORG_REQ_URI} \.(ico|pdf|flv)$ [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=86400]
+
+    # Cache dynamic content for a shorter time
+    RewriteCond %{ORG_REQ_URI} \.(php|cgi) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=30]
+
+    # Cache other static files
+    RewriteCond %{ORG_REQ_URI} \.(zip|gz|gzip|bz2|csv|xml) [NC]
+    RewriteRule .* - [E=Cache-Control:max-age=5184000]
+
+    # Exclude specific directories from caching
+    RewriteCond %{ORG_REQ_URI} !/exclude-directory/ [NC]
+    RewriteRule .* - [E=Cache-Control:no-store]
+
+    # Apply caching headers
+    Header set Cache-Control "public, max-age=120"
+
+    # Exclude specific file types from caching
+    <FilesMatch "\.(php|cgi|pl|htm)$">
+        Header set Cache-Control "private, no-store, no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
