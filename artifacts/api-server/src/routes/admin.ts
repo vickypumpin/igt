@@ -138,18 +138,52 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
 
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
 
-  const [creator] = await db.select({ billingMode: usersTable.billingMode, commissionRate: usersTable.commissionRate }).from(usersTable).where(eq(usersTable.id, payout.creatorId));
-  if (creator?.billingMode === "commission" && creator.commissionRate) {
-    const rate = parseFloat(String(creator.commissionRate));
-    const amount = parseFloat(String(payout.amount));
-    if (rate > 0 && amount > 0) {
-      const deductionAmount = (amount * rate) / 100;
-      await db.insert(commissionDeductionsTable).values({
-        userId: payout.creatorId,
-        deductionPercent: String(rate),
-        deductionAmount: String(deductionAmount.toFixed(2)),
-      });
+  // Commission hook: trace creator → recent campaign submission → brand → agency
+  // A payout is a creator cash withdrawal; we find the most recent campaign they
+  // submitted to, resolve that campaign's brand owner, and apply the brand's
+  // commission billing settings (set by admin via the billing modal).
+  try {
+    const [recentSub] = await db
+      .select({ campaignId: submissionsTable.campaignId })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.creatorId, payout.creatorId))
+      .orderBy(sql`submissions.created_at desc`)
+      .limit(1);
+
+    if (recentSub?.campaignId) {
+      const [campaign] = await db
+        .select({ brandId: campaignsTable.brandId })
+        .from(campaignsTable)
+        .where(eq(campaignsTable.id, recentSub.campaignId));
+
+      if (campaign?.brandId) {
+        const [brand] = await db
+          .select({
+            agencyId: usersTable.agencyId,
+            billingMode: usersTable.billingMode,
+            commissionRate: usersTable.commissionRate,
+          })
+          .from(usersTable)
+          .where(eq(usersTable.id, campaign.brandId));
+
+        if (brand?.billingMode === "commission" && brand.agencyId && brand.commissionRate) {
+          const rate = parseFloat(String(brand.commissionRate));
+          const amount = parseFloat(String(payout.amount));
+          if (rate > 0 && amount > 0) {
+            const deductionAmount = (amount * rate) / 100;
+            await db.insert(commissionDeductionsTable).values({
+              userId: campaign.brandId,
+              agencyId: brand.agencyId,
+              campaignId: recentSub.campaignId,
+              deductionPercent: String(rate),
+              deductionAmount: String(deductionAmount.toFixed(2)),
+            });
+          }
+        }
+      }
     }
+  } catch (e) {
+    console.error("Commission hook error:", e);
   }
 
   res.json({ message: "Approved" });

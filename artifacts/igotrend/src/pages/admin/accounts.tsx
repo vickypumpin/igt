@@ -15,6 +15,11 @@ interface User {
   phone: string | null; role: "brand" | "creator" | "admin" | "agency"; badge: string | null;
   isActive: boolean; isLocked: boolean; gems: number; avatarUrl: string | null;
   companyName: string | null; createdAt: string;
+  agencyId: number | null;
+  billingMode: string | null;
+  commissionRate: number | null;
+  billingAmount: number | null;
+  subscriptionStatus: string | null;
 }
 
 interface BillingInfo {
@@ -187,7 +192,16 @@ export default function AdminAccountsPage() {
                         </td>
                         <td className="px-5 py-3.5">
                           <button onClick={() => openBilling(u)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group" title="Edit billing">
-                            <span className="text-xs font-medium capitalize">—</span>
+                            {u.billingMode ? (
+                              <span className="text-xs font-semibold capitalize px-2 py-0.5 rounded-full"
+                                style={u.billingMode === "commission"
+                                  ? { background: "rgba(107,47,206,0.1)", color: "#6B2FCE" }
+                                  : { background: "rgba(29,207,179,0.12)", color: "#0FA88E" }}>
+                                {u.billingMode === "commission" ? `${u.commissionRate ?? 0}% comm.` : "subscription"}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/60">—</span>
+                            )}
                             <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </button>
                         </td>

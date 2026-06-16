@@ -27,7 +27,7 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
   const { data: user } = useGetMe();
 
   const handleLogout = () => {
-    logoutMutation.mutate({}, { onSettled: () => { logout(); queryClient.clear(); } });
+    logoutMutation.mutate(undefined as unknown as void, { onSettled: () => { logout(); queryClient.clear(); } });
   };
 
   const initials = `${user?.firstName?.[0] ?? "A"}${user?.lastName?.[0] ?? "G"}`;

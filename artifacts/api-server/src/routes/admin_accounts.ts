@@ -12,6 +12,11 @@ const userShape = (u: typeof usersTable.$inferSelect) => ({
   badge: u.badge ?? null, isActive: u.isActive, isLocked: u.isLocked,
   gems: u.gems, balance: u.balance, avatarUrl: u.avatarUrl ?? null,
   companyName: u.companyName ?? null, bio: u.bio ?? null,
+  agencyId: u.agencyId ?? null,
+  billingMode: u.billingMode ?? null,
+  commissionRate: u.commissionRate != null ? parseFloat(String(u.commissionRate)) : null,
+  billingAmount: u.billingAmount != null ? parseFloat(String(u.billingAmount)) : null,
+  subscriptionStatus: u.subscriptionStatus ?? null,
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
 });
 
@@ -24,7 +29,7 @@ router.get("/admin/accounts", requireAuth, requireRole("admin"), async (req, res
   const offset = (pageNum - 1) * limitNum;
 
   const conditions: ReturnType<typeof eq>[] = [];
-  if (role === "brand" || role === "creator") conditions.push(eq(usersTable.role, role));
+  if (role === "brand" || role === "creator" || role === "agency") conditions.push(eq(usersTable.role, role));
   if (status === "active") conditions.push(eq(usersTable.isActive, true));
   if (status === "inactive") conditions.push(eq(usersTable.isActive, false));
   if (status === "locked") conditions.push(eq(usersTable.isLocked, true));

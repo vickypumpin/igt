@@ -4,11 +4,20 @@ import AgencyLayout from "@/components/layout/agency-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Megaphone, Users } from "lucide-react";
 
+interface ClientInfo {
+  brandUserId: number | null;
+  companyName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+}
+
 interface Campaign {
   id: number; name: string; sponsor: string; status: string; type: string;
   noOfCreators: number | null; startDate: string | null; endDate: string | null;
-  coverImageUrl: string | null; userId: number; createdAt: string;
+  coverImageUrl: string | null; brandId: number | null; createdAt: string;
   submissionsCount: number;
+  client: ClientInfo | null;
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
@@ -52,6 +61,7 @@ export default function AgencyCampaignsPage() {
               <thead style={{ background: "#fafbfd", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
                 <tr>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Campaign</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Client</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Type</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Creators</th>
@@ -62,6 +72,10 @@ export default function AgencyCampaignsPage() {
               <tbody className="divide-y divide-border/60">
                 {campaigns.map(c => {
                   const st = byCampaignStatus(c.status);
+                  const clientName = c.client?.companyName
+                    || (c.client?.firstName ? `${c.client.firstName} ${c.client.lastName ?? ""}`.trim() : null)
+                    || c.client?.email
+                    || "—";
                   return (
                     <tr key={c.id} className="hover:bg-muted/30 transition-colors" data-testid={`campaign-row-${c.id}`}>
                       <td className="px-5 py-3.5">
@@ -78,6 +92,12 @@ export default function AgencyCampaignsPage() {
                             <div className="text-xs text-muted-foreground">{c.sponsor}</div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="text-xs font-medium">{clientName}</div>
+                        {c.client?.email && c.client.companyName && (
+                          <div className="text-xs text-muted-foreground">{c.client.email}</div>
+                        )}
                       </td>
                       <td className="px-5 py-3.5 text-xs capitalize text-muted-foreground">{c.type}</td>
                       <td className="px-5 py-3.5">
