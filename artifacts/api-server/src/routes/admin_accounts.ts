@@ -176,7 +176,11 @@ router.get("/admin/roles", requireAuth, requireRole("admin"), async (_req, res):
 const saveRoles = async (req: import("express").Request, res: import("express").Response): Promise<void> => {
   try {
     await ensureRolePermissionsColumn();
-    await pool.query(`UPDATE settings SET role_permissions = $1`, [JSON.stringify(req.body)]);
+    await pool.query(
+      `INSERT INTO settings (id, role_permissions) VALUES (1, $1)
+       ON CONFLICT (id) DO UPDATE SET role_permissions = EXCLUDED.role_permissions`,
+      [JSON.stringify(req.body)]
+    );
     res.json({ message: "Permissions updated", permissions: req.body });
   } catch (err) {
     console.error("Failed to persist permissions:", err);

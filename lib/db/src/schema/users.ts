@@ -61,6 +61,15 @@ export const usersTable = pgTable("users", {
   snapchatDayStoryPrice: integer("snapchat_day_story_price"),
   snapchatWeekStoryPrice: integer("snapchat_week_story_price"),
   contentCreatorRate: integer("content_creator_rate"),
+  // Follower counts per platform
+  instagramFollowers: integer("instagram_followers"),
+  facebookFollowers: integer("facebook_followers"),
+  twitterFollowers: integer("twitter_followers"),
+  youtubeFollowers: integer("youtube_followers"),
+  tiktokFollowers: integer("tiktok_followers"),
+  snapchatFollowers: integer("snapchat_followers"),
+  // Brand website
+  websiteUrl: text("website_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
