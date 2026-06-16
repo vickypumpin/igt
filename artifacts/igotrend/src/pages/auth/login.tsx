@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { IgtLogo } from "@/components/IgtLogo";
+import { GeomDecor } from "@/components/GeomDecor";
 import type { AuthResponse } from "@workspace/api-client-react";
 
 const schema = z.object({
@@ -44,50 +46,100 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex" data-testid="page-login">
-      <div className="hidden lg:flex flex-1 bg-primary items-center justify-center p-12">
-        <div className="max-w-md text-primary-foreground">
-          <div className="text-3xl font-bold tracking-tight mb-3">iGoTrend</div>
-          <p className="text-lg opacity-80 leading-relaxed">The influencer marketing command center for West Africa's top agencies.</p>
-          <div className="mt-10 space-y-4 text-sm opacity-70">
-            <div className="flex gap-3 items-start"><span className="mt-0.5 text-base">&#9679;</span><span>Discover 10,000+ vetted creators across Instagram, TikTok, YouTube and more</span></div>
-            <div className="flex gap-3 items-start"><span className="mt-0.5 text-base">&#9679;</span><span>Run multi-platform campaigns with per-format deliverable tracking</span></div>
-            <div className="flex gap-3 items-start"><span className="mt-0.5 text-base">&#9679;</span><span>Pay creators in USD — Gems, airtime, or direct bank transfer</span></div>
+    <div className="min-h-screen flex" data-testid="page-login">
+
+      {/* ── Left hero panel ── */}
+      <div className="hidden lg:flex flex-col flex-1 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #6B2FCE 0%, #4E22A8 45%, #3A1A90 100%)" }}>
+        <GeomDecor variant="purple" />
+
+        {/* Logo */}
+        <div className="relative z-10 p-8">
+          <IgtLogo size="lg" white />
+          <p className="text-white/50 text-xs mt-1 tracking-wide">INFLUENCER MARKETING PLATFORM</p>
+        </div>
+
+        {/* Headline + stats */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center px-10 pb-12">
+          <h1 className="text-4xl font-extrabold text-white leading-tight mb-2">Log In</h1>
+          <p className="text-white/65 text-base leading-relaxed max-w-xs">
+            Access your account and start creating campaigns that trend.
+          </p>
+
+          <div className="mt-10 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.10)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              <div className="text-2xl font-extrabold text-white">10,000+</div>
+              <div className="text-white/55 text-xs mt-0.5">Verified creators</div>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.10)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              <div className="text-2xl font-extrabold text-white">₦18.5M</div>
+              <div className="text-white/55 text-xs mt-0.5">Campaign budgets</div>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.10)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.12)" }}>
+              <div className="text-2xl font-extrabold text-white">148K</div>
+              <div className="text-white/55 text-xs mt-0.5">Collaborations</div>
+            </div>
+            <div className="rounded-2xl p-4" style={{ background: "rgba(29,207,179,0.18)", backdropFilter: "blur(8px)", border: "1px solid rgba(29,207,179,0.35)" }}>
+              <div className="text-2xl font-extrabold" style={{ color: "#1DCFB3" }}>18M</div>
+              <div className="text-white/55 text-xs mt-0.5">Total reach</div>
+            </div>
           </div>
         </div>
+
+        {/* Bottom wave */}
+        <div className="absolute bottom-0 left-0 right-0" style={{ height: 80, background: "linear-gradient(to top, rgba(58,26,144,0.8), transparent)" }} />
       </div>
-      <div className="flex-1 flex items-center justify-center p-8">
+
+      {/* ── Right form panel ── */}
+      <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
+          {/* Mobile-only logo */}
+          <div className="lg:hidden mb-8 flex justify-center">
+            <IgtLogo size="lg" />
+          </div>
+
           <div className="mb-8">
-            <div className="text-2xl font-bold text-foreground mb-1">Welcome back</div>
+            <h2 className="text-2xl font-bold text-foreground mb-1">Welcome back</h2>
             <p className="text-muted-foreground text-sm">Sign in to your iGoTrend account</p>
           </div>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField control={form.control} name="email" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl><Input {...field} type="email" placeholder="you@agency.com" data-testid="input-email" /></FormControl>
+                  <FormLabel className="text-sm font-semibold text-foreground">Email address</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="email" placeholder="you@agency.com" className="h-11 rounded-xl border-border/60 focus:border-primary" data-testid="input-email" />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl><Input {...field} type="password" placeholder="••••••••" data-testid="input-password" /></FormControl>
+                  <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="password" placeholder="••••••••" className="h-11 rounded-xl border-border/60 focus:border-primary" data-testid="input-password" />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-              <Button type="submit" className="w-full" disabled={loginMutation.isPending} data-testid="button-login">
-                {loginMutation.isPending ? "Signing in..." : "Sign in"}
+              <Button
+                type="submit"
+                className="w-full h-11 rounded-xl font-bold text-base mt-2"
+                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
+                disabled={loginMutation.isPending}
+                data-testid="button-login"
+              >
+                {loginMutation.isPending ? "Signing in…" : "Sign in"}
               </Button>
             </form>
           </Form>
+
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <Link href="/register" className="text-primary font-medium hover:underline" data-testid="link-register">Create one</Link>
+            <Link href="/register" className="font-semibold hover:underline" style={{ color: "#1DCFB3" }} data-testid="link-register">Create one</Link>
           </p>
-          <div className="mt-8 pt-6 border-t border-border">
+
+          <div className="mt-8 pt-6 border-t border-border/60">
             <p className="text-xs text-muted-foreground text-center">Demo: admin@igotrend.com / password</p>
           </div>
         </div>

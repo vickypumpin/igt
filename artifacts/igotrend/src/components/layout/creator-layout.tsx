@@ -7,8 +7,8 @@ import { LayoutDashboard, Inbox, Upload, Coins, MessageSquare, Settings, LogOut,
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Link as WLink } from "wouter";
+import { IgtLogo } from "@/components/IgtLogo";
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -31,39 +31,69 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
     logoutMutation.mutate({}, { onSettled: () => { logout(); queryClient.clear(); } });
   };
 
+  const badgeColor: Record<string, string> = {
+    micro: "rgba(29,207,179,0.25)",
+    macro: "rgba(107,47,206,0.25)",
+    mega: "rgba(249,199,79,0.25)",
+    nano: "rgba(224,88,120,0.25)",
+  };
+  const badgeText: Record<string, string> = {
+    micro: "#0FA88E",
+    macro: "#8B5CF6",
+    mega: "#D97706",
+    nano: "#E05878",
+  };
+  const badge = user?.badge?.toLowerCase() ?? "creator";
+
   return (
     <div className="flex h-screen bg-background overflow-hidden" data-testid="layout-creator">
-      <aside className="w-56 bg-sidebar border-r border-sidebar-border flex flex-col">
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="text-lg font-bold text-sidebar-foreground tracking-tight">iGoTrend</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Creator Portal</div>
+      <aside className="w-60 flex flex-col flex-shrink-0" style={{ background: "linear-gradient(180deg, #1A1440 0%, #141C35 100%)" }}>
+        {/* Logo */}
+        <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <IgtLogo size="sm" white />
+          <div className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>CREATOR PORTAL</div>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+
+        {/* Navigation */}
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {navItems.map(({ href, icon: Icon, label }) => {
             const active = location === href || (href !== "/" && location.startsWith(href));
             return (
               <Link key={href} href={href}>
-                <div className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium cursor-pointer transition-colors ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"}`} data-testid={`nav-${label.toLowerCase()}`}>
-                  <Icon className="h-4 w-4" />
-                  {label}
-                  {label === "Invites" && user && <span className="ml-auto text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">new</span>}
+                <div
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium cursor-pointer transition-all`}
+                  style={active
+                    ? { background: "rgba(29,207,179,0.18)", color: "#1DCFB3", border: "1px solid rgba(29,207,179,0.28)" }
+                    : { color: "rgba(255,255,255,0.55)", border: "1px solid transparent" }
+                  }
+                  data-testid={`nav-${label.toLowerCase()}`}
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="flex-1">{label}</span>
+                  {label === "Invites" && (
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(29,207,179,0.25)", color: "#1DCFB3" }}>new</span>
+                  )}
                 </div>
               </Link>
             );
           })}
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
+
+        {/* User footer */}
+        <div className="px-3 pb-3 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2 w-full px-2 py-2 rounded-md hover:bg-sidebar-accent transition-colors" data-testid="button-user-menu">
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback className="text-xs bg-primary text-primary-foreground">{user?.firstName?.[0]}{user?.lastName?.[0]}</AvatarFallback>
+              <button className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl transition-colors" data-testid="button-user-menu">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarFallback className="text-xs font-bold" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", color: "white" }}>{user?.firstName?.[0]}{user?.lastName?.[0]}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left min-w-0">
-                  <div className="text-xs font-medium text-sidebar-foreground truncate">@{user?.userName}</div>
-                  <div className="text-xs text-muted-foreground truncate capitalize">{user?.badge ?? "Creator"}</div>
+                  <div className="text-xs font-semibold text-white truncate">@{user?.userName}</div>
+                  <div className="text-xs px-1.5 py-0.5 rounded-full inline-block capitalize font-medium" style={{ background: badgeColor[badge] ?? "rgba(255,255,255,0.1)", color: badgeText[badge] ?? "rgba(255,255,255,0.5)" }}>
+                    {user?.badge ?? "Creator"}
+                  </div>
                 </div>
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                <ChevronDown className="h-3 w-3 flex-shrink-0" style={{ color: "rgba(255,255,255,0.35)" }} />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -75,14 +105,18 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
           </DropdownMenu>
         </div>
       </aside>
+
       <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-12 border-b border-border flex items-center justify-end px-6 bg-background">
-          <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+        <header className="border-b border-border flex items-center justify-between px-6 bg-white" style={{ height: 52 }}>
+          <div className="text-xs text-muted-foreground font-medium">
+            Hey <span className="text-foreground">@{user?.userName}</span> — let's trend 🔥
+          </div>
+          <Button variant="ghost" size="icon" className="relative h-8 w-8" data-testid="button-notifications">
             <Bell className="h-4 w-4" />
-            {unread > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">{unread}</span>}
+            {unread > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">{unread}</span>}
           </Button>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-6 bg-background">{children}</main>
       </div>
     </div>
   );
