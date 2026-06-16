@@ -11,8 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { FileText, Pencil, X, Plus } from "lucide-react";
 
 const DEFAULT_PAGES = [
-  { slug: "privacy-policy", title: "Privacy Policy" },
-  { slug: "terms-of-service", title: "Terms of Service" },
+  { slug: "privacy", title: "Privacy Policy" },
+  { slug: "terms", title: "Terms of Service" },
   { slug: "terms-of-use", title: "Terms of Use" },
   { slug: "gdpr", title: "GDPR Policy" },
 ];

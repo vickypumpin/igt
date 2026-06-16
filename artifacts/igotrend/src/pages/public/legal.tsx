@@ -5,8 +5,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, AlertCircle } from "lucide-react";
 
 const SLUG_MAP: Record<string, string> = {
-  "privacy-policy": "Privacy Policy",
-  "terms-of-service": "Terms of Service",
+  "privacy": "Privacy Policy",
+  "terms": "Terms of Service",
   "terms-of-use": "Terms of Use",
   "gdpr": "GDPR Policy",
 };

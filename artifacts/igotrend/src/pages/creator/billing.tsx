@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import {
-  useGetMe, getGetMeQueryKey,
   useListBankAccounts, useAddBankAccount, useSetDefaultBankAccount, useDeleteBankAccount,
-  getListBankAccountsQueryKey,
+  useBillingBalance, getBillingBalanceQueryKey, getListBankAccountsQueryKey,
 } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Gem, Landmark, Plus, Star, Trash2, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Gem, Gift, Landmark, Plus, Star, Trash2, X } from "lucide-react";
 
 function AddBankModal({ onClose }: { onClose: () => void }) {
   const { toast } = useToast();
@@ -25,6 +25,7 @@ function AddBankModal({ onClose }: { onClose: () => void }) {
     addMutation.mutate(form, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getBillingBalanceQueryKey() });
         toast({ title: "Bank account added ✓" });
         onClose();
       },
@@ -77,9 +78,21 @@ function AddBankModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+const TXN_ICONS: Record<string, React.ElementType> = {
+  purchase: ArrowDownCircle,
+  reward: Gift,
+  spend: ArrowUpCircle,
+};
+const TXN_COLORS: Record<string, string> = {
+  purchase: "#059669",
+  reward: "#6B2FCE",
+  spend: "#DC2626",
+};
+
 export default function CreatorBillingPage() {
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
-  const { data: accounts = [], isLoading } = useListBankAccounts();
+  const { data: accounts = [], isLoading: loadingAccounts } = useListBankAccounts();
+  const { data: billing, isLoading: loadingBilling } = useBillingBalance();
   const setDefault = useSetDefaultBankAccount();
   const deleteAccount = useDeleteBankAccount();
   const { toast } = useToast();
@@ -96,6 +109,8 @@ export default function CreatorBillingPage() {
       onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() }); toast({ title: "Account removed" }); },
     });
   };
+
+  const transactions = billing?.transactions ?? [];
 
   return (
     <CreatorLayout>
@@ -114,7 +129,7 @@ export default function CreatorBillingPage() {
                 <Gem className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-2xl font-extrabold">{me?.gems ?? 0}</div>
+                <div className="text-2xl font-extrabold">{me?.gems ?? billing?.gems ?? 0}</div>
                 <div className="text-xs text-muted-foreground">Gem balance</div>
               </div>
             </CardContent>
@@ -132,14 +147,14 @@ export default function CreatorBillingPage() {
           </Card>
         </div>
 
-        <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm mb-4">
+        <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm mb-6">
           <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
             <div className="text-sm font-bold">Payout Bank Accounts</div>
             <Button onClick={() => setShowAdd(true)} size="sm" className="rounded-xl gap-1.5 h-8 px-3 text-xs font-semibold" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}>
               <Plus className="h-3.5 w-3.5" />Add Account
             </Button>
           </div>
-          {isLoading ? (
+          {loadingAccounts ? (
             <div className="p-5 space-y-2">{Array(2).fill(0).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
           ) : !accounts.length ? (
             <div className="text-center py-14">
@@ -175,6 +190,42 @@ export default function CreatorBillingPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-border/60">
+            <div className="text-sm font-bold">Transaction History</div>
+          </div>
+          {loadingBilling ? (
+            <div className="p-5 space-y-2">{Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+          ) : !transactions.length ? (
+            <div className="text-center py-12">
+              <p className="text-sm font-medium text-muted-foreground">No transactions yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Gem earnings and spending will appear here</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {transactions.map(txn => {
+                const Icon = TXN_ICONS[txn.type] ?? Gem;
+                const color = TXN_COLORS[txn.type] ?? "#6B7280";
+                const sign = txn.type === "spend" ? "-" : "+";
+                return (
+                  <div key={txn.id} className="px-5 py-4 flex items-center gap-4" data-testid={`txn-row-${txn.id}`}>
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}18` }}>
+                      <Icon className="h-4 w-4" style={{ color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">{txn.description ?? txn.type}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+                    </div>
+                    <div className="font-bold text-sm flex-shrink-0" style={{ color }}>
+                      {sign}{txn.gemsDelta} <span className="font-normal text-muted-foreground">gems</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

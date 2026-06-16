@@ -14,6 +14,22 @@ export interface BankAccount {
   createdAt: string;
 }
 
+export interface GemsTransaction {
+  id: number;
+  type: "purchase" | "spend" | "reward";
+  gemsDelta: number;
+  amount: number | null;
+  description: string | null;
+  reference: string | null;
+  createdAt: string;
+}
+
+export interface BillingBalance {
+  gems: number;
+  balance: string;
+  transactions: GemsTransaction[];
+}
+
 export interface Faq {
   id: number;
   question: string;
@@ -33,12 +49,23 @@ export interface LegalPage {
   updatedAt: string;
 }
 
+export interface AdminMessage {
+  id: number;
+  fromUserId: number;
+  toUserId: number;
+  body: string;
+  isRead: boolean;
+  fromName: string;
+  fromRole: string;
+  createdAt: string;
+}
+
 // ── Bank Accounts ─────────────────────────────────────────────────────────────
 
-export const getListBankAccountsQueryKey = () => ["/bank-accounts"] as const;
+export const getListBankAccountsQueryKey = () => ["/account/bank-accounts"] as const;
 
 export const listBankAccounts = () =>
-  customFetch<BankAccount[]>("/api/bank-accounts");
+  customFetch<BankAccount[]>("/api/account/bank-accounts");
 
 export const useListBankAccounts = <TData = BankAccount[]>(options?: {
   query?: UseQueryOptions<BankAccount[], unknown, TData>;
@@ -54,7 +81,7 @@ export const useAddBankAccount = (
 ) =>
   useMutation<BankAccount, unknown, { bankName: string; bankCode?: string; accountNumber: string; accountName: string; isDefault?: boolean }>({
     mutationFn: (data) =>
-      customFetch<BankAccount>("/api/bank-accounts", {
+      customFetch<BankAccount>("/api/account/bank-accounts", {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -62,11 +89,11 @@ export const useAddBankAccount = (
   });
 
 export const useSetDefaultBankAccount = (
-  options?: UseMutationOptions<void, unknown, { id: number }>
+  options?: UseMutationOptions<{ message: string }, unknown, { id: number }>
 ) =>
-  useMutation<void, unknown, { id: number }>({
+  useMutation<{ message: string }, unknown, { id: number }>({
     mutationFn: ({ id }) =>
-      customFetch<void>(`/api/bank-accounts/${id}/set-default`, { method: "PATCH" }),
+      customFetch<{ message: string }>(`/api/account/bank-accounts/${id}/default`, { method: "PUT" }),
     ...options,
   });
 
@@ -75,7 +102,44 @@ export const useDeleteBankAccount = (
 ) =>
   useMutation<void, unknown, { id: number }>({
     mutationFn: ({ id }) =>
-      customFetch<void>(`/api/bank-accounts/${id}`, { method: "DELETE" }),
+      customFetch<void>(`/api/account/bank-accounts/${id}`, { method: "DELETE" }),
+    ...options,
+  });
+
+// ── Billing Balance ────────────────────────────────────────────────────────────
+
+export const getBillingBalanceQueryKey = () => ["/billing/balance"] as const;
+
+export const useBillingBalance = <TData = BillingBalance>(options?: {
+  query?: UseQueryOptions<BillingBalance, unknown, TData>;
+}) =>
+  useQuery<BillingBalance, unknown, TData>({
+    queryKey: getBillingBalanceQueryKey(),
+    queryFn: () => customFetch<BillingBalance>("/api/billing/balance"),
+    ...options?.query,
+  });
+
+export const usePurchaseGems = (
+  options?: UseMutationOptions<{ paymentUrl: string | null; txRef: string }, unknown, { packageId: string; amount: number; gems: number; currency?: string }>
+) =>
+  useMutation<{ paymentUrl: string | null; txRef: string }, unknown, { packageId: string; amount: number; gems: number; currency?: string }>({
+    mutationFn: (data) =>
+      customFetch<{ paymentUrl: string | null; txRef: string }>("/api/billing/purchase", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
+export const useVerifyGemsPurchase = (
+  options?: UseMutationOptions<{ success: boolean; gemsAdded: number }, unknown, { txRef: string }>
+) =>
+  useMutation<{ success: boolean; gemsAdded: number }, unknown, { txRef: string }>({
+    mutationFn: (data) =>
+      customFetch<{ success: boolean; gemsAdded: number }>("/api/billing/verify", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
     ...options,
   });
 
@@ -175,6 +239,19 @@ export const useAdminBroadcast = (
 ) =>
   useMutation<{ sent: number }, unknown, { message: string; targetRole?: string; link?: string }>({
     mutationFn: (data) =>
-      customFetch<{ sent: number }>("/api/admin/broadcast", { method: "POST", body: JSON.stringify(data) }),
+      customFetch<{ sent: number }>("/api/admin/messages/broadcast", { method: "POST", body: JSON.stringify(data) }),
     ...options,
+  });
+
+// ── Admin Messages Monitor ────────────────────────────────────────────────────
+
+export const getAdminMessagesQueryKey = () => ["/admin/messages"] as const;
+
+export const useAdminMessages = <TData = AdminMessage[]>(options?: {
+  query?: UseQueryOptions<AdminMessage[], unknown, TData>;
+}) =>
+  useQuery<AdminMessage[], unknown, TData>({
+    queryKey: getAdminMessagesQueryKey(),
+    queryFn: () => customFetch<AdminMessage[]>("/api/admin/messages"),
+    ...options?.query,
   });

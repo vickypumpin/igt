@@ -98,8 +98,8 @@ function AppRouter() {
       <Route path="/forgot-password" component={ForgotPasswordPage} />
 
       {/* ── Public legal pages (always accessible) ── */}
-      <Route path="/privacy-policy" component={LegalPage} />
-      <Route path="/terms-of-service" component={LegalPage} />
+      <Route path="/privacy" component={LegalPage} />
+      <Route path="/terms" component={LegalPage} />
       <Route path="/terms-of-use" component={LegalPage} />
       <Route path="/gdpr" component={LegalPage} />
       <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
