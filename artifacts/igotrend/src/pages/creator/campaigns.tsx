@@ -1,0 +1,126 @@
+import { useListMyInvites, useAcceptInvite, useDeclineInvite, getListMyInvitesQueryKey } from "@workspace/api-client-react";
+import { queryClient } from "@/lib/query-client";
+import CreatorLayout from "@/components/layout/creator-layout";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { Briefcase, CheckCircle, Clock, XCircle } from "lucide-react";
+import { useState } from "react";
+
+type FilterType = "all" | "pending" | "accepted" | "declined";
+
+const STATUS_STYLES: Record<string, { bg: string; color: string; label: string; Icon: React.ElementType }> = {
+  pending:  { bg: "rgba(245,158,11,0.12)",  color: "#D97706", label: "Pending",  Icon: Clock },
+  accepted: { bg: "rgba(16,185,129,0.12)",  color: "#059669", label: "Accepted", Icon: CheckCircle },
+  declined: { bg: "rgba(239,68,68,0.12)",   color: "#DC2626", label: "Declined", Icon: XCircle },
+};
+
+export default function CreatorCampaignsPage() {
+  const { toast } = useToast();
+  const { data: invites = [], isLoading } = useListMyInvites({ query: { queryKey: getListMyInvitesQueryKey() } });
+  const acceptMutation = useAcceptInvite();
+  const declineMutation = useDeclineInvite();
+  const [filter, setFilter] = useState<FilterType>("all");
+
+  const filtered = filter === "all" ? invites : invites.filter(i => i.status === filter);
+
+  const handleAccept = (id: number) => {
+    acceptMutation.mutate({ id }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListMyInvitesQueryKey() }); toast({ title: "Invite accepted! 🎉" }); },
+      onError: () => toast({ title: "Failed to accept invite", variant: "destructive" }),
+    });
+  };
+
+  const handleDecline = (id: number) => {
+    declineMutation.mutate({ id }, {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListMyInvitesQueryKey() }); toast({ title: "Invite declined" }); },
+    });
+  };
+
+  const counts = {
+    all: invites.length,
+    pending: invites.filter(i => i.status === "pending").length,
+    accepted: invites.filter(i => i.status === "accepted").length,
+    declined: invites.filter(i => i.status === "declined").length,
+  };
+
+  return (
+    <CreatorLayout>
+      <div data-testid="page-creator-campaigns">
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold">My Campaigns</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Track all your campaign invitations</p>
+        </div>
+
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {(["all", "pending", "accepted", "declined"] as FilterType[]).map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all"
+              style={filter === f ? { background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", color: "#fff", border: "none" } : { background: "white", borderColor: "rgba(0,0,0,0.12)" }}
+              data-testid={`filter-${f}`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
+            </button>
+          ))}
+        </div>
+
+        {isLoading ? (
+          <div className="space-y-3">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+        ) : !filtered.length ? (
+          <div className="text-center py-20">
+            <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "rgba(29,207,179,0.1)" }}>
+              <Briefcase className="h-7 w-7" style={{ color: "#1DCFB3" }} />
+            </div>
+            <p className="text-sm font-medium">No {filter === "all" ? "" : filter} invitations</p>
+            <p className="text-xs text-muted-foreground mt-1">Campaign invitations will appear here</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map(invite => {
+              const s = STATUS_STYLES[invite.status] ?? STATUS_STYLES.pending;
+              const { Icon } = s;
+              return (
+                <div key={invite.id} className="bg-white rounded-2xl border border-border/60 shadow-sm p-5 flex items-center gap-4" data-testid={`invite-row-${invite.id}`}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}>
+                    <Briefcase className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm">{invite.campaignName ?? `Campaign #${invite.campaignId}`}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{invite.message ?? "You've been invited to participate in this campaign"}</div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: s.bg, color: s.color }}>
+                      <Icon className="h-3.5 w-3.5" />{s.label}
+                    </span>
+                    {invite.status === "pending" && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleAccept(invite.id)}
+                          disabled={acceptMutation.isPending}
+                          className="h-8 px-3 rounded-xl text-xs font-semibold"
+                          style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+                          data-testid={`btn-accept-${invite.id}`}
+                        >Accept</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDecline(invite.id)}
+                          disabled={declineMutation.isPending}
+                          className="h-8 px-3 rounded-xl text-xs font-semibold text-red-500 border-red-200 hover:bg-red-50"
+                          data-testid={`btn-decline-${invite.id}`}
+                        >Decline</Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </CreatorLayout>
+  );
+}

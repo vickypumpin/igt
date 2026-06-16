@@ -11,6 +11,10 @@ import notificationsRouter from "./notifications";
 import dashboardRouter from "./dashboard";
 import adminRouter from "./admin";
 import settingsRouter from "./settings";
+import bankAccountsRouter from "./bank_accounts";
+import faqsRouter from "./faqs";
+import legalRouter from "./legal";
+import broadcastRouter from "./broadcast";
 
 const router: IRouter = Router();
 
@@ -26,5 +30,9 @@ router.use(notificationsRouter);
 router.use(dashboardRouter);
 router.use(adminRouter);
 router.use(settingsRouter);
+router.use(bankAccountsRouter);
+router.use(faqsRouter);
+router.use(legalRouter);
+router.use(broadcastRouter);
 
 export default router;

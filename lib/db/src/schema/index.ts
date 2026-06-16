@@ -7,3 +7,7 @@ export * from "./rewards";
 export * from "./messages";
 export * from "./notifications";
 export * from "./settings";
+export * from "./bank_accounts";
+export * from "./faqs";
+export * from "./legal_pages";
+export * from "./gems_transactions";

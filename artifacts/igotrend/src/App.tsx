@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
@@ -18,6 +18,7 @@ import BrandsPage from "@/pages/public/brands";
 import InfluencersCreatorsPage from "@/pages/public/influencers-creators";
 import ServicesPage from "@/pages/public/services";
 import CommunityGuidelinesPage from "@/pages/public/community-guidelines";
+import LegalPage from "@/pages/public/legal";
 
 import BrandDashboardPage from "@/pages/brand/dashboard";
 import CampaignsPage from "@/pages/brand/campaigns";
@@ -27,11 +28,14 @@ import CreatorsPage from "@/pages/brand/creators";
 import CreatorProfilePage from "@/pages/brand/creator-profile";
 import BrandMessagesPage from "@/pages/brand/messages";
 import PaymentsPage from "@/pages/brand/payments";
+import BrandBillingPage from "@/pages/brand/billing";
 
 import CreatorDashboardPage from "@/pages/creator/dashboard";
 import InvitesPage from "@/pages/creator/invites";
 import SubmitPage from "@/pages/creator/submit";
 import EarningsPage from "@/pages/creator/earnings";
+import CreatorBillingPage from "@/pages/creator/billing";
+import CreatorCampaignsPage from "@/pages/creator/campaigns";
 
 import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminUsersPage from "@/pages/admin/users";
@@ -40,26 +44,19 @@ import AdminSubmissionsPage from "@/pages/admin/submissions";
 import VerifyRequestsPage from "@/pages/admin/verify-requests";
 import AdminPayoutsPage from "@/pages/admin/payouts";
 import AdminSettingsPage from "@/pages/admin/settings";
+import AdminFaqsPage from "@/pages/admin/faqs";
+import AdminLegalPage from "@/pages/admin/legal";
+import AdminMessagingPage from "@/pages/admin/messaging";
 
 import SettingsPage from "@/pages/shared/settings";
+import FaqPage from "@/pages/shared/faq";
+import TrendAiPage from "@/pages/shared/trend-ai";
 import ComingSoonPage from "@/pages/shared/coming-soon";
 
-/* ── Coming-soon wrappers with titles ── */
-const TrendAiPage   = () => <ComingSoonPage title="Trend Ai" description="AI-powered campaign insights are coming soon. Stay tuned!" />;
-const FaqPage       = () => <ComingSoonPage title="FAQ" description="Frequently asked questions will be available here soon." />;
-const BillingPage   = () => <ComingSoonPage title="Billing" description="Billing and subscription management is coming soon." />;
-const AccountPage   = () => <Redirect to="/settings/profile" />;
-
-/* Admin coming-soon pages */
-const AdminMessagesPage        = () => <ComingSoonPage title="Messages" description="Platform messaging is coming soon." />;
-const AdminBroadcastPage       = () => <ComingSoonPage title="Broadcast" description="Broadcast messaging is coming soon." />;
-const AdminFaqsPage            = () => <ComingSoonPage title="FAQs" description="FAQ management is coming soon." />;
-const AdminLegalPage           = () => <ComingSoonPage title="Legal Pages" description="Legal page management is coming soon." />;
-const AdminAccountPage         = () => <Redirect to="/admin/settings" />;
-const AdminSettingsFeesPage    = () => <ComingSoonPage title="Fees & Taxes" description="Fee and tax configuration is coming soon." />;
-const AdminSettingsGatewayPage = () => <ComingSoonPage title="Payment Gateway" description="Payment gateway settings are coming soon." />;
-const AdminSettingsSmtpPage    = () => <ComingSoonPage title="SMTP Settings" description="SMTP email configuration is coming soon." />;
-const AdminSettingsRolesPage   = () => <ComingSoonPage title="Roles & Permissions" description="Role management is coming soon." />;
+const AdminSettingsFeesPage    = () => <AdminSettingsPage />;
+const AdminSettingsGatewayPage = () => <AdminSettingsPage />;
+const AdminSettingsSmtpPage    = () => <AdminSettingsPage />;
+const AdminSettingsRolesPage   = () => <ComingSoonPage title="Roles & Permissions" description="Fine-grained role management is coming soon." />;
 
 function AppRouter() {
   const { user, setAuth, isLoading: authLoading } = useAuth();
@@ -100,6 +97,13 @@ function AppRouter() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
 
+      {/* ── Public legal pages (always accessible) ── */}
+      <Route path="/privacy-policy" component={LegalPage} />
+      <Route path="/terms-of-service" component={LegalPage} />
+      <Route path="/terms-of-use" component={LegalPage} />
+      <Route path="/gdpr" component={LegalPage} />
+      <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
+
       {/* ── Public marketing pages (unauthenticated users) ── */}
       {!user && (
         <>
@@ -107,7 +111,6 @@ function AppRouter() {
           <Route path="/brands" component={BrandsPage} />
           <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
           <Route path="/services" component={ServicesPage} />
-          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}
@@ -141,8 +144,8 @@ function AppRouter() {
           <Route path="/admin/submissions" component={AdminSubmissionsPage} />
 
           {/* Messaging */}
-          <Route path="/admin/messages" component={AdminMessagesPage} />
-          <Route path="/admin/messages/broadcast" component={AdminBroadcastPage} />
+          <Route path="/admin/messages" component={AdminMessagingPage} />
+          <Route path="/admin/messages/broadcast" component={AdminMessagingPage} />
 
           {/* Settings sub-pages */}
           <Route path="/admin/settings" component={AdminSettingsPage} />
@@ -156,9 +159,8 @@ function AppRouter() {
           <Route path="/admin/legal" component={AdminLegalPage} />
 
           {/* Account */}
-          <Route path="/admin/account" component={AdminAccountPage} />
+          <Route path="/admin/account" component={() => <Redirect to="/settings/profile" />} />
           <Route path="/settings/profile" component={SettingsPage} />
-          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}
@@ -169,6 +171,10 @@ function AppRouter() {
           <Route path="/" component={CreatorDashboardPage} />
 
           {/* Campaign Mgt sub-pages */}
+          <Route path="/campaigns" component={CreatorCampaignsPage} />
+          <Route path="/campaigns/accepted" component={() => <CreatorCampaignsPage />} />
+          <Route path="/campaigns/completed" component={() => <CreatorCampaignsPage />} />
+          <Route path="/campaigns/declined" component={() => <CreatorCampaignsPage />} />
           <Route path="/invites" component={InvitesPage} />
           <Route path="/invites/:id" component={InvitesPage} />
           <Route path="/invites/accepted" component={() => <InvitesPage />} />
@@ -179,13 +185,11 @@ function AppRouter() {
           <Route path="/earnings" component={EarningsPage} />
           <Route path="/messages" component={BrandMessagesPage} />
 
-          {/* New nav items */}
+          <Route path="/billing" component={CreatorBillingPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />
-          <Route path="/billing" component={BillingPage} />
 
           <Route path="/settings/profile" component={SettingsPage} />
-          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}
@@ -207,13 +211,11 @@ function AppRouter() {
           <Route path="/messages" component={BrandMessagesPage} />
           <Route path="/payments" component={PaymentsPage} />
 
-          {/* New nav items */}
+          <Route path="/billing" component={BrandBillingPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />
-          <Route path="/billing" component={BillingPage} />
 
           <Route path="/settings/profile" component={SettingsPage} />
-          <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
           <Route component={NotFound} />
         </>
       )}
