@@ -221,7 +221,7 @@ router.get("/admin/payments/subscriptions", requireAuth, requireRole("admin"), a
         userId: paymentsTable.userId,
         lastPaymentDate: max(paymentsTable.createdAt),
       }).from(paymentsTable)
-        .where(and(inArray(paymentsTable.userId, userIds), eq(paymentsTable.status, "completed")))
+        .where(and(inArray(paymentsTable.userId, userIds), eq(paymentsTable.paymentStatus, true)))
         .groupBy(paymentsTable.userId)
     : [];
   const lastPaymentMap = Object.fromEntries(lastPayments.map(r => [r.userId, r.lastPaymentDate]));

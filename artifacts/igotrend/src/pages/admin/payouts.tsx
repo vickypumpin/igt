@@ -19,6 +19,7 @@ interface SubUser {
   id: number; firstName: string; lastName: string; email: string;
   role: string; companyName: string | null; billingMode: string | null;
   billingAmount: number; subscriptionStatus: string | null; createdAt: string;
+  lastPaymentDate: string | null;
 }
 
 interface CommissionRow {
@@ -184,6 +185,7 @@ export default function AdminPayoutsPage() {
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Role</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Monthly Fee</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Sub Status</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Last Payment</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Since</th>
                       </tr>
                     </thead>
@@ -201,6 +203,9 @@ export default function AdminPayoutsPage() {
                             <td className="px-5 py-3.5 font-bold">₦{s.billingAmount.toLocaleString()}</td>
                             <td className="px-5 py-3.5">
                               <span className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize" style={{ background: st.bg, color: st.color }}>{s.subscriptionStatus ?? "active"}</span>
+                            </td>
+                            <td className="px-5 py-3.5 text-xs text-muted-foreground">
+                              {s.lastPaymentDate ? new Date(s.lastPaymentDate).toLocaleDateString() : <span className="text-muted-foreground/50">—</span>}
                             </td>
                             <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(s.createdAt).toLocaleDateString()}</td>
                           </tr>
