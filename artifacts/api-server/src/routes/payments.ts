@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, sql } from "drizzle-orm";
-import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, settingsTable } from "@workspace/db";
+import { eq, sql, desc } from "drizzle-orm";
+import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, settingsTable, submissionsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -183,8 +183,22 @@ router.get("/payouts", requireAuth, requireRole("creator"), async (req, res): Pr
 router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
   const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
+
+  // Derive campaignId from creator's most recent approved submission when not explicitly provided.
+  // This ensures commission deduction fires reliably on payout approval.
+  let resolvedCampaignId: number | null = campaignId ? Number(campaignId) : null;
+  if (!resolvedCampaignId) {
+    const [recentSub] = await db
+      .select({ campaignId: submissionsTable.campaignId })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.creatorId, req.userId!))
+      .orderBy(desc(submissionsTable.createdAt))
+      .limit(1);
+    if (recentSub?.campaignId) resolvedCampaignId = recentSub.campaignId;
+  }
+
   await db.insert(payoutsTable).values({
-    creatorId: req.userId!, campaignId: campaignId ? Number(campaignId) : null,
+    creatorId: req.userId!, campaignId: resolvedCampaignId,
     amount: String(amount), bankCode: bankCode ?? null, accountNumber: accountNumber ?? null, status: "pending",
   });
   res.json({ message: "Payout requested successfully. An admin will process it within 1–2 business days." });

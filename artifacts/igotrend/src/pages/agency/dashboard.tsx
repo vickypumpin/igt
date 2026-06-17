@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 import AgencyLayout from "@/components/layout/agency-layout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Megaphone, Clock, TrendingUp } from "lucide-react";
+import { Users, Megaphone, Clock, TrendingUp, DollarSign } from "lucide-react";
 
 interface DashboardData {
   agency: {
@@ -31,6 +31,7 @@ export default function AgencyDashboardPage() {
     { label: "Pending Invites", value: data.pendingInvites, icon: Clock, gradient: "linear-gradient(135deg, #F59E0B, #D97706)" },
     { label: "Active Campaigns", value: data.activeCampaigns, icon: Megaphone, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
     { label: "Monthly Spend", value: fmt(data.monthlySpend), icon: TrendingUp, gradient: "linear-gradient(135deg, #EF4444, #DC2626)" },
+    { label: "Commission Owed", value: fmt(data.totalCommissionOwed), icon: DollarSign, gradient: "linear-gradient(135deg, #FF8C42, #E56B1F)" },
   ] : [];
 
   return (
@@ -51,11 +52,11 @@ export default function AgencyDashboardPage() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            {Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+            {Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
             {stats.map(({ label, value, icon: Icon, gradient }) => (
               <div key={label} className="bg-white rounded-2xl border border-border/60 p-5 shadow-sm flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white" style={{ background: gradient }}>
