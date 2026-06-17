@@ -254,6 +254,7 @@ function AppRouter() {
           <Route path="/agency/clients" component={AgencyClientsPage} />
           <Route path="/agency/campaigns" component={AgencyCampaignsPage} />
           <Route path="/agency/billing" component={AgencyDashboardPage} />
+          <Route path="/agency/messages" component={AgencyDashboardPage} />
           <Route path="/agency/settings" component={SettingsPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />

@@ -19,6 +19,7 @@ router.get("/settings", requireAuth, requireRole("admin"), async (req, res): Pro
 router.patch("/settings", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const fields = [
     "siteName","siteDescription","gemPrice","gemServiceFee","creatorServiceFee","brandServiceFee",
+    "defaultBillingMode","defaultCommissionRate",
     "registrationStatus","loginStatus","smsNotify","facebookUrl","instagramUrl","youtubeUrl","contactEmail",
     "flutterwavePublicKey","flutterwaveSecretKey","flutterwaveEncryptionKey","flutterwaveLive",
     "twilioAccountSid","twilioAuthToken","twilioPhoneNumber",
