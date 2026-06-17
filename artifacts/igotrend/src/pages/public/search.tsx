@@ -2,18 +2,22 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { useAuth } from "@/contexts/auth-context";
-import { Search, Instagram, Youtube, Twitter, Facebook, Users, Star } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Search, Instagram, Youtube, Twitter, Facebook, Users, Star, X,
+  CheckCircle, Lock, Briefcase, Send, ChevronDown,
+} from "lucide-react";
 import { SiTiktok, SiSnapchat } from "react-icons/si";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
-const BADGE_CFG: Record<string, { bg: string; text: string; label: string }> = {
-  nano:     { bg: "rgba(107,114,128,0.12)", text: "#4B5563",  label: "Nano" },
-  micro:    { bg: "rgba(59,130,246,0.12)",  text: "#2563EB",  label: "Micro" },
-  mid_tier: { bg: "rgba(16,185,129,0.12)",  text: "#059669",  label: "Mid-tier" },
-  macro:    { bg: "rgba(139,92,246,0.12)",  text: "#7C3AED",  label: "Macro" },
-  mega:     { bg: "rgba(249,115,22,0.12)",  text: "#EA580C",  label: "Mega" },
-  elite:    { bg: "rgba(234,179,8,0.12)",   text: "#B45309",  label: "Elite" },
+const BADGE_CFG: Record<string, { bg: string; text: string; label: string; grad: string }> = {
+  nano:     { bg: "rgba(107,114,128,0.12)", text: "#4B5563", label: "Nano",     grad: "linear-gradient(135deg,#6B7280,#374151)" },
+  micro:    { bg: "rgba(59,130,246,0.12)",  text: "#2563EB", label: "Micro",    grad: "linear-gradient(135deg,#3B82F6,#2563EB)" },
+  mid_tier: { bg: "rgba(16,185,129,0.12)",  text: "#059669", label: "Mid-tier", grad: "linear-gradient(135deg,#10B981,#059669)" },
+  macro:    { bg: "rgba(139,92,246,0.12)",  text: "#7C3AED", label: "Macro",    grad: "linear-gradient(135deg,#8B5CF6,#6D28D9)" },
+  mega:     { bg: "rgba(249,115,22,0.12)",  text: "#EA580C", label: "Mega",     grad: "linear-gradient(135deg,#F59E0B,#D97706)" },
+  elite:    { bg: "rgba(234,179,8,0.12)",   text: "#B45309", label: "Elite",    grad: "linear-gradient(135deg,#FBBF24,#F59E0B)" },
 };
 
 const PLATFORM_ICONS: Record<string, React.ReactNode> = {
@@ -23,6 +27,11 @@ const PLATFORM_ICONS: Record<string, React.ReactNode> = {
   twitter:   <Twitter className="h-3.5 w-3.5" />,
   facebook:  <Facebook className="h-3.5 w-3.5" />,
   snapchat:  <SiSnapchat className="h-3 w-3" />,
+};
+
+const PLATFORM_LABELS: Record<string, string> = {
+  instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube",
+  twitter: "Twitter / X", facebook: "Facebook", snapchat: "Snapchat",
 };
 
 const CATEGORIES = [
@@ -64,6 +73,8 @@ type Creator = {
   facebookProfile: string | null;
 };
 
+type Campaign = { id: number; name: string; status: string };
+
 function getActivePlatforms(c: Creator): string[] {
   const out: string[] = [];
   if (c.instagramProfile) out.push("instagram");
@@ -74,11 +85,302 @@ function getActivePlatforms(c: Creator): string[] {
   return out;
 }
 
-function CreatorCard({ creator, idx, profileHref }: { creator: Creator; idx: number; profileHref: string }) {
+function getInitials(c: Creator) {
+  if (c.firstName && c.lastName) return `${c.firstName[0]}${c.lastName[0]}`.toUpperCase();
+  return c.userName?.slice(0, 2).toUpperCase() ?? "??";
+}
+
+function getDisplayName(c: Creator) {
+  return c.firstName && c.lastName ? `${c.firstName} ${c.lastName}` : c.userName;
+}
+
+/* ────────────────────────────────────────────────
+   Creator Profile Modal
+──────────────────────────────────────────────── */
+function CreatorModal({
+  creator,
+  idx,
+  user,
+  onClose,
+}: {
+  creator: Creator;
+  idx: number;
+  user: { role: string } | null;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
   const grad = AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length];
   const badge = creator.badge ? BADGE_CFG[creator.badge] : null;
   const platforms = getActivePlatforms(creator);
-  const initials = creator.userName?.slice(0, 2).toUpperCase() ?? "??";
+
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [campsLoading, setCampsLoading] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === "brand") {
+      setCampsLoading(true);
+      fetch(`${API_BASE}/campaigns`, { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => {
+          const arr = Array.isArray(d) ? d : [];
+          setCampaigns(arr);
+          if (arr.length > 0) setSelectedCampaign(String(arr[0].id));
+        })
+        .catch(() => setCampaigns([]))
+        .finally(() => setCampsLoading(false));
+    }
+  }, [user?.role]);
+
+  async function handleInvite() {
+    if (!selectedCampaign) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${API_BASE}/campaigns/${selectedCampaign}/invites`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorId: creator.id }),
+      });
+      if (res.ok) {
+        setSent(true);
+        toast({ title: "Invite sent!", description: `${getDisplayName(creator)} has been invited to your campaign.` });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Failed to send invite", description: err.error ?? "Something went wrong.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(10,6,30,0.65)", backdropFilter: "blur(6px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+        style={{ maxHeight: "92vh", overflowY: "auto" }}
+      >
+        {/* ── Banner ── */}
+        <div className="h-24 w-full relative" style={{ background: "linear-gradient(135deg, #1a0a3e, #3d1a85)" }}>
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+            style={{ background: "rgba(255,255,255,0.15)" }}
+          >
+            <X className="h-4 w-4 text-white" />
+          </button>
+        </div>
+
+        <div className="px-6 pb-6 -mt-10">
+          {/* Avatar + badge */}
+          <div className="flex items-end justify-between mb-3">
+            <div
+              className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-black text-2xl border-4 border-white shadow-lg"
+              style={creator.avatarUrl ? {} : { background: grad }}
+            >
+              {creator.avatarUrl
+                ? <img src={creator.avatarUrl} alt={creator.userName} className="w-full h-full object-cover rounded-2xl" />
+                : getInitials(creator)}
+            </div>
+            {badge && (
+              <span
+                className="mb-1 px-3 py-1 rounded-full text-xs font-bold capitalize"
+                style={{ background: badge.bg, color: badge.text }}
+              >
+                {badge.label}
+              </span>
+            )}
+          </div>
+
+          {/* Name & handle */}
+          <h2 className="text-xl font-extrabold text-gray-900 leading-tight">{getDisplayName(creator)}</h2>
+          <p className="text-sm text-gray-400 mb-3">@{creator.userName}</p>
+
+          {/* Category */}
+          {creator.contentCategory && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold mb-3"
+              style={{ background: "rgba(29,207,179,0.12)", color: "#0FA88E" }}>
+              {creator.contentCategory}
+            </span>
+          )}
+
+          {/* Bio */}
+          {creator.bio && (
+            <p className="text-sm text-gray-600 leading-relaxed mb-4 bg-gray-50 rounded-xl p-3">{creator.bio}</p>
+          )}
+
+          {/* Platforms */}
+          {platforms.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Active Platforms</p>
+              <div className="flex flex-wrap gap-2">
+                {platforms.map((p) => (
+                  <span key={p} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-600 border border-gray-100 bg-gray-50">
+                    {PLATFORM_ICONS[p]}
+                    {PLATFORM_LABELS[p]}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Actions ── */}
+          <div className="rounded-2xl p-4" style={{ background: "rgba(107,47,206,0.06)", border: "1px solid rgba(107,47,206,0.12)" }}>
+
+            {/* Not logged in */}
+            {!user && (
+              <div className="text-center py-2">
+                <Lock className="h-8 w-8 mx-auto mb-2 text-purple-300" />
+                <p className="font-bold text-gray-800 mb-1">Sign in to contact this creator</p>
+                <p className="text-xs text-gray-500 mb-4">Create a brand or agency account to invite creators to your campaigns.</p>
+                <div className="flex gap-3 justify-center">
+                  <Link
+                    href={`/login?returnTo=${encodeURIComponent(`/search${window.location.search}`)}`}
+                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
+                    style={{ background: "linear-gradient(135deg,#6B2FCE,#4E22A8)" }}
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="px-5 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
+                    style={{ background: "linear-gradient(135deg,#1DCFB3,#0FA88E)" }}
+                  >
+                    Register
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Brand — campaign invite */}
+            {user?.role === "brand" && (
+              <div>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Add to Campaign</p>
+                {campsLoading ? (
+                  <div className="h-10 bg-gray-100 rounded-xl animate-pulse mb-3" />
+                ) : campaigns.length === 0 ? (
+                  <div className="text-center py-3">
+                    <p className="text-sm text-gray-500 mb-3">You have no campaigns yet.</p>
+                    <Link
+                      href="/campaigns/create"
+                      className="inline-block px-5 py-2 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
+                      style={{ background: "linear-gradient(135deg,#1DCFB3,#0FA88E)" }}
+                    >
+                      Create a Campaign
+                    </Link>
+                  </div>
+                ) : sent ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(29,207,179,0.1)" }}>
+                    <CheckCircle className="h-5 w-5 text-teal-500 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-teal-700">Invite Sent!</p>
+                      <p className="text-xs text-teal-600">{getDisplayName(creator)} has been invited to your campaign.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative mb-3">
+                      <select
+                        value={selectedCampaign}
+                        onChange={(e) => setSelectedCampaign(e.target.value)}
+                        className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl text-sm bg-white border border-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      >
+                        {campaigns.map((c) => (
+                          <option key={c.id} value={String(c.id)}>{c.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    </div>
+                    <button
+                      onClick={handleInvite}
+                      disabled={sending || !selectedCampaign}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+                      style={{ background: "linear-gradient(135deg,#1DCFB3,#0FA88E)" }}
+                    >
+                      <Send className="h-4 w-4" />
+                      {sending ? "Sending…" : "Send Campaign Invite"}
+                    </button>
+                    <div className="mt-2 text-center">
+                      <Link
+                        href={`/creators/${creator.id}`}
+                        className="text-xs text-purple-600 hover:underline font-medium"
+                        onClick={onClose}
+                      >
+                        View full profile →
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Agency */}
+            {user?.role === "agency" && (
+              <div className="text-center py-2">
+                <Briefcase className="h-8 w-8 mx-auto mb-2" style={{ color: "#6B2FCE" }} />
+                <p className="font-bold text-gray-800 mb-1">Add to a Client Campaign</p>
+                <p className="text-xs text-gray-500 mb-4">Go to your campaigns dashboard to assign this creator to an active client campaign.</p>
+                <Link
+                  href="/agency/campaigns"
+                  className="inline-block px-6 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
+                  style={{ background: "linear-gradient(135deg,#6B2FCE,#4E22A8)" }}
+                  onClick={onClose}
+                >
+                  Go to Campaigns →
+                </Link>
+              </div>
+            )}
+
+            {/* Creator (shouldn't see this page but just in case) */}
+            {user?.role === "creator" && (
+              <div className="text-center py-2">
+                <p className="text-sm text-gray-500">This creator directory is for brands and agencies.</p>
+              </div>
+            )}
+
+            {/* Admin */}
+            {user?.role === "admin" && (
+              <div className="text-center py-2">
+                <Link
+                  href={`/creators/${creator.id}`}
+                  className="inline-block px-6 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
+                  style={{ background: "linear-gradient(135deg,#FF8C42,#e07030)" }}
+                  onClick={onClose}
+                >
+                  View Full Profile (Admin)
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────
+   Creator Card (public grid)
+──────────────────────────────────────────────── */
+function CreatorCard({
+  creator,
+  idx,
+  onViewProfile,
+}: {
+  creator: Creator;
+  idx: number;
+  onViewProfile: () => void;
+}) {
+  const grad = AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length];
+  const badge = creator.badge ? BADGE_CFG[creator.badge] : null;
+  const platforms = getActivePlatforms(creator);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 hover:shadow-lg transition-all duration-200 overflow-hidden group">
@@ -90,16 +392,12 @@ function CreatorCard({ creator, idx, profileHref }: { creator: Creator; idx: num
         >
           {creator.avatarUrl
             ? <img src={creator.avatarUrl} alt={creator.userName} className="w-full h-full object-cover rounded-xl" />
-            : initials}
+            : getInitials(creator)}
         </div>
 
         <div className="flex items-start justify-between gap-2 mb-1">
           <div>
-            <p className="font-bold text-gray-900 leading-tight">
-              {creator.firstName && creator.lastName
-                ? `${creator.firstName} ${creator.lastName}`
-                : creator.userName}
-            </p>
+            <p className="font-bold text-gray-900 leading-tight">{getDisplayName(creator)}</p>
             <p className="text-xs text-gray-400">@{creator.userName}</p>
           </div>
           {badge && (
@@ -129,13 +427,13 @@ function CreatorCard({ creator, idx, profileHref }: { creator: Creator; idx: num
           </div>
         )}
 
-        <Link
-          href={profileHref}
+        <button
+          onClick={onViewProfile}
           className="block w-full text-center py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90"
           style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
         >
           View Profile
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -166,8 +464,11 @@ function parseQuery(search: string) {
   };
 }
 
+/* ────────────────────────────────────────────────
+   Page
+──────────────────────────────────────────────── */
 export default function PublicSearchPage() {
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const qs = parseQuery(window.location.search);
 
@@ -181,14 +482,14 @@ export default function PublicSearchPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [page, setPage] = useState(1);
 
+  const [modalCreator, setModalCreator] = useState<{ creator: Creator; idx: number } | null>(null);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchText), 350);
     return () => clearTimeout(t);
   }, [searchText]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [platform, category, debouncedQ]);
+  useEffect(() => { setPage(1); }, [platform, category, debouncedQ]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -199,18 +500,34 @@ export default function PublicSearchPage() {
 
     fetch(`${API_BASE}/public/creators?${params}`)
       .then((r) => r.json())
-      .then((d) => {
-        setCreators(d.data ?? []);
-        setTotal(d.total ?? 0);
-      })
+      .then((d) => { setCreators(d.data ?? []); setTotal(d.total ?? 0); })
       .catch(() => { setCreators([]); setTotal(0); })
       .finally(() => setIsLoading(false));
   }, [platform, category, debouncedQ, page]);
 
   const totalPages = Math.ceil(total / 24);
 
+  function openModal(creator: Creator, idx: number) {
+    if (!user) {
+      navigate(`/login?returnTo=${encodeURIComponent(`/search${window.location.search}`)}`);
+      return;
+    }
+    setModalCreator({ creator, idx });
+  }
+
   return (
     <PublicLayout>
+
+      {/* ── Creator Profile Modal ── */}
+      {modalCreator && (
+        <CreatorModal
+          creator={modalCreator.creator}
+          idx={modalCreator.idx}
+          user={user}
+          onClose={() => setModalCreator(null)}
+        />
+      )}
+
       {/* ── Header ── */}
       <section
         className="relative overflow-hidden py-12"
@@ -224,7 +541,11 @@ export default function PublicSearchPage() {
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white mb-2">
             Find the Right <span style={{ color: "#1DCFB3" }}>Trender</span> for Your Campaign
           </h1>
-          <p className="text-white/60 text-sm mb-8">Browse verified West African content creators — sign up to unlock full profiles, pricing and invites.</p>
+          <p className="text-white/60 text-sm mb-8">
+            {user
+              ? "Browse verified West African content creators — click View Profile to invite them to your campaign."
+              : "Browse verified West African content creators — sign up to unlock full profiles, pricing and invites."}
+          </p>
 
           {/* Search / Filter bar */}
           <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-2 p-2 rounded-2xl" style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.15)" }}>
@@ -270,13 +591,15 @@ export default function PublicSearchPage() {
             <p className="text-sm text-gray-500">
               {isLoading ? "Searching…" : `${total.toLocaleString()} creator${total !== 1 ? "s" : ""} found`}
             </p>
-            <Link
-              href="/register"
-              className="px-5 py-2 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #6B2FCE, #4E22A8)" }}
-            >
-              Sign up to invite creators →
-            </Link>
+            {!user && (
+              <Link
+                href="/register"
+                className="px-5 py-2 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90"
+                style={{ background: "linear-gradient(135deg, #6B2FCE, #4E22A8)" }}
+              >
+                Sign up to invite creators →
+              </Link>
+            )}
           </div>
 
           {/* Grid */}
@@ -291,13 +614,14 @@ export default function PublicSearchPage() {
                     <p className="text-sm text-gray-400 mt-1">Try broadening your search or removing a filter.</p>
                   </div>
                 )
-                : creators.map((c, i) => {
-                    const loginReturnTo = `/search${window.location.search}`;
-                    const profileHref = user
-                      ? `/creators/${c.id}`
-                      : `/login?returnTo=${encodeURIComponent(loginReturnTo)}`;
-                    return <CreatorCard key={c.id} creator={c} idx={i} profileHref={profileHref} />;
-                  })
+                : creators.map((c, i) => (
+                  <CreatorCard
+                    key={c.id}
+                    creator={c}
+                    idx={i}
+                    onViewProfile={() => openModal(c, i)}
+                  />
+                ))
             }
           </div>
 
@@ -324,19 +648,21 @@ export default function PublicSearchPage() {
             </div>
           )}
 
-          {/* Upsell banner */}
-          <div className="mt-14 rounded-2xl p-8 text-center" style={{ background: "linear-gradient(135deg, #1a0a3e, #3d1a85)" }}>
-            <h3 className="text-xl font-extrabold text-white mb-2">Want to invite these creators?</h3>
-            <p className="text-white/60 text-sm mb-5">Sign up as a brand or agency to unlock full profiles, pricing, and campaign invitations.</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/register" className="px-6 py-3 rounded-xl font-bold text-white text-sm hover:opacity-90 transition" style={{ background: "linear-gradient(135deg,#1DCFB3,#0FA88E)" }}>
-                Get Started Free
-              </Link>
-              <Link href="/login" className="px-6 py-3 rounded-xl font-bold text-white text-sm hover:bg-white/10 transition" style={{ border: "1px solid rgba(255,255,255,0.25)" }}>
-                Log In
-              </Link>
+          {/* Upsell banner — only for unauthenticated */}
+          {!user && (
+            <div className="mt-14 rounded-2xl p-8 text-center" style={{ background: "linear-gradient(135deg, #1a0a3e, #3d1a85)" }}>
+              <h3 className="text-xl font-extrabold text-white mb-2">Want to invite these creators?</h3>
+              <p className="text-white/60 text-sm mb-5">Sign up as a brand or agency to unlock full profiles, pricing, and campaign invitations.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Link href="/register" className="px-6 py-3 rounded-xl font-bold text-white text-sm hover:opacity-90 transition" style={{ background: "linear-gradient(135deg,#1DCFB3,#0FA88E)" }}>
+                  Get Started Free
+                </Link>
+                <Link href="/login" className="px-6 py-3 rounded-xl font-bold text-white text-sm hover:bg-white/10 transition" style={{ border: "1px solid rgba(255,255,255,0.25)" }}>
+                  Log In
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </PublicLayout>
