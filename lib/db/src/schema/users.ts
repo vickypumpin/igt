@@ -1,6 +1,7 @@
-import { pgTable, serial, text, integer, boolean, numeric, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, numeric, timestamp, pgEnum, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { agenciesTable } from "./agencies";
 
 export const userRoleEnum = pgEnum("user_role", ["brand", "creator", "admin", "agency"]);
 export const badgeTierEnum = pgEnum("badge_tier", ["nano", "micro", "mid_tier", "macro", "mega", "elite"]);
@@ -69,7 +70,7 @@ export const usersTable = pgTable("users", {
   tiktokFollowers: integer("tiktok_followers"),
   snapchatFollowers: integer("snapchat_followers"),
   // Agency relationship + billing mode
-  agencyId: integer("agency_id"),
+  agencyId: integer("agency_id").references((): AnyPgColumn => agenciesTable.id, { onDelete: "set null" }),
   billingMode: text("billing_mode").default("commission"),
   billingAmount: numeric("billing_amount", { precision: 12, scale: 2 }).default("0"),
   commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
