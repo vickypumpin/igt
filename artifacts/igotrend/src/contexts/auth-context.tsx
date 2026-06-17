@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTokenState(null);
     setUser(null);
     queryClient.clear();
+    window.location.href = "/";
   };
 
   return (
