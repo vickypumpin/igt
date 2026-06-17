@@ -32,18 +32,21 @@ export default function AgencyMessagesPage() {
 
   const handleSend = () => {
     if (!messageText.trim() || !selectedUserId) return;
+    const text = messageText;
+    setMessageText("");
     sendMutation.mutate(
-      { userId: selectedUserId, data: { content: messageText.trim() } },
+      { userId: selectedUserId, data: { body: text } },
       {
         onSuccess: () => {
-          setMessageText("");
           queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey(selectedUserId) });
+          queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
         },
+        onError: () => setMessageText(text),
       }
     );
   };
 
-  const selected = conversations.find((c: any) => c.otherUser?.id === selectedUserId);
+  const selected = conversations.find((c: any) => c.userId === selectedUserId);
 
   return (
     <AgencyLayout>
@@ -51,6 +54,7 @@ export default function AgencyMessagesPage() {
         <div className="w-72 flex flex-col border-r border-gray-100 flex-shrink-0">
           <div className="p-4 border-b border-gray-100">
             <h2 className="text-sm font-bold text-gray-900">Messages</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{conversations.length} conversations</p>
           </div>
           <div className="flex-1 overflow-y-auto">
             {isLoading
@@ -70,14 +74,14 @@ export default function AgencyMessagesPage() {
                     <p className="text-xs text-gray-400">No conversations yet</p>
                   </div>
                 )
-              : conversations.map((c: any) => {
-                  const other = c.otherUser;
+              : (conversations as any[]).map((c) => {
+                  const other = c.user;
                   const initials = `${other?.firstName?.[0] ?? "?"}${other?.lastName?.[0] ?? ""}`;
-                  const isSelected = selectedUserId === other?.id;
+                  const isSelected = selectedUserId === c.userId;
                   return (
                     <button
-                      key={c.otherUser?.id}
-                      onClick={() => setSelectedUserId(other?.id)}
+                      key={c.userId}
+                      onClick={() => setSelectedUserId(c.userId)}
                       className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors text-left"
                       style={isSelected ? { background: "rgba(107,47,206,0.07)", borderLeft: `3px solid ${PURPLE}` } : {}}
                     >
@@ -90,6 +94,9 @@ export default function AgencyMessagesPage() {
                         <div className="text-xs font-semibold text-gray-900 truncate">{other?.firstName} {other?.lastName}</div>
                         <div className="text-xs text-gray-400 truncate">{c.lastMessage ?? "No messages yet"}</div>
                       </div>
+                      {c.unreadCount > 0 && (
+                        <span className="h-5 w-5 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0" style={{ background: `linear-gradient(135deg, ${PURPLE}, #8B5CF6)` }}>{c.unreadCount}</span>
+                      )}
                     </button>
                   );
                 })}
@@ -108,17 +115,17 @@ export default function AgencyMessagesPage() {
               <div className="px-5 py-3.5 border-b border-gray-100 flex items-center gap-3">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs font-bold text-white" style={{ background: `linear-gradient(135deg, ${PURPLE}, #8B5CF6)` }}>
-                    {selected?.otherUser?.firstName?.[0]}{selected?.otherUser?.lastName?.[0]}
+                    {(selected as any)?.user?.firstName?.[0]}{(selected as any)?.user?.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <div className="text-sm font-bold text-gray-900">{selected?.otherUser?.firstName} {selected?.otherUser?.lastName}</div>
+                  <div className="text-sm font-bold text-gray-900">{(selected as any)?.user?.firstName} {(selected as any)?.user?.lastName}</div>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((msg: any) => {
-                  const isMine = msg.senderId === me?.id;
+                {(messages as any[]).map((msg) => {
+                  const isMine = msg.fromUserId === me?.id;
                   return (
                     <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
                       <div
@@ -127,7 +134,7 @@ export default function AgencyMessagesPage() {
                           ? { background: PURPLE, color: "white", borderBottomRightRadius: 4 }
                           : { background: "#F3F4F6", color: "#111827", borderBottomLeftRadius: 4 }}
                       >
-                        {msg.content}
+                        {msg.body}
                       </div>
                     </div>
                   );

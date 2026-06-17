@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useAdminBroadcast, useAdminMessages } from "@workspace/api-client-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import AdminLayout from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCircle, Megaphone, Send, Users, Shield } from "lucide-react";
+import { getToken } from "@/lib/auth-store";
 
 const TARGET_OPTIONS = [
   { value: "all",     label: "All users" },
@@ -22,20 +23,45 @@ const ROLE_STYLES: Record<string, { bg: string; color: string }> = {
 
 type Tab = "monitor" | "broadcast";
 
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getToken();
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+
 export default function AdminMessagingPage() {
   const { toast } = useToast();
-  // Route /admin/messages/broadcast should open the broadcast tab directly
   const initialTab: Tab = window.location.pathname.endsWith("/broadcast") ? "broadcast" : "monitor";
   const [tab, setTab] = useState<Tab>(initialTab);
-  const { data: messages = [], isLoading: loadingMessages } = useAdminMessages();
-  const broadcastMutation = useAdminBroadcast();
+
+  const { data: messages = [], isLoading: loadingMessages } = useQuery<any[]>({
+    queryKey: ["admin-messages"],
+    queryFn: () => apiFetch("/api/admin/messages"),
+  });
+
+  const broadcastMutation = useMutation<{ sent: number }, Error, { message: string; targetRole?: string; link?: string }>({
+    mutationFn: (body) => apiFetch("/api/admin/messages/broadcast", { method: "POST", body: JSON.stringify(body) }),
+  });
+
   const [broadcastForm, setBroadcastForm] = useState({ message: "", targetRole: "all", link: "" });
   const [lastResult, setLastResult] = useState<{ sent: number } | null>(null);
 
   const handleSend = () => {
     if (!broadcastForm.message.trim()) { toast({ title: "Message is required", variant: "destructive" }); return; }
     broadcastMutation.mutate(
-      { message: broadcastForm.message, targetRole: broadcastForm.targetRole === "all" ? undefined : broadcastForm.targetRole, link: broadcastForm.link || undefined },
+      {
+        message: broadcastForm.message,
+        ...(broadcastForm.targetRole !== "all" ? { targetRole: broadcastForm.targetRole } : {}),
+        ...(broadcastForm.link ? { link: broadcastForm.link } : {}),
+      },
       {
         onSuccess: (result) => {
           setLastResult(result);
@@ -92,7 +118,7 @@ export default function AdminMessagingPage() {
               </div>
             ) : (
               <div className="divide-y divide-border/60">
-                {messages.map(msg => {
+                {messages.map((msg: any) => {
                   const roleStyle = ROLE_STYLES[msg.fromRole] ?? ROLE_STYLES.unknown;
                   return (
                     <div key={msg.id} className="px-5 py-4 flex items-start gap-4" data-testid={`msg-row-${msg.id}`}>
