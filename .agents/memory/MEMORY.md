@@ -1,0 +1,2 @@
+- [AI integration schema naming](ai-schema-naming.md) — cp of AI skill templates overwrites existing schema files; always rename AI tables (ai_conversations, ai_messages) to avoid collision with user-to-user messaging tables.
+- [DB push TTY requirement](db-push-tty.md) — drizzle-kit push/push-force requires a TTY when columns conflict; use executeSql directly to CREATE TABLE IF NOT EXISTS instead.

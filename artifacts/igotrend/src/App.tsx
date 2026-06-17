@@ -59,9 +59,14 @@ import SettingsPage from "@/pages/shared/settings";
 import FaqPage from "@/pages/shared/faq";
 import TrendAiPage from "@/pages/shared/trend-ai";
 
+import BlogPage from "@/pages/public/blog";
+import HelpPage from "@/pages/public/help";
+
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import AgencyClientsPage from "@/pages/agency/clients";
 import AgencyCampaignsPage from "@/pages/agency/campaigns";
+import AgencyBillingPage from "@/pages/agency/billing";
+import AgencyMessagesPage from "@/pages/agency/messages";
 
 function AppRouter() {
   const { user, setAuth, isLoading: authLoading } = useAuth();
@@ -117,6 +122,8 @@ function AppRouter() {
           <Route path="/agencies" component={AgenciesPage} />
           <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
           <Route path="/services" component={ServicesPage} />
+          <Route path="/blog" component={BlogPage} />
+          <Route path="/help" component={HelpPage} />
           <Route component={NotFound} />
         </>
       )}
@@ -255,8 +262,8 @@ function AppRouter() {
           <Route path="/agency/dashboard" component={AgencyDashboardPage} />
           <Route path="/agency/clients" component={AgencyClientsPage} />
           <Route path="/agency/campaigns" component={AgencyCampaignsPage} />
-          <Route path="/agency/billing" component={AgencyDashboardPage} />
-          <Route path="/agency/messages" component={AgencyDashboardPage} />
+          <Route path="/agency/billing" component={AgencyBillingPage} />
+          <Route path="/agency/messages" component={AgencyMessagesPage} />
           <Route path="/agency/settings" component={SettingsPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />

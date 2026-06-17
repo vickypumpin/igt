@@ -53,6 +53,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               { href: "/admin/accounts", label: "All Accounts" },
               { href: "/admin/accounts/brands", label: "Brand Accounts" },
               { href: "/admin/accounts/creators", label: "Creator Accounts" },
+              { href: "/admin/accounts/agencies", label: "Agency Accounts" },
               { href: "/admin/accounts/pending", label: "Pending Accounts" },
             ]}
           />
@@ -111,6 +112,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             ]}
           />
 
+          <NavLink href="/admin/submissions" icon={FileText} label="Submissions" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/roles" icon={Shield} label="Roles & Permissions" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/faqs" icon={HelpCircle} label="FAQs" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/legal" icon={FileText} label="Legal Pages" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />

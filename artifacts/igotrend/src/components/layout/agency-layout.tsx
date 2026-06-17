@@ -16,8 +16,9 @@ const PURPLE_BG = "rgba(107,47,206,0.18)";
 const PURPLE_BORDER = "rgba(107,47,206,0.28)";
 
 const LEGAL_LINKS = [
-  { label: "Privacy Policy", href: "/community-guidelines" },
-  { label: "TOS", href: "/tos" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "TOS", href: "/terms" },
+  { label: "GDPR", href: "/gdpr" },
 ];
 
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {

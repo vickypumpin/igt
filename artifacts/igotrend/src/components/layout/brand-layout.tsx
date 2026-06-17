@@ -16,9 +16,9 @@ const TEAL_BG = "rgba(29,207,179,0.18)";
 const TEAL_BORDER = "rgba(29,207,179,0.28)";
 
 const LEGAL_LINKS = [
-  { label: "Privacy Policy", href: "/community-guidelines" },
-  { label: "TOS", href: "/tos" },
-  { label: "TAU", href: "/tau" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "TOS", href: "/terms" },
+  { label: "TAU", href: "/terms-of-use" },
   { label: "GDPR", href: "/gdpr" },
 ];
 

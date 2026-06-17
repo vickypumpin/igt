@@ -14,3 +14,5 @@ export * from "./bank_accounts";
 export * from "./faqs";
 export * from "./legal_pages";
 export * from "./gems_transactions";
+export * from "./ai_conversations";
+export * from "./ai_messages";
