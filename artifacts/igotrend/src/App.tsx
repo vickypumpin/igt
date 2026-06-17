@@ -61,6 +61,7 @@ import TrendAiPage from "@/pages/shared/trend-ai";
 
 import BlogPage from "@/pages/public/blog";
 import HelpPage from "@/pages/public/help";
+import PublicSearchPage from "@/pages/public/search";
 
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import AgencyClientsPage from "@/pages/agency/clients";
@@ -121,6 +122,7 @@ function AppRouter() {
           <Route path="/brands" component={BrandsPage} />
           <Route path="/agencies" component={AgenciesPage} />
           <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
+          <Route path="/search" component={PublicSearchPage} />
           <Route path="/services" component={ServicesPage} />
           <Route path="/blog" component={BlogPage} />
           <Route path="/help" component={HelpPage} />

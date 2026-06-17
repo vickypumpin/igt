@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { GeomDecor } from "@/components/GeomDecor";
 import { ChevronRight, Star, Users, DollarSign, TrendingUp, CheckCircle, Instagram, Youtube, Twitter, Facebook, Building2 } from "lucide-react";
@@ -56,6 +56,7 @@ const tiers = [
 export default function HomePage() {
   const [platform, setPlatform] = useState("");
   const [category, setCategory] = useState("");
+  const [, navigate] = useLocation();
 
   return (
     <PublicLayout>
@@ -104,13 +105,18 @@ export default function HomePage() {
                 <option key={c.label} value={c.label.toLowerCase()}>{c.icon} {c.label}</option>
               ))}
             </select>
-            <Link
-              href="/register"
+            <button
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (platform) params.set("platform", platform);
+                if (category) params.set("category", category);
+                navigate(`/search${params.toString() ? `?${params}` : ""}`);
+              }}
               className="px-6 py-2.5 rounded-xl font-bold text-sm text-white whitespace-nowrap transition-all hover:opacity-90"
               style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
             >
               Search Now
-            </Link>
+            </button>
           </div>
 
           {/* Platform icons */}
