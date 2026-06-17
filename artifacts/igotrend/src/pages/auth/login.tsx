@@ -25,6 +25,8 @@ export default function LoginPage() {
   const { toast } = useToast();
   const loginMutation = useLogin();
 
+  const returnTo = new URLSearchParams(window.location.search).get("returnTo") ?? "";
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { email: "", password: "" },
@@ -35,9 +37,17 @@ export default function LoginPage() {
       onSuccess: (data) => {
         const auth = data as unknown as AuthResponse;
         setAuth(auth.token, auth.user);
-        if (auth.user.role === "admin") setLocation("/admin");
-        else if (auth.user.role === "creator") setLocation("/");
-        else setLocation("/");
+        if (returnTo && returnTo.startsWith("/")) {
+          setLocation(returnTo);
+        } else if (auth.user.role === "admin") {
+          setLocation("/admin");
+        } else if (auth.user.role === "agency") {
+          setLocation("/agency/dashboard");
+        } else if (auth.user.role === "brand") {
+          setLocation("/dashboard");
+        } else {
+          setLocation("/");
+        }
       },
       onError: () => {
         toast({ title: "Login failed", description: "Invalid email or password", variant: "destructive" });

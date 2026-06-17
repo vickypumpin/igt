@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
+import { useAuth } from "@/contexts/auth-context";
 import { Search, Instagram, Youtube, Twitter, Facebook, Users, Star } from "lucide-react";
 import { SiTiktok, SiSnapchat } from "react-icons/si";
 
@@ -73,7 +74,7 @@ function getActivePlatforms(c: Creator): string[] {
   return out;
 }
 
-function CreatorCard({ creator, idx }: { creator: Creator; idx: number }) {
+function CreatorCard({ creator, idx, profileHref }: { creator: Creator; idx: number; profileHref: string }) {
   const grad = AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length];
   const badge = creator.badge ? BADGE_CFG[creator.badge] : null;
   const platforms = getActivePlatforms(creator);
@@ -129,7 +130,7 @@ function CreatorCard({ creator, idx }: { creator: Creator; idx: number }) {
         )}
 
         <Link
-          href="/register"
+          href={profileHref}
           className="block w-full text-center py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90"
           style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
         >
@@ -167,6 +168,7 @@ function parseQuery(search: string) {
 
 export default function PublicSearchPage() {
   const [location, navigate] = useLocation();
+  const { user } = useAuth();
   const qs = parseQuery(window.location.search);
 
   const [platform, setPlatform] = useState(qs.platform);
@@ -289,7 +291,13 @@ export default function PublicSearchPage() {
                     <p className="text-sm text-gray-400 mt-1">Try broadening your search or removing a filter.</p>
                   </div>
                 )
-                : creators.map((c, i) => <CreatorCard key={c.id} creator={c} idx={i} />)
+                : creators.map((c, i) => {
+                    const loginReturnTo = `/search${window.location.search}`;
+                    const profileHref = user
+                      ? `/creators/${c.id}`
+                      : `/login?returnTo=${encodeURIComponent(loginReturnTo)}`;
+                    return <CreatorCard key={c.id} creator={c} idx={i} profileHref={profileHref} />;
+                  })
             }
           </div>
 
