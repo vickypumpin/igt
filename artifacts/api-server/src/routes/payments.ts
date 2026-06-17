@@ -184,9 +184,29 @@ router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, 
   const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
 
-  // campaignId is accepted from the caller but never inferred by heuristic.
-  // Commission deduction is skipped on approval when campaignId is absent.
-  const resolvedCampaignId: number | null = campaignId ? Number(campaignId) : null;
+  // campaignId is always derived server-side from the creator's most recent submission.
+  // Client-supplied campaignId is validated against submissions before use;
+  // if absent or invalid, fall back to the most recent submission's campaign.
+  // This ensures commission deduction fires on approval without trusting client input.
+  let resolvedCampaignId: number | null = null;
+  if (campaignId) {
+    // Validate: creator must have a submission for the supplied campaignId
+    const [validSub] = await db
+      .select({ campaignId: submissionsTable.campaignId })
+      .from(submissionsTable)
+      .where(and(eq(submissionsTable.creatorId, req.userId!), eq(submissionsTable.campaignId, Number(campaignId))))
+      .limit(1);
+    if (validSub) resolvedCampaignId = validSub.campaignId;
+  }
+  if (!resolvedCampaignId) {
+    const [recentSub] = await db
+      .select({ campaignId: submissionsTable.campaignId })
+      .from(submissionsTable)
+      .where(eq(submissionsTable.creatorId, req.userId!))
+      .orderBy(desc(submissionsTable.createdAt))
+      .limit(1);
+    if (recentSub?.campaignId) resolvedCampaignId = recentSub.campaignId;
+  }
 
   await db.insert(payoutsTable).values({
     creatorId: req.userId!, campaignId: resolvedCampaignId,
