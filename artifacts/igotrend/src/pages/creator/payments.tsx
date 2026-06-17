@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useRequestPayout, getGetMeQueryKey, useGetMe } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
-import { customFetch } from "@workspace/api-client-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getGetMeQueryKey, useGetMe, customFetch } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowDownToLine, CheckCircle, Clock, XCircle, DollarSign } from "lucide-react";
 
 type Payout = { id: number; amount: string; status: string; bankCode: string | null; accountNumber: string | null; createdAt: string };
+type EligibleCampaign = { campaignId: number; campaignName: string; sponsor: string | null };
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; Icon: React.ElementType; label: string }> = {
   pending:  { bg: "rgba(245,158,11,0.12)",  color: "#D97706", Icon: Clock,        label: "Pending"  },
@@ -27,26 +27,39 @@ export default function CreatorPaymentsPage() {
     queryKey: PAYOUTS_QUERY_KEY,
     queryFn: () => customFetch<Payout[]>("/api/payouts"),
   });
-  const payoutMutation = useRequestPayout();
+  const { data: eligibleCampaigns = [] } = useQuery<EligibleCampaign[]>({
+    queryKey: ["/creator/eligible-campaigns"],
+    queryFn: () => customFetch("/api/creator/eligible-campaigns"),
+  });
   const [amount, setAmount] = useState("");
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
 
   const totalPaid = payouts.filter(p => p.status === "approved").reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
   const totalPending = payouts.filter(p => p.status === "pending").reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
   const balance = Number(me?.balance ?? 0);
 
+  const payoutMutation = useMutation({
+    mutationFn: (data: { amount: number; campaignId: number }) =>
+      customFetch("/api/rewards/payout", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      toast({ title: "Payout requested! An admin will process it within 1–2 business days." });
+      setAmount("");
+      setSelectedCampaignId("");
+      queryClient.invalidateQueries({ queryKey: PAYOUTS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { data?: { error?: string } })?.data?.error ?? "Payout request failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    },
+  });
+
   const handleRequest = () => {
     const amtNum = parseFloat(amount);
     if (!amtNum || amtNum < 10) { toast({ title: "Minimum payout is $10", variant: "destructive" }); return; }
     if (amtNum > balance) { toast({ title: "Exceeds your balance", variant: "destructive" }); return; }
-    payoutMutation.mutate({ data: { amount: amtNum } }, {
-      onSuccess: () => {
-        toast({ title: "Payout requested! An admin will process it within 1–2 business days." });
-        setAmount("");
-        queryClient.invalidateQueries({ queryKey: PAYOUTS_QUERY_KEY });
-        queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-      },
-      onError: () => toast({ title: "Payout request failed", variant: "destructive" }),
-    });
+    if (!selectedCampaignId) { toast({ title: "Please select a campaign for this payout", variant: "destructive" }); return; }
+    payoutMutation.mutate({ amount: amtNum, campaignId: Number(selectedCampaignId) });
   };
 
   return (
@@ -82,22 +95,43 @@ export default function CreatorPaymentsPage() {
             <div className="text-sm font-bold">Request Payout</div>
             <div className="text-xs text-muted-foreground mt-0.5">Minimum $10 · Processed within 1–2 business days</div>
           </div>
-          <div className="p-5 flex gap-3 items-end">
-            <div className="flex-1 max-w-xs">
-              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Amount (USD)</label>
-              <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
-                className="h-10 rounded-xl" data-testid="input-payout-amount" min="10" step="1" />
+          <div className="p-5 space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Campaign *</label>
+              <select
+                value={selectedCampaignId}
+                onChange={e => setSelectedCampaignId(e.target.value)}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="select-payout-campaign"
+              >
+                <option value="">Select a campaign with approved submission…</option>
+                {eligibleCampaigns.map(c => (
+                  <option key={c.campaignId} value={c.campaignId}>
+                    {c.campaignName}{c.sponsor ? ` — ${c.sponsor}` : ""}
+                  </option>
+                ))}
+              </select>
+              {eligibleCampaigns.length === 0 && (
+                <p className="text-xs text-muted-foreground mt-1">No campaigns with approved submissions yet.</p>
+              )}
             </div>
-            <Button
-              onClick={handleRequest}
-              disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10}
-              className="h-10 px-5 rounded-xl font-semibold gap-2"
-              style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
-              data-testid="btn-request-payout"
-            >
-              <ArrowDownToLine className="h-4 w-4" />
-              {payoutMutation.isPending ? "Requesting…" : "Request Payout"}
-            </Button>
+            <div className="flex gap-3 items-end">
+              <div className="flex-1 max-w-xs">
+                <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Amount (USD)</label>
+                <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
+                  className="h-10 rounded-xl" data-testid="input-payout-amount" min="10" step="1" />
+              </div>
+              <Button
+                onClick={handleRequest}
+                disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10 || !selectedCampaignId}
+                className="h-10 px-5 rounded-xl font-semibold gap-2"
+                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+                data-testid="btn-request-payout"
+              >
+                <ArrowDownToLine className="h-4 w-4" />
+                {payoutMutation.isPending ? "Requesting…" : "Request Payout"}
+              </Button>
+            </div>
           </div>
         </div>
 

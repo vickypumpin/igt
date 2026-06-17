@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 import AgencyLayout from "@/components/layout/agency-layout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Megaphone, Clock, TrendingUp, DollarSign } from "lucide-react";
+import { Users, Megaphone, Clock, TrendingUp, DollarSign, Activity } from "lucide-react";
 
 interface DashboardData {
   agency: {
@@ -17,12 +17,31 @@ interface DashboardData {
   totalCommissionOwed: number;
 }
 
+interface CampaignRow {
+  id: number; name: string; sponsor: string | null; status: string | null;
+  type: string | null; noOfCreators: number | null; startDate: string | null;
+  submissionsCount: number; brandId: number | null; createdAt: string;
+  client: { companyName: string | null; firstName: string | null; lastName: string | null } | null;
+}
+
 const PURPLE = "#6B2FCE";
+
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  active:    { bg: "rgba(16,185,129,0.12)", color: "#059669" },
+  draft:     { bg: "rgba(107,47,206,0.1)",  color: "#6B2FCE" },
+  completed: { bg: "rgba(100,116,139,0.12)", color: "#475569" },
+  paused:    { bg: "rgba(245,158,11,0.12)", color: "#D97706" },
+};
 
 export default function AgencyDashboardPage() {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/agency/dashboard"],
     queryFn: () => customFetch("/api/agency/dashboard"),
+  });
+
+  const { data: recentCampaigns = [], isLoading: campaignsLoading } = useQuery<CampaignRow[]>({
+    queryKey: ["/agency/campaigns"],
+    queryFn: () => customFetch("/api/agency/campaigns"),
   });
 
   const fmt = (n: number) => n >= 1000 ? `₦${(n/1000).toFixed(1)}k` : `₦${n.toLocaleString()}`;
@@ -70,6 +89,58 @@ export default function AgencyDashboardPage() {
             ))}
           </div>
         )}
+
+        {/* Recent Campaign Activity */}
+        <div className="bg-white rounded-2xl border border-border/60 shadow-sm overflow-hidden mb-5" data-testid="recent-campaign-activity">
+          <div className="px-5 py-4 border-b border-border/60 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl text-white flex items-center justify-center flex-shrink-0" style={{ background: "linear-gradient(135deg, #6B2FCE, #8B5CF6)" }}>
+              <Activity className="h-4 w-4" />
+            </div>
+            <div className="font-bold text-sm">Recent Campaign Activity</div>
+          </div>
+          {campaignsLoading ? (
+            <div className="p-4 space-y-2">{Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+          ) : !recentCampaigns.length ? (
+            <div className="py-10 text-center">
+              <Megaphone className="h-7 w-7 mx-auto mb-2 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">No campaigns yet — invite clients to get started</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
+                <thead style={{ background: "#fafbfd", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+                  <tr>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Campaign</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Client</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Submissions</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {recentCampaigns.slice(0, 8).map(c => {
+                    const st = STATUS_COLORS[c.status ?? ""] ?? { bg: "rgba(100,116,139,0.1)", color: "#64748B" };
+                    const clientName = (c.client?.companyName ?? `${c.client?.firstName ?? ""} ${c.client?.lastName ?? ""}`.trim()) || "—";
+                    return (
+                      <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="font-semibold">{c.name}</div>
+                          {c.sponsor && <div className="text-xs text-muted-foreground">{c.sponsor}</div>}
+                        </td>
+                        <td className="px-5 py-3.5 text-xs text-muted-foreground">{clientName}</td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: st.bg, color: st.color }}>{c.status ?? "—"}</span>
+                        </td>
+                        <td className="px-5 py-3.5 text-xs font-medium">{c.submissionsCount}</td>
+                        <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           <div className="bg-white rounded-2xl border border-border/60 shadow-sm p-5">

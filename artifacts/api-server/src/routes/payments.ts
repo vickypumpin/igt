@@ -190,7 +190,11 @@ router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, 
   const [validSub] = await db
     .select({ campaignId: submissionsTable.campaignId })
     .from(submissionsTable)
-    .where(and(eq(submissionsTable.creatorId, req.userId!), eq(submissionsTable.campaignId, Number(campaignId))))
+    .where(and(
+      eq(submissionsTable.creatorId, req.userId!),
+      eq(submissionsTable.campaignId, Number(campaignId)),
+      eq(submissionsTable.status, "approved"),
+    ))
     .limit(1);
   if (!validSub) { res.status(400).json({ error: "You have no approved submission for the given campaign" }); return; }
 

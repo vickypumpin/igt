@@ -255,4 +255,20 @@ router.get("/campaigns/:id/budget", requireAuth, async (req, res): Promise<void>
   res.json({ estimated: 0, perCreator: [] });
 });
 
+// Campaigns where this creator has at least one approved submission — used for payout campaign selection
+router.get("/creator/eligible-campaigns", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+  const rows = await db.select({
+    campaignId: submissionsTable.campaignId,
+    campaignName: campaignsTable.name,
+    sponsor: campaignsTable.sponsor,
+  }).from(submissionsTable)
+    .innerJoin(campaignsTable, eq(submissionsTable.campaignId, campaignsTable.id))
+    .where(and(
+      eq(submissionsTable.creatorId, req.userId!),
+      eq(submissionsTable.status, "approved"),
+    ))
+    .groupBy(submissionsTable.campaignId, campaignsTable.name, campaignsTable.sponsor);
+  res.json(rows);
+});
+
 export default router;

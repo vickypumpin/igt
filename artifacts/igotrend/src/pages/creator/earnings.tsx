@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useListRewards, useRequestPayout, useGetMe, getListRewardsQueryKey, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useListRewards, useGetMe, getListRewardsQueryKey, getGetMeQueryKey, customFetch } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,19 +10,38 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Gem, DollarSign, ArrowDownToLine, TrendingUp } from "lucide-react";
 
+type EligibleCampaign = { campaignId: number; campaignName: string; sponsor: string | null };
+
 export default function EarningsPage() {
   const { toast } = useToast();
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const { data: rewards = [], isLoading } = useListRewards({ query: { queryKey: getListRewardsQueryKey() } });
-  const payoutMutation = useRequestPayout();
+  const { data: eligibleCampaigns = [] } = useQuery<EligibleCampaign[]>({
+    queryKey: ["/creator/eligible-campaigns"],
+    queryFn: () => customFetch("/api/creator/eligible-campaigns"),
+  });
   const [amount, setAmount] = useState("");
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+
+  const payoutMutation = useMutation({
+    mutationFn: (data: { amount: number; campaignId: number }) =>
+      customFetch("/api/rewards/payout", { method: "POST", body: JSON.stringify(data) }),
+    onSuccess: () => {
+      toast({ title: "Payout requested! 💰" });
+      setAmount("");
+      setSelectedCampaignId("");
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { data?: { error?: string } })?.data?.error ?? "Payout request failed";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    },
+  });
 
   const handlePayout = () => {
     if (!amount || parseFloat(amount) <= 0) return;
-    payoutMutation.mutate({ data: { amount: parseFloat(amount) } }, {
-      onSuccess: () => { toast({ title: "Payout requested! 💰" }); setAmount(""); queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() }); },
-      onError: () => { toast({ title: "Payout request failed", variant: "destructive" }); },
-    });
+    if (!selectedCampaignId) { toast({ title: "Please select a campaign", variant: "destructive" }); return; }
+    payoutMutation.mutate({ amount: parseFloat(amount), campaignId: Number(selectedCampaignId) });
   };
 
   return (
@@ -59,7 +79,23 @@ export default function EarningsPage() {
             <div className="text-sm font-bold">Request Payout</div>
             <div className="text-xs text-muted-foreground mt-0.5">Minimum payout is $10</div>
           </div>
-          <CardContent className="p-5">
+          <CardContent className="p-5 space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Campaign *</label>
+              <select
+                value={selectedCampaignId}
+                onChange={e => setSelectedCampaignId(e.target.value)}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                data-testid="select-payout-campaign"
+              >
+                <option value="">Select a campaign with approved submission…</option>
+                {eligibleCampaigns.map(c => (
+                  <option key={c.campaignId} value={c.campaignId}>
+                    {c.campaignName}{c.sponsor ? ` — ${c.sponsor}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex gap-3 items-end">
               <div className="flex-1 max-w-xs">
                 <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Amount (USD)</label>
@@ -67,7 +103,7 @@ export default function EarningsPage() {
               </div>
               <Button
                 onClick={handlePayout}
-                disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10}
+                disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10 || !selectedCampaignId}
                 className="h-10 px-5 rounded-xl font-semibold gap-2"
                 style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
                 data-testid="button-request-payout"
