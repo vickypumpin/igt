@@ -62,6 +62,8 @@ import TrendAiPage from "@/pages/shared/trend-ai";
 import BlogPage from "@/pages/public/blog";
 import HelpPage from "@/pages/public/help";
 import PublicSearchPage from "@/pages/public/search";
+import AdminReportsPage from "@/pages/admin/reports";
+import BrandReportsPage from "@/pages/brand/reports";
 
 import AgencyDashboardPage from "@/pages/agency/dashboard";
 import AgencyClientsPage from "@/pages/agency/clients";
@@ -108,27 +110,22 @@ function AppRouter() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
 
-      {/* ── Public legal pages (always accessible) ── */}
+      {/* ── Public pages (always accessible to everyone) ── */}
       <Route path="/privacy" component={LegalPage} />
       <Route path="/terms" component={LegalPage} />
       <Route path="/terms-of-use" component={LegalPage} />
       <Route path="/gdpr" component={LegalPage} />
       <Route path="/community-guidelines" component={CommunityGuidelinesPage} />
+      <Route path="/brands" component={BrandsPage} />
+      <Route path="/agencies" component={AgenciesPage} />
+      <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
+      <Route path="/search" component={PublicSearchPage} />
+      <Route path="/services" component={ServicesPage} />
+      <Route path="/blog" component={BlogPage} />
+      <Route path="/help" component={HelpPage} />
 
-      {/* ── Public marketing pages (unauthenticated users) ── */}
-      {!user && (
-        <>
-          <Route path="/" component={HomePage} />
-          <Route path="/brands" component={BrandsPage} />
-          <Route path="/agencies" component={AgenciesPage} />
-          <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
-          <Route path="/search" component={PublicSearchPage} />
-          <Route path="/services" component={ServicesPage} />
-          <Route path="/blog" component={BlogPage} />
-          <Route path="/help" component={HelpPage} />
-          <Route component={NotFound} />
-        </>
-      )}
+      {/* ── Home page — only for unauthenticated (logged-in users land on their dashboard) ── */}
+      {!user && <Route path="/" component={HomePage} />}
 
       {/* ── Admin routes ── */}
       {user && role === "admin" && (
@@ -162,6 +159,9 @@ function AppRouter() {
           <Route path="/admin/verify-requests" component={VerifyRequestsPage} />
           <Route path="/admin/verify-requests/approved" component={VerifyRequestsPage} />
           <Route path="/admin/verify-requests/declined" component={VerifyRequestsPage} />
+
+          {/* Reports */}
+          <Route path="/admin/reports" component={AdminReportsPage} />
 
           {/* Submissions */}
           <Route path="/admin/submissions" component={AdminSubmissionsPage} />
@@ -248,6 +248,7 @@ function AppRouter() {
           <Route path="/payments" component={PaymentsPage} />
 
           <Route path="/rewards" component={BrandRewardsPage} />
+          <Route path="/reports" component={BrandReportsPage} />
           <Route path="/billing" component={BrandBillingPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />

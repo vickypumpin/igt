@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { IgtLogo } from "@/components/IgtLogo";
-import { Menu, X, ChevronDown, Facebook, Twitter, Instagram, Youtube, Linkedin } from "lucide-react";
+import { Menu, X, ChevronDown, Facebook, Twitter, Instagram, Youtube, Linkedin, LayoutDashboard } from "lucide-react";
+import { useAuth } from "@/contexts/auth-context";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -24,10 +25,19 @@ const footerLinks = [
   { label: "GDPR", href: "/gdpr" },
 ];
 
+function getDashboardHref(role?: string) {
+  if (role === "admin") return "/admin";
+  if (role === "agency") return "/agency/dashboard";
+  return "/";
+}
+
 export function PublicLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const [location] = useLocation();
+  const { user } = useAuth();
+
+  const dashHref = getDashboardHref(user?.role);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "#fafbff" }}>
@@ -36,7 +46,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+            <Link href={user ? dashHref : "/"} className="flex items-center gap-2 flex-shrink-0">
               <IgtLogo size="md" />
             </Link>
 
@@ -82,21 +92,34 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               </div>
             </nav>
 
-            {/* Auth buttons */}
+            {/* Auth buttons — context-aware */}
             <div className="hidden lg:flex items-center gap-3">
-              <Link
-                href="/login"
-                className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
-              >
-                Log In
-              </Link>
-              <Link
-                href="/register"
-                className="px-5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 shadow-sm"
-                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
-              >
-                Register
-              </Link>
+              {user ? (
+                <Link
+                  href={dashHref}
+                  className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 shadow-sm"
+                  style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="px-4 py-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/register"
+                    className="px-5 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 shadow-sm"
+                    style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile hamburger */}
@@ -133,21 +156,34 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3">
-              <Link
-                href="/login"
-                onClick={() => setMobileOpen(false)}
-                className="flex-1 text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700"
-              >
-                Log In
-              </Link>
-              <Link
-                href="/register"
-                onClick={() => setMobileOpen(false)}
-                className="flex-1 text-center py-2.5 rounded-xl text-sm font-bold text-white"
-                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
-              >
-                Register
-              </Link>
+              {user ? (
+                <Link
+                  href={dashHref}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex-1 text-center py-2.5 rounded-xl text-sm font-bold text-white"
+                  style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
+                >
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 text-center py-2.5 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700"
+                  >
+                    Log In
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 text-center py-2.5 rounded-xl text-sm font-bold text-white"
+                    style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

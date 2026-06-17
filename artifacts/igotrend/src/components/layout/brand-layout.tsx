@@ -4,7 +4,7 @@ import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import {
   LayoutDashboard, Megaphone, MessageSquare, LogOut, Bell, ChevronDown,
-  HelpCircle, Bot, Gem,
+  HelpCircle, Bot, Gem, BarChart2,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -60,6 +60,7 @@ export default function BrandLayout({ children }: { children: React.ReactNode })
           />
 
           <NavLink href="/rewards" icon={Gem} label="Reward Creators" />
+          <NavLink href="/reports" icon={BarChart2} label="Reports" />
           <NavLink href="/messages" icon={MessageSquare} label="Messages" />
           <NavLink href="/trend-ai" icon={Bot} label="Trend Ai" />
           <NavLink href="/faq" icon={HelpCircle} label="FAQ" />

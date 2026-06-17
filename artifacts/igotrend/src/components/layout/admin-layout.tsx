@@ -4,7 +4,7 @@ import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import {
   LayoutDashboard, Users, Megaphone, Wallet, Settings, LogOut,
-  ChevronDown, Shield, MessageSquare, HelpCircle, FileText, Bell,
+  ChevronDown, Shield, MessageSquare, HelpCircle, FileText, Bell, BarChart2,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -113,6 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
 
           <NavLink href="/admin/submissions" icon={FileText} label="Submissions" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
+          <NavLink href="/admin/reports" icon={BarChart2} label="Reports" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/roles" icon={Shield} label="Roles & Permissions" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/faqs" icon={HelpCircle} label="FAQs" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
           <NavLink href="/admin/legal" icon={FileText} label="Legal Pages" activeColor={ORANGE} activeBg={ORANGE_BG} activeBorder={ORANGE_BORDER} />
