@@ -144,8 +144,23 @@ router.put("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), asy
   const id = parseInt(req.params.id as string, 10);
   const { billingMode, billingAmount, commissionRate, subscriptionStatus, billingNotes } = req.body;
 
-  const [user] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id));
+  const [user] = await db.select({ role: usersTable.role, agencyId: usersTable.agencyId }).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Brand sub-accounts: billing is owned by the parent agency. Block billing field edits
+  // (billingNotes is still allowed). Admin must edit the agency account instead.
+  if (user.role === "brand" && user.agencyId) {
+    if (billingMode !== undefined || billingAmount !== undefined || commissionRate !== undefined || subscriptionStatus !== undefined) {
+      res.status(400).json({ error: "This brand inherits billing from its parent agency. Edit the agency account to change billing settings." });
+      return;
+    }
+    // Allow billingNotes only
+    if (billingNotes !== undefined) {
+      await db.update(usersTable).set({ billingNotes, updatedAt: new Date() }).where(eq(usersTable.id, id));
+    }
+    res.json({ message: "Notes updated (billing is managed by parent agency)" });
+    return;
+  }
 
   // Agency accounts: all billing fields live in agenciesTable; billingNotes stays on user
   if (user.role === "agency") {

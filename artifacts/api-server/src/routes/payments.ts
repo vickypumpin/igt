@@ -184,18 +184,9 @@ router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, 
   const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
 
-  // Derive campaignId from creator's most recent approved submission when not explicitly provided.
-  // This ensures commission deduction fires reliably on payout approval.
-  let resolvedCampaignId: number | null = campaignId ? Number(campaignId) : null;
-  if (!resolvedCampaignId) {
-    const [recentSub] = await db
-      .select({ campaignId: submissionsTable.campaignId })
-      .from(submissionsTable)
-      .where(eq(submissionsTable.creatorId, req.userId!))
-      .orderBy(desc(submissionsTable.createdAt))
-      .limit(1);
-    if (recentSub?.campaignId) resolvedCampaignId = recentSub.campaignId;
-  }
+  // campaignId is accepted from the caller but never inferred by heuristic.
+  // Commission deduction is skipped on approval when campaignId is absent.
+  const resolvedCampaignId: number | null = campaignId ? Number(campaignId) : null;
 
   await db.insert(payoutsTable).values({
     creatorId: req.userId!, campaignId: resolvedCampaignId,

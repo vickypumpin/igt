@@ -51,10 +51,7 @@ router.get("/agency/clients", requireAuth, requireRole("agency"), async (req, re
     })
     .from(agencyClientsTable)
     .leftJoin(usersTable, eq(agencyClientsTable.brandUserId, usersTable.id))
-    .where(and(
-      eq(agencyClientsTable.agencyId, agency.id),
-      eq(usersTable.agencyId, agency.id),
-    ));
+    .where(eq(agencyClientsTable.agencyId, agency.id));
   res.json(clients.map(c => ({
     ...c,
     commissionRate: c.commissionRate != null ? parseFloat(String(c.commissionRate)) : null,
