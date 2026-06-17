@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable } from "@workspace/db";
+import bcrypt from "bcryptjs";
+import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -75,6 +76,39 @@ router.post("/agency/clients/invite", requireAuth, requireRole("agency"), async 
     agencyId: agency.id, brandUserId: brand.id, inviteStatus: "pending",
   }).returning();
   res.status(201).json(client);
+});
+
+router.post("/agency/clients/create", requireAuth, requireRole("agency"), async (req, res): Promise<void> => {
+  const { firstName, lastName, email, password, companyName } = req.body;
+  if (!firstName || !lastName || !email || !password) {
+    res.status(400).json({ error: "firstName, lastName, email, and password are required" }); return;
+  }
+  const [agency] = await db.select().from(agenciesTable).where(eq(agenciesTable.userId, req.userId!));
+  if (!agency) { res.status(404).json({ error: "Agency not found" }); return; }
+  const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
+  if (existing) { res.status(400).json({ error: "Email already registered" }); return; }
+
+  const [platformSettings] = await db.select({
+    defaultBillingMode: settingsTable.defaultBillingMode,
+    defaultCommissionRate: settingsTable.defaultCommissionRate,
+  }).from(settingsTable).limit(1);
+  const defaultBillingMode = platformSettings?.defaultBillingMode ?? "commission";
+  const defaultCommissionRate = platformSettings?.defaultCommissionRate ?? "5.00";
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const userName = email.split("@")[0] + "_" + Date.now();
+  const [brand] = await db.insert(usersTable).values({
+    firstName, lastName, userName, email, passwordHash, role: "brand",
+    companyName: companyName ?? null,
+    agencyId: agency.id,
+    billingMode: defaultBillingMode,
+    commissionRate: defaultCommissionRate,
+  }).returning({ id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName });
+
+  const [client] = await db.insert(agencyClientsTable).values({
+    agencyId: agency.id, brandUserId: brand.id, inviteStatus: "accepted", joinedAt: new Date(),
+  }).returning();
+  res.status(201).json({ ...client, brand });
 });
 
 router.patch("/agency/clients/:id/respond", requireAuth, async (req, res): Promise<void> => {

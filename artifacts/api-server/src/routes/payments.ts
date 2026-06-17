@@ -181,10 +181,11 @@ router.get("/payouts", requireAuth, requireRole("creator"), async (req, res): Pr
 });
 
 router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
-  const { amount, bankCode, accountNumber } = req.body;
+  const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
+  if (!campaignId) { res.status(400).json({ error: "Missing campaignId — payout must reference a specific campaign" }); return; }
   await db.insert(payoutsTable).values({
-    creatorId: req.userId!, amount: String(amount),
+    creatorId: req.userId!, campaignId: Number(campaignId), amount: String(amount),
     bankCode: bankCode ?? null, accountNumber: accountNumber ?? null, status: "pending",
   });
   res.json({ message: "Payout requested successfully. An admin will process it within 1–2 business days." });

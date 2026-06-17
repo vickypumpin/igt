@@ -42,10 +42,11 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          <NavLink href="/" icon={LayoutDashboard} label="Dashboard" exact activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
-          <NavLink href="/clients" icon={Users} label="Clients" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
-          <NavLink href="/campaigns" icon={Megaphone} label="Campaigns" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
-          <NavLink href="/billing" icon={Wallet} label="Billing" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
+          <NavLink href="/agency/dashboard" icon={LayoutDashboard} label="Dashboard" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
+          <NavLink href="/agency/clients" icon={Users} label="Clients" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
+          <NavLink href="/agency/campaigns" icon={Megaphone} label="Campaigns" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
+          <NavLink href="/agency/billing" icon={Wallet} label="Billing" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
+          <NavLink href="/agency/settings" icon={Settings} label="Settings" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/trend-ai" icon={Bot} label="Trend Ai" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/faq" icon={HelpCircle} label="FAQ" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
         </nav>
@@ -84,10 +85,10 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem asChild>
-                <Link href="/account/edit"><span className="cursor-pointer w-full">Edit Account</span></Link>
+                <Link href="/agency/settings"><span className="cursor-pointer w-full">Settings</span></Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/billing"><span className="cursor-pointer w-full">Billing</span></Link>
+                <Link href="/agency/billing"><span className="cursor-pointer w-full">Billing</span></Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleLogout} className="text-destructive" data-testid="button-logout">
                 <LogOut className="h-4 w-4 mr-2" /> Logout
@@ -103,7 +104,7 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
             <span className="font-semibold uppercase tracking-wide" style={{ color: PURPLE }}>HOME</span>
             <span>/</span>
             <span className="uppercase tracking-wide font-medium text-foreground">
-              {location === "/" ? "DASHBOARD" : location.replace("/", "").replace(/-/g, " ").toUpperCase()}
+              {location.replace(/^\/agency\/?/, "").replace(/-/g, " ").toUpperCase() || "DASHBOARD"}
             </span>
           </div>
           <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors" data-testid="button-notifications">

@@ -250,13 +250,13 @@ function AppRouter() {
       {user && role === "agency" && (
         <>
           <Route path="/" component={AgencyDashboardPage} />
-          <Route path="/clients" component={AgencyClientsPage} />
-          <Route path="/campaigns" component={AgencyCampaignsPage} />
-          <Route path="/billing" component={AgencyDashboardPage} />
+          <Route path="/agency/dashboard" component={AgencyDashboardPage} />
+          <Route path="/agency/clients" component={AgencyClientsPage} />
+          <Route path="/agency/campaigns" component={AgencyCampaignsPage} />
+          <Route path="/agency/billing" component={AgencyDashboardPage} />
+          <Route path="/agency/settings" component={SettingsPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />
-          <Route path="/account/edit" component={AgencyDashboardPage} />
-          <Route path="/settings/profile" component={SettingsPage} />
           <Route component={NotFound} />
         </>
       )}
