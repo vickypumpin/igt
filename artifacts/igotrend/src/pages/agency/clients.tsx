@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Trash2, Clock, CheckCircle, Mail, Megaphone, DollarSign, PlusCircle, ExternalLink } from "lucide-react";
+import { Users, UserPlus, Trash2, Clock, CheckCircle, Mail, Megaphone, DollarSign, PlusCircle, ExternalLink, Eye, Building2, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Link } from "wouter";
 
@@ -26,6 +26,7 @@ export default function AgencyClientsPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState({ firstName: "", lastName: "", email: "", password: "", companyName: "" });
+  const [profileClient, setProfileClient] = useState<Client | null>(null);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -170,6 +171,9 @@ export default function AgencyClientsPage() {
                       <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(c.invitedAt).toLocaleDateString()}</td>
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5">
+                          <button onClick={() => setProfileClient(c)} className="p-1.5 rounded-lg text-muted-foreground hover:text-purple-600 hover:bg-purple-50 transition-colors" title="View profile">
+                            <Eye className="h-4 w-4" />
+                          </button>
                           <Link href={`/agency/campaigns?client=${c.brandUserId}`}>
                             <button className="p-1.5 rounded-lg text-muted-foreground hover:text-purple-600 hover:bg-purple-50 transition-colors" title="View campaigns">
                               <ExternalLink className="h-4 w-4" />
@@ -187,6 +191,64 @@ export default function AgencyClientsPage() {
             </table>
           </div>
         )}
+
+        {/* Client Profile — read-only */}
+        <Dialog open={!!profileClient} onOpenChange={v => { if (!v) setProfileClient(null); }}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Client Profile</DialogTitle>
+            </DialogHeader>
+            {profileClient && (() => {
+              const fullName = `${profileClient.firstName ?? ""} ${profileClient.lastName ?? ""}`.trim();
+              const name = profileClient.companyName ?? (fullName || "—");
+              const st = statusStyle(profileClient.inviteStatus);
+              return (
+                <div className="space-y-4 mt-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0" style={{ background: PURPLE }}>
+                      {(name[0] ?? "?").toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="font-bold text-base">{name}</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5"><Mail className="h-3 w-3" />{profileClient.email ?? "—"}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-muted/40 rounded-xl p-3">
+                      <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><CheckCircle className="h-3 w-3" />Status</div>
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full capitalize" style={{ background: st.bg, color: st.color }}>{profileClient.inviteStatus}</span>
+                    </div>
+                    <div className="bg-muted/40 rounded-xl p-3">
+                      <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><Calendar className="h-3 w-3" />Invited</div>
+                      <div className="text-sm font-semibold">{new Date(profileClient.invitedAt).toLocaleDateString()}</div>
+                    </div>
+                    <div className="bg-muted/40 rounded-xl p-3">
+                      <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><Megaphone className="h-3 w-3" />Campaigns</div>
+                      <div className="text-sm font-semibold">{profileClient.activeCampaigns} active / {profileClient.totalCampaigns} total</div>
+                    </div>
+                    <div className="bg-muted/40 rounded-xl p-3">
+                      <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><DollarSign className="h-3 w-3" />Total Spend</div>
+                      <div className="text-sm font-semibold">₦{profileClient.totalSpend.toLocaleString()}</div>
+                    </div>
+                  </div>
+                  <div className="bg-muted/40 rounded-xl p-3">
+                    <div className="text-xs text-muted-foreground mb-0.5 flex items-center gap-1"><Building2 className="h-3 w-3" />Billing</div>
+                    {profileClient.billingMode ? (
+                      <div className="text-sm font-semibold capitalize">
+                        {profileClient.billingMode === "commission" ? `Commission — ${profileClient.commissionRate ?? 0}%` : "Subscription"}
+                      </div>
+                    ) : <div className="text-sm text-muted-foreground">—</div>}
+                  </div>
+                  <Link href={`/agency/campaigns?client=${profileClient.brandUserId}`}>
+                    <Button className="w-full h-9 rounded-xl font-semibold text-sm gap-1.5" style={{ background: PURPLE, border: "none", color: "white" }}>
+                      <ExternalLink className="h-4 w-4" />View Campaigns
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
           <DialogContent className="max-w-md rounded-2xl">

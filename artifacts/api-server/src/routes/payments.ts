@@ -184,32 +184,18 @@ router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, 
   const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
 
-  // campaignId is always derived server-side from the creator's most recent submission.
-  // Client-supplied campaignId is validated against submissions before use;
-  // if absent or invalid, fall back to the most recent submission's campaign.
-  // This ensures commission deduction fires on approval without trusting client input.
-  let resolvedCampaignId: number | null = null;
-  if (campaignId) {
-    // Validate: creator must have a submission for the supplied campaignId
-    const [validSub] = await db
-      .select({ campaignId: submissionsTable.campaignId })
-      .from(submissionsTable)
-      .where(and(eq(submissionsTable.creatorId, req.userId!), eq(submissionsTable.campaignId, Number(campaignId))))
-      .limit(1);
-    if (validSub) resolvedCampaignId = validSub.campaignId;
-  }
-  if (!resolvedCampaignId) {
-    const [recentSub] = await db
-      .select({ campaignId: submissionsTable.campaignId })
-      .from(submissionsTable)
-      .where(eq(submissionsTable.creatorId, req.userId!))
-      .orderBy(desc(submissionsTable.createdAt))
-      .limit(1);
-    if (recentSub?.campaignId) resolvedCampaignId = recentSub.campaignId;
-  }
+  // campaignId must be explicitly supplied and verified against a creator submission.
+  // No heuristic fallback — guessing the wrong campaign would misattribute commission.
+  if (!campaignId) { res.status(400).json({ error: "campaignId is required for a payout request" }); return; }
+  const [validSub] = await db
+    .select({ campaignId: submissionsTable.campaignId })
+    .from(submissionsTable)
+    .where(and(eq(submissionsTable.creatorId, req.userId!), eq(submissionsTable.campaignId, Number(campaignId))))
+    .limit(1);
+  if (!validSub) { res.status(400).json({ error: "You have no approved submission for the given campaign" }); return; }
 
   await db.insert(payoutsTable).values({
-    creatorId: req.userId!, campaignId: resolvedCampaignId,
+    creatorId: req.userId!, campaignId: validSub.campaignId,
     amount: String(amount), bankCode: bankCode ?? null, accountNumber: accountNumber ?? null, status: "pending",
   });
   res.json({ message: "Payout requested successfully. An admin will process it within 1–2 business days." });

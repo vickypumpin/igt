@@ -1,12 +1,13 @@
-import { pgTable, serial, integer, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, numeric, timestamp, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { campaignsTable } from "./campaigns";
+import { payoutsTable } from "./rewards";
 
 export const commissionDeductionsTable = pgTable("commission_deductions", {
   id: serial("id").primaryKey(),
-  payoutId: integer("payout_id"),
+  payoutId: integer("payout_id").unique().references((): AnyPgColumn => payoutsTable.id),
   campaignId: integer("campaign_id").references(() => campaignsTable.id),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   agencyId: integer("agency_id"),

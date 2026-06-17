@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { db, pool, usersTable, agenciesTable, settingsTable, commissionDeductionsTable } from "@workspace/db";
+import { db, pool, usersTable, agenciesTable, settingsTable, commissionDeductionsTable, paymentsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
-import { eq, ilike, or, and, sql, inArray } from "drizzle-orm";
+import { eq, ilike, or, and, sql, inArray, max } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -214,10 +214,25 @@ router.get("/admin/payments/subscriptions", requireAuth, requireRole("admin"), a
   const all = [...brandSubs, ...agencySubs]
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+  // Fetch last payment date per user (status = 'completed')
+  const userIds = all.map(u => u.id);
+  const lastPayments = userIds.length
+    ? await db.select({
+        userId: paymentsTable.userId,
+        lastPaymentDate: max(paymentsTable.createdAt),
+      }).from(paymentsTable)
+        .where(and(inArray(paymentsTable.userId, userIds), eq(paymentsTable.status, "completed")))
+        .groupBy(paymentsTable.userId)
+    : [];
+  const lastPaymentMap = Object.fromEntries(lastPayments.map(r => [r.userId, r.lastPaymentDate]));
+
   res.json(all.map(u => ({
     ...u,
     billingAmount: parseFloat(String(u.billingAmount ?? "0")),
     createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+    lastPaymentDate: lastPaymentMap[u.id]
+      ? (lastPaymentMap[u.id] instanceof Date ? (lastPaymentMap[u.id] as Date).toISOString() : String(lastPaymentMap[u.id]))
+      : null,
   })));
 });
 

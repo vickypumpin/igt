@@ -138,46 +138,54 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
   if (!payout) { res.status(404).json({ error: "Payout not found" }); return; }
   if (payout.status === "approved") { res.json({ message: "Already approved" }); return; }
 
+  // Pre-approval gate: if the brand is on commission billing, campaignId MUST be set.
+  // Without it we cannot attribute the commission correctly — block rather than mischarge.
+  if (!payout.campaignId) {
+    const [campaign] = await db.select({ brandId: campaignsTable.brandId }).from(campaignsTable)
+      .innerJoin(submissionsTable, eq(submissionsTable.campaignId, campaignsTable.id))
+      .where(eq(submissionsTable.creatorId, payout.creatorId))
+      .limit(1);
+    if (campaign?.brandId) {
+      const billing = await resolveBilling(campaign.brandId);
+      if (billing?.billingMode === "commission") {
+        res.status(400).json({ error: "Cannot approve: payout has no campaign linkage but brand uses commission billing. Ask the creator to resubmit with a valid campaignId." });
+        return;
+      }
+    }
+  }
+
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
 
-  // Commission hook: only fires when payout has an explicit campaignId.
-  // Heuristic fallbacks (e.g. recent submission) are intentionally omitted
-  // to avoid mis-attributing commission to the wrong brand/agency.
-  try {
-    const effectiveCampaignId = payout.campaignId;
+  // Commission hook: fires only when payout has an explicit campaignId.
+  // Errors here abort the response with 500 — billing failures must not be silently swallowed.
+  if (payout.campaignId) {
+    const [campaign] = await db
+      .select({ brandId: campaignsTable.brandId })
+      .from(campaignsTable)
+      .where(eq(campaignsTable.id, payout.campaignId));
 
-    if (effectiveCampaignId) {
-      const [campaign] = await db
-        .select({ brandId: campaignsTable.brandId })
-        .from(campaignsTable)
-        .where(eq(campaignsTable.id, effectiveCampaignId));
-
-      if (campaign?.brandId) {
-        // Idempotency: skip if a deduction already exists for this payoutId
-        const [existing] = await db.select({ id: commissionDeductionsTable.id })
-          .from(commissionDeductionsTable)
-          .where(eq(commissionDeductionsTable.payoutId, payout.id));
-        if (!existing) {
-          const billing = await resolveBilling(campaign.brandId);
-          if (billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
-            const payoutAmount = parseFloat(String(payout.amount));
-            const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
-            if (deductionAmount > 0) {
-              await db.insert(commissionDeductionsTable).values({
-                payoutId: payout.id,
-                userId: campaign.brandId,
-                agencyId: billing.agencyId,
-                campaignId: effectiveCampaignId,
-                deductionPercent: String(billing.commissionRate),
-                deductionAmount: String(deductionAmount.toFixed(2)),
-              });
-            }
+    if (campaign?.brandId) {
+      const [existing] = await db.select({ id: commissionDeductionsTable.id })
+        .from(commissionDeductionsTable)
+        .where(eq(commissionDeductionsTable.payoutId, payout.id));
+      if (!existing) {
+        const billing = await resolveBilling(campaign.brandId);
+        if (billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
+          const payoutAmount = parseFloat(String(payout.amount));
+          const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
+          if (deductionAmount > 0) {
+            await db.insert(commissionDeductionsTable).values({
+              payoutId: payout.id,
+              userId: campaign.brandId,
+              agencyId: billing.agencyId,
+              campaignId: payout.campaignId,
+              deductionPercent: String(billing.commissionRate),
+              deductionAmount: String(deductionAmount.toFixed(2)),
+            });
           }
         }
       }
     }
-  } catch (e) {
-    console.error("Commission hook error:", e);
   }
 
   res.json({ message: "Approved" });
