@@ -63,10 +63,11 @@ export default function AgencyReportsPage() {
     queryFn: () => fetch("/api/agency/dashboard", { credentials: "include" }).then(r => r.json()),
   });
 
-  const { data: campaigns = [], isLoading: campsLoading } = useQuery<Campaign[]>({
+  const { data: rawCampaigns, isLoading: campsLoading } = useQuery<Campaign[]>({
     queryKey: ["agency-campaigns"],
     queryFn: () => fetch("/api/agency/campaigns", { credentials: "include" }).then(r => r.json()),
   });
+  const campaigns: Campaign[] = Array.isArray(rawCampaigns) ? rawCampaigns : [];
 
   const isLoading = dashLoading || campsLoading;
 
