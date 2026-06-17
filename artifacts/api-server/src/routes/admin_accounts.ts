@@ -88,17 +88,18 @@ router.get("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), asy
   }).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
 
-  // For agency accounts read billing from agenciesTable (source of truth for inherited billing)
+  // For agency accounts read all billing fields from agenciesTable (source of truth)
   if (user.role === "agency") {
     const [agency] = await db.select({
       billingMode: agenciesTable.billingMode, commissionRate: agenciesTable.commissionRate,
+      billingAmount: agenciesTable.billingAmount, subscriptionStatus: agenciesTable.subscriptionStatus,
     }).from(agenciesTable).where(eq(agenciesTable.userId, id));
     return res.json({
       id: user.id, role: user.role, billingNotes: user.billingNotes,
       billingMode: agency?.billingMode ?? user.billingMode,
-      commissionRate: parseFloat(String(agency?.commissionRate ?? user.commissionRate ?? "0")),
-      billingAmount: user.billingAmount != null ? parseFloat(String(user.billingAmount)) : null,
-      subscriptionStatus: user.subscriptionStatus,
+      commissionRate: parseFloat(String(agency?.commissionRate ?? "0")),
+      billingAmount: agency?.billingAmount != null ? parseFloat(String(agency.billingAmount)) : 0,
+      subscriptionStatus: agency?.subscriptionStatus ?? "active",
       inherited: false,
     }) as unknown as void;
   }
@@ -124,18 +125,18 @@ router.put("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), asy
   const [user] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, id));
   if (!user) { res.status(404).json({ error: "Not found" }); return; }
 
-  // Agency accounts: write commission/billingMode to agenciesTable (that's what resolveBilling reads)
+  // Agency accounts: all billing fields live in agenciesTable; billingNotes stays on user
   if (user.role === "agency") {
     const agencyUpdates: Record<string, unknown> = {};
     if (billingMode !== undefined) agencyUpdates.billingMode = billingMode;
     if (commissionRate !== undefined) agencyUpdates.commissionRate = String(commissionRate);
+    if (billingAmount !== undefined) agencyUpdates.billingAmount = String(billingAmount);
+    if (subscriptionStatus !== undefined) agencyUpdates.subscriptionStatus = subscriptionStatus;
     if (Object.keys(agencyUpdates).length) {
       await db.update(agenciesTable).set(agencyUpdates).where(eq(agenciesTable.userId, id));
     }
-    // billingNotes/subscriptionStatus still stored on user row
     const userUpdates: Record<string, unknown> = { updatedAt: new Date() };
     if (billingNotes !== undefined) userUpdates.billingNotes = billingNotes;
-    if (subscriptionStatus !== undefined) userUpdates.subscriptionStatus = subscriptionStatus;
     await db.update(usersTable).set(userUpdates).where(eq(usersTable.id, id));
     return res.json({ message: "Agency billing updated" }) as unknown as void;
   }
@@ -152,7 +153,8 @@ router.put("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), asy
 });
 
 router.get("/admin/payments/subscriptions", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
-  const users = await db.select({
+  // Brand/creator accounts with subscription billing on usersTable
+  const brandSubs = await db.select({
     id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName,
     email: usersTable.email, role: usersTable.role, companyName: usersTable.companyName,
     billingMode: usersTable.billingMode, billingAmount: usersTable.billingAmount,
@@ -160,7 +162,22 @@ router.get("/admin/payments/subscriptions", requireAuth, requireRole("admin"), a
   }).from(usersTable)
     .where(eq(usersTable.billingMode, "subscription"))
     .orderBy(usersTable.createdAt);
-  res.json(users.map(u => ({
+
+  // Agency accounts with subscription billing on agenciesTable
+  const agencySubs = await db.select({
+    id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName,
+    email: usersTable.email, role: usersTable.role, companyName: usersTable.companyName,
+    billingMode: agenciesTable.billingMode, billingAmount: agenciesTable.billingAmount,
+    subscriptionStatus: agenciesTable.subscriptionStatus, createdAt: usersTable.createdAt,
+  }).from(agenciesTable)
+    .innerJoin(usersTable, eq(agenciesTable.userId, usersTable.id))
+    .where(eq(agenciesTable.billingMode, "subscription"))
+    .orderBy(usersTable.createdAt);
+
+  const all = [...brandSubs, ...agencySubs]
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  res.json(all.map(u => ({
     ...u,
     billingAmount: parseFloat(String(u.billingAmount ?? "0")),
     createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),

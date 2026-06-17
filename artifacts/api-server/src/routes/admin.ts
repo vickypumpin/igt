@@ -134,8 +134,9 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  const [payout] = await db.select({ id: payoutsTable.id, creatorId: payoutsTable.creatorId, campaignId: payoutsTable.campaignId, amount: payoutsTable.amount }).from(payoutsTable).where(eq(payoutsTable.id, id));
+  const [payout] = await db.select({ id: payoutsTable.id, creatorId: payoutsTable.creatorId, campaignId: payoutsTable.campaignId, amount: payoutsTable.amount, status: payoutsTable.status }).from(payoutsTable).where(eq(payoutsTable.id, id));
   if (!payout) { res.status(404).json({ error: "Payout not found" }); return; }
+  if (payout.status === "approved") { res.json({ message: "Already approved" }); return; }
 
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
 
@@ -150,19 +151,25 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
         .where(eq(campaignsTable.id, payout.campaignId));
 
       if (campaign?.brandId) {
-        const billing = await resolveBilling(campaign.brandId);
-        if (billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
-          const payoutAmount = parseFloat(String(payout.amount));
-          const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
-          if (deductionAmount > 0) {
-            await db.insert(commissionDeductionsTable).values({
-              payoutId: payout.id,
-              userId: campaign.brandId,
-              agencyId: billing.agencyId,
-              campaignId: payout.campaignId,
-              deductionPercent: String(billing.commissionRate),
-              deductionAmount: String(deductionAmount.toFixed(2)),
-            });
+        // Idempotency: skip if a deduction already exists for this payoutId
+        const [existing] = await db.select({ id: commissionDeductionsTable.id })
+          .from(commissionDeductionsTable)
+          .where(eq(commissionDeductionsTable.payoutId, payout.id));
+        if (!existing) {
+          const billing = await resolveBilling(campaign.brandId);
+          if (billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
+            const payoutAmount = parseFloat(String(payout.amount));
+            const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
+            if (deductionAmount > 0) {
+              await db.insert(commissionDeductionsTable).values({
+                payoutId: payout.id,
+                userId: campaign.brandId,
+                agencyId: billing.agencyId,
+                campaignId: payout.campaignId,
+                deductionPercent: String(billing.commissionRate),
+                deductionAmount: String(deductionAmount.toFixed(2)),
+              });
+            }
           }
         }
       }
