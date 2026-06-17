@@ -6,7 +6,7 @@ import {
 } from "recharts";
 import { useGetAdminDashboard, getGetAdminDashboardQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Users, Megaphone, DollarSign, Star, BarChart2 } from "lucide-react";
+import { TrendingUp, Users, Megaphone, DollarSign, BarChart2, Download } from "lucide-react";
 
 const ORANGE = "#FF8C42";
 const TEAL = "#1DCFB3";
@@ -41,6 +41,17 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
       </div>
     </div>
   );
+}
+
+function downloadCSV(filename: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [headers.join(","), ...rows.map(r => headers.map(h => escape(r[h])).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -120,6 +131,40 @@ export default function AdminReportsPage() {
     );
   }
 
+  function handleDownload() {
+    const tabLabel = activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+    if (activeTab === "overview") {
+      downloadCSV("igotrend-overview-report.csv", [
+        { Metric: "Total Users",          Value: totalUsers },
+        { Metric: "Total Brands",         Value: totalBrands },
+        { Metric: "Total Creators",       Value: totalCreators },
+        { Metric: "Total Campaigns",      Value: totalCampaigns },
+        { Metric: "Active Campaigns",     Value: activeCampaigns },
+        { Metric: "Pending Campaigns",    Value: pendingCampaigns },
+        { Metric: "Completed Campaigns",  Value: completedCampaigns },
+        { Metric: "Platform Revenue (₦)", Value: totalRevenue },
+        { Metric: "Pending Payouts (₦)",  Value: pendingPayouts },
+      ]);
+    } else if (activeTab === "campaigns") {
+      downloadCSV("igotrend-campaigns-report.csv", monthlyGrowth.map(m => ({
+        Month: m.month, "New Campaigns": m.campaigns, "Total Users": m.users,
+      })));
+    } else if (activeTab === "creators") {
+      downloadCSV("igotrend-creators-report.csv", [
+        ...tiers.map(t => ({ Category: "Tier", Name: t.name, Count: t.value })),
+        ...platforms.map(p => ({ Category: "Platform", Name: p.name, Count: p.value })),
+      ]);
+    } else if (activeTab === "revenue") {
+      downloadCSV("igotrend-revenue-report.csv", [
+        { Metric: "Total Revenue (₦)",    Value: totalRevenue },
+        { Metric: "Pending Payouts (₦)",  Value: pendingPayouts },
+        { Metric: "Platform Margin (₦)",  Value: Math.round(totalRevenue * 0.12) },
+        { Metric: "Avg per Campaign (₦)", Value: totalCampaigns > 0 ? Math.round(totalRevenue / totalCampaigns) : 0 },
+      ]);
+    }
+    void tabLabel;
+  }
+
   return (
     <AdminLayout>
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
@@ -127,21 +172,28 @@ export default function AdminReportsPage() {
           <h1 className="text-2xl font-extrabold text-gray-900">Platform Reports</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Analytics overview for iGoTrend across all accounts</p>
         </div>
-        <div className="inline-flex rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 text-sm font-semibold transition-colors ${
-                activeTab === t.key
-                  ? "text-white"
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}
-              style={activeTab === t.key ? { background: ORANGE } : {}}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleDownload}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
+            style={{ background: ORANGE }}
+          >
+            <Download className="h-4 w-4" /> Download CSV
+          </button>
+          <div className="inline-flex rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`px-4 py-2 text-sm font-semibold transition-colors ${
+                  activeTab === t.key ? "text-white" : "text-gray-600 hover:bg-gray-50"
+                }`}
+                style={activeTab === t.key ? { background: ORANGE } : {}}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

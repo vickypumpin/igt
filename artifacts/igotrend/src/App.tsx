@@ -70,6 +70,7 @@ import AgencyClientsPage from "@/pages/agency/clients";
 import AgencyCampaignsPage from "@/pages/agency/campaigns";
 import AgencyBillingPage from "@/pages/agency/billing";
 import AgencyMessagesPage from "@/pages/agency/messages";
+import AgencyReportsPage from "@/pages/agency/reports";
 
 function AppRouter() {
   const { user, setAuth, isLoading: authLoading } = useAuth();
@@ -267,6 +268,7 @@ function AppRouter() {
           <Route path="/agency/campaigns" component={AgencyCampaignsPage} />
           <Route path="/agency/billing" component={AgencyBillingPage} />
           <Route path="/agency/messages" component={AgencyMessagesPage} />
+          <Route path="/agency/reports" component={AgencyReportsPage} />
           <Route path="/agency/settings" component={SettingsPage} />
           <Route path="/trend-ai" component={TrendAiPage} />
           <Route path="/faq" component={FaqPage} />

@@ -5,7 +5,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { Megaphone, Users, DollarSign, TrendingUp, CheckCircle, Clock, XCircle } from "lucide-react";
+import { Megaphone, Users, DollarSign, TrendingUp, CheckCircle, Clock, XCircle, Download } from "lucide-react";
+
+function downloadCSV(filename: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [headers.join(","), ...rows.map(r => headers.map(h => escape(r[h])).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
 
 const TEAL = "#1DCFB3";
 const PURPLE = "#6B2FCE";
@@ -47,6 +58,31 @@ export default function BrandReportsPage() {
   const invited   = Number(d?.totalCreatorsInvited ?? 0);
   const spend     = Number(d?.totalSpend ?? 0);
 
+  const recentCampaigns = (d?.recentCampaigns as Record<string, unknown>[] | undefined) ?? [];
+
+  function handleDownloadSummary() {
+    downloadCSV("brand-summary-report.csv", [
+      { Metric: "Total Campaigns",      Value: total },
+      { Metric: "Active Campaigns",     Value: active },
+      { Metric: "Pending Campaigns",    Value: pending },
+      { Metric: "Completed Campaigns",  Value: completed },
+      { Metric: "Declined Campaigns",   Value: declined },
+      { Metric: "Creators Invited",     Value: invited },
+      { Metric: "Total Spend (₦)",      Value: spend },
+      { Metric: "Completion Rate (%)",  Value: total > 0 ? Math.round((completed / total) * 100) : 0 },
+    ]);
+  }
+
+  function handleDownloadCampaigns() {
+    downloadCSV("brand-campaigns-report.csv", recentCampaigns.map(c => ({
+      Campaign: String(c.name ?? ""),
+      Sponsor:  String(c.sponsor ?? ""),
+      Status:   String(c.status ?? ""),
+      Invites:  String(c.invitesCount ?? 0),
+      Submissions: String(c.submissionsCount ?? 0),
+    })));
+  }
+
   const statusData = [
     { name: "Active",    value: active,    fill: TEAL },
     { name: "Pending",   value: pending,   fill: ORANGE },
@@ -60,8 +96,6 @@ export default function BrandReportsPage() {
     { name: "Completed", campaigns: completed },
     { name: "Declined",  campaigns: declined },
   ];
-
-  const recentCampaigns = (d?.recentCampaigns as Record<string, unknown>[] | undefined) ?? [];
 
   if (isLoading) {
     return (
@@ -78,9 +112,26 @@ export default function BrandReportsPage() {
 
   return (
     <BrandLayout>
-      <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-gray-900">Campaign Reports</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Performance overview for all your campaigns</p>
+      <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold text-gray-900">Campaign Reports</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Performance overview for all your campaigns</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleDownloadSummary}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors"
+            style={{ background: TEAL }}
+          >
+            <Download className="h-4 w-4" /> Summary CSV
+          </button>
+          <button
+            onClick={handleDownloadCampaigns}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors bg-white"
+          >
+            <Download className="h-4 w-4" /> Campaigns CSV
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -179,7 +230,15 @@ export default function BrandReportsPage() {
       {/* Recent campaigns table */}
       {recentCampaigns.length > 0 && (
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-          <h3 className="font-bold text-gray-900 mb-5">Recent Campaigns</h3>
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-bold text-gray-900">Recent Campaigns</h3>
+            <button
+              onClick={handleDownloadCampaigns}
+              className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Download CSV
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

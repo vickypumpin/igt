@@ -4,7 +4,7 @@ import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import {
   LayoutDashboard, Megaphone, Users, Wallet, LogOut, Bell,
-  ChevronDown, HelpCircle, Bot, Settings, MessageSquare,
+  ChevronDown, HelpCircle, Bot, Settings, MessageSquare, BarChart2,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -47,6 +47,7 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
           <NavLink href="/agency/clients" icon={Users} label="Clients" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/agency/campaigns" icon={Megaphone} label="Campaigns" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/agency/billing" icon={Wallet} label="Billing" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
+          <NavLink href="/agency/reports" icon={BarChart2} label="Reports" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/agency/messages" icon={MessageSquare} label="Messages" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/agency/settings" icon={Settings} label="Settings" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
           <NavLink href="/trend-ai" icon={Bot} label="Trend Ai" activeColor={PURPLE} activeBg={PURPLE_BG} activeBorder={PURPLE_BORDER} />
