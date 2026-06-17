@@ -140,20 +140,11 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
 
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
 
-  // Commission hook: one deterministic deduction per payout.
-  // Prefers payout.campaignId; falls back to creator's most recent submission
-  // campaign so commission fires even when the creator UI omits campaignId.
+  // Commission hook: only fires when payout has an explicit campaignId.
+  // Heuristic fallbacks (e.g. recent submission) are intentionally omitted
+  // to avoid mis-attributing commission to the wrong brand/agency.
   try {
-    let effectiveCampaignId = payout.campaignId;
-    if (!effectiveCampaignId) {
-      const [recentSub] = await db
-        .select({ campaignId: submissionsTable.campaignId })
-        .from(submissionsTable)
-        .where(eq(submissionsTable.creatorId, payout.creatorId))
-        .orderBy(desc(submissionsTable.createdAt))
-        .limit(1);
-      if (recentSub?.campaignId) effectiveCampaignId = recentSub.campaignId;
-    }
+    const effectiveCampaignId = payout.campaignId;
 
     if (effectiveCampaignId) {
       const [campaign] = await db

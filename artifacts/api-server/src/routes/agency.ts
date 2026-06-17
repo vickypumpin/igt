@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
@@ -51,7 +51,10 @@ router.get("/agency/clients", requireAuth, requireRole("agency"), async (req, re
     })
     .from(agencyClientsTable)
     .leftJoin(usersTable, eq(agencyClientsTable.brandUserId, usersTable.id))
-    .where(eq(agencyClientsTable.agencyId, agency.id));
+    .where(and(
+      eq(agencyClientsTable.agencyId, agency.id),
+      eq(usersTable.agencyId, agency.id),
+    ));
   res.json(clients.map(c => ({
     ...c,
     commissionRate: c.commissionRate != null ? parseFloat(String(c.commissionRate)) : null,
@@ -69,9 +72,14 @@ router.post("/agency/clients/invite", requireAuth, requireRole("agency"), async 
   const [brand] = await db.select({ id: usersTable.id, role: usersTable.role }).from(usersTable).where(eq(usersTable.email, email));
   if (!brand) { res.status(404).json({ error: "No user found with that email" }); return; }
   if (brand.role !== "brand") { res.status(400).json({ error: "User must be a brand account" }); return; }
+  // Prevent duplicate invite from this agency
   const [existing] = await db.select({ id: agencyClientsTable.id }).from(agencyClientsTable)
     .where(and(eq(agencyClientsTable.agencyId, agency.id), eq(agencyClientsTable.brandUserId, brand.id)));
   if (existing) { res.status(400).json({ error: "Already invited" }); return; }
+  // Enforce single active agency per brand — reject if brand already has an accepted agency
+  const [activeLink] = await db.select({ id: agencyClientsTable.id }).from(agencyClientsTable)
+    .where(and(eq(agencyClientsTable.brandUserId, brand.id), eq(agencyClientsTable.inviteStatus, "accepted")));
+  if (activeLink) { res.status(400).json({ error: "This brand already belongs to an agency" }); return; }
   const [client] = await db.insert(agencyClientsTable).values({
     agencyId: agency.id, brandUserId: brand.id, inviteStatus: "pending",
   }).returning();
@@ -124,6 +132,14 @@ router.patch("/agency/clients/:id/respond", requireAuth, async (req, res): Promi
     res.status(403).json({ error: "Forbidden" }); return;
   }
   if (action === "accept") {
+    // Enforce single active agency per brand before accepting
+    const [activeLink] = await db.select({ id: agencyClientsTable.id }).from(agencyClientsTable)
+      .where(and(
+        eq(agencyClientsTable.brandUserId, invite.brandUserId),
+        eq(agencyClientsTable.inviteStatus, "accepted"),
+        ne(agencyClientsTable.id, id),
+      ));
+    if (activeLink) { res.status(409).json({ error: "You already belong to an agency. Leave your current agency before accepting a new invite." }); return; }
     await Promise.all([
       db.update(agencyClientsTable).set({ inviteStatus: "accepted", joinedAt: new Date() }).where(eq(agencyClientsTable.id, id)),
       db.update(usersTable).set({ agencyId: invite.agencyId }).where(eq(usersTable.id, invite.brandUserId)),
@@ -161,7 +177,11 @@ router.get("/agency/campaigns", requireAuth, requireRole("agency"), async (req, 
   })
     .from(agencyClientsTable)
     .leftJoin(usersTable, eq(agencyClientsTable.brandUserId, usersTable.id))
-    .where(and(eq(agencyClientsTable.agencyId, agency.id), eq(agencyClientsTable.inviteStatus, "accepted")));
+    .where(and(
+      eq(agencyClientsTable.agencyId, agency.id),
+      eq(agencyClientsTable.inviteStatus, "accepted"),
+      eq(usersTable.agencyId, agency.id),
+    ));
   const clientIds = clients.map(c => c.brandUserId);
   if (!clientIds.length) { res.json([]); return; }
   const clientMap = new Map(clients.map(c => [c.brandUserId, c]));
@@ -199,7 +219,12 @@ router.get("/agency/dashboard", requireAuth, requireRole("agency"), async (req, 
 
   const acceptedClients = await db.select({ brandUserId: agencyClientsTable.brandUserId })
     .from(agencyClientsTable)
-    .where(and(eq(agencyClientsTable.agencyId, agency.id), eq(agencyClientsTable.inviteStatus, "accepted")));
+    .leftJoin(usersTable, eq(agencyClientsTable.brandUserId, usersTable.id))
+    .where(and(
+      eq(agencyClientsTable.agencyId, agency.id),
+      eq(agencyClientsTable.inviteStatus, "accepted"),
+      eq(usersTable.agencyId, agency.id),
+    ));
   const clientIds = acceptedClients.map(c => c.brandUserId);
 
   let activeCampaigns = 0;
