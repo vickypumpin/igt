@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserPlus, Trash2, Clock, CheckCircle, Mail, Megaphone, DollarSign, PlusCircle } from "lucide-react";
+import { Users, UserPlus, Trash2, Clock, CheckCircle, Mail, Megaphone, DollarSign, PlusCircle, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Link } from "wouter";
 
 interface Client {
   id: number; agencyId: number; brandUserId: number; inviteStatus: string;
@@ -168,9 +169,16 @@ export default function AgencyClientsPage() {
                       </td>
                       <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(c.invitedAt).toLocaleDateString()}</td>
                       <td className="px-5 py-3.5">
-                        <button onClick={() => removeMutation.mutate(c.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <Link href={`/agency/campaigns?client=${c.brandUserId}`}>
+                            <button className="p-1.5 rounded-lg text-muted-foreground hover:text-purple-600 hover:bg-purple-50 transition-colors" title="View campaigns">
+                              <ExternalLink className="h-4 w-4" />
+                            </button>
+                          </Link>
+                          <button onClick={() => removeMutation.mutate(c.id)} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors" title="Remove">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

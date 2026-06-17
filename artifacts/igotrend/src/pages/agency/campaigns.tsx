@@ -1,8 +1,10 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 import AgencyLayout from "@/components/layout/agency-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Megaphone, Users } from "lucide-react";
+import { useSearch } from "wouter";
 
 interface ClientInfo {
   brandUserId: number | null;
@@ -30,19 +32,58 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 const PURPLE = "#6B2FCE";
 
 export default function AgencyCampaignsPage() {
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const defaultClient = params.get("client") ?? "all";
+
+  const [clientFilter, setClientFilter] = useState<string>(defaultClient);
+
   const { data: campaigns = [], isLoading } = useQuery<Campaign[]>({
     queryKey: ["/agency/campaigns"],
     queryFn: () => customFetch("/api/agency/campaigns"),
   });
+
+  const clients = useMemo(() => {
+    const seen = new Map<string, string>();
+    campaigns.forEach(c => {
+      if (c.client?.brandUserId) {
+        const name = c.client.companyName
+          || (c.client.firstName ? `${c.client.firstName} ${c.client.lastName ?? ""}`.trim() : null)
+          || c.client.email
+          || String(c.client.brandUserId);
+        seen.set(String(c.client.brandUserId), name);
+      }
+    });
+    return Array.from(seen.entries());
+  }, [campaigns]);
+
+  const filtered = useMemo(() =>
+    clientFilter === "all" ? campaigns : campaigns.filter(c => String(c.client?.brandUserId) === clientFilter),
+    [campaigns, clientFilter]);
 
   const byCampaignStatus = (s: string) => STATUS_STYLE[s] ?? { bg: "rgba(107,114,128,0.12)", color: "#4B5563" };
 
   return (
     <AgencyLayout>
       <div data-testid="page-agency-campaigns">
-        <div className="mb-6">
-          <h1 className="text-2xl font-extrabold">Client Campaigns</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">All campaigns across your accepted clients — {campaigns.length} total</p>
+        <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-extrabold">Client Campaigns</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">All campaigns across your accepted clients — {filtered.length} of {campaigns.length} shown</p>
+          </div>
+          {clients.length > 0 && (
+            <select
+              value={clientFilter}
+              onChange={e => setClientFilter(e.target.value)}
+              className="h-9 rounded-xl border border-border/60 px-3 text-sm bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+              data-testid="select-client-filter"
+            >
+              <option value="all">All clients</option>
+              {clients.map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
+            </select>
+          )}
         </div>
 
         {isLoading ? (
@@ -70,7 +111,7 @@ export default function AgencyCampaignsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {campaigns.map(c => {
+                {filtered.map(c => {
                   const st = byCampaignStatus(c.status);
                   const clientName = c.client?.companyName
                     || (c.client?.firstName ? `${c.client.firstName} ${c.client.lastName ?? ""}`.trim() : null)

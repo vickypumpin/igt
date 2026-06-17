@@ -146,7 +146,8 @@ export default function RegisterPage() {
           )}
           {role === "agency" && (
             <div className="mb-4 px-3 py-2.5 rounded-xl text-xs font-medium" style={{ background: "rgba(107,47,206,0.08)", color: "#6B2FCE", border: "1px solid rgba(107,47,206,0.25)" }}>
-              🏛️ Agencies manage multiple brand clients and earn via commission or subscription billing.
+              🏛️ Agencies manage multiple brand clients and earn via commission or subscription billing.<br />
+              <span className="opacity-75">After registration, our team will contact you to set up your billing arrangement.</span>
             </div>
           )}
 

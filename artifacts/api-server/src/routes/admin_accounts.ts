@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db, pool, usersTable, agenciesTable, settingsTable, commissionDeductionsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
-import { eq, ilike, or, and, sql } from "drizzle-orm";
+import { eq, ilike, or, and, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../lib/auth";
 import type { IRouter } from "express";
 
@@ -56,7 +56,29 @@ router.get("/admin/accounts", requireAuth, requireRole("admin"), async (req, res
     db.select({ count: sql<number>`count(*)` }).from(usersTable).where(where),
   ]);
 
-  res.json({ data: users.map(userShape), total: Number(countRow.count), page: pageNum, limit: limitNum });
+  // For agency-role users, override billing fields from agenciesTable (source of truth)
+  const agencyUserIds = users.filter(u => u.role === "agency").map(u => u.id);
+  const agencyRows = agencyUserIds.length > 0
+    ? await db.select().from(agenciesTable).where(inArray(agenciesTable.userId, agencyUserIds))
+    : [];
+  const agencyMap = new Map(agencyRows.map(a => [a.userId, a]));
+
+  const data = users.map(u => {
+    const base = userShape(u);
+    if (u.role === "agency") {
+      const ag = agencyMap.get(u.id);
+      if (ag) return {
+        ...base,
+        billingMode: ag.billingMode ?? base.billingMode,
+        commissionRate: ag.commissionRate != null ? parseFloat(String(ag.commissionRate)) : base.commissionRate,
+        billingAmount: ag.billingAmount != null ? parseFloat(String(ag.billingAmount)) : base.billingAmount,
+        subscriptionStatus: ag.subscriptionStatus ?? base.subscriptionStatus,
+      };
+    }
+    return base;
+  });
+
+  res.json({ data, total: Number(countRow.count), page: pageNum, limit: limitNum });
 });
 
 router.patch("/admin/accounts/:id/status", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {

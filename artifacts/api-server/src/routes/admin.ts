@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, ilike, sql } from "drizzle-orm";
+import { eq, and, ilike, sql, desc } from "drizzle-orm";
 import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { requireAuth, requireRole } from "../lib/auth";
@@ -140,15 +140,26 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
 
   await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
 
-  // Commission hook: one deterministic deduction per payout, using the payout's campaignId.
-  // If campaignId is set on the payout, resolve the brand via the campaign and create
-  // exactly one commission_deductions record for that brand's effective billing config.
+  // Commission hook: one deterministic deduction per payout.
+  // Prefers payout.campaignId; falls back to creator's most recent submission
+  // campaign so commission fires even when the creator UI omits campaignId.
   try {
-    if (payout.campaignId) {
+    let effectiveCampaignId = payout.campaignId;
+    if (!effectiveCampaignId) {
+      const [recentSub] = await db
+        .select({ campaignId: submissionsTable.campaignId })
+        .from(submissionsTable)
+        .where(eq(submissionsTable.creatorId, payout.creatorId))
+        .orderBy(desc(submissionsTable.createdAt))
+        .limit(1);
+      if (recentSub?.campaignId) effectiveCampaignId = recentSub.campaignId;
+    }
+
+    if (effectiveCampaignId) {
       const [campaign] = await db
         .select({ brandId: campaignsTable.brandId })
         .from(campaignsTable)
-        .where(eq(campaignsTable.id, payout.campaignId));
+        .where(eq(campaignsTable.id, effectiveCampaignId));
 
       if (campaign?.brandId) {
         // Idempotency: skip if a deduction already exists for this payoutId
@@ -165,7 +176,7 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
                 payoutId: payout.id,
                 userId: campaign.brandId,
                 agencyId: billing.agencyId,
-                campaignId: payout.campaignId,
+                campaignId: effectiveCampaignId,
                 deductionPercent: String(billing.commissionRate),
                 deductionAmount: String(deductionAmount.toFixed(2)),
               });
