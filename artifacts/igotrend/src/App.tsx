@@ -15,6 +15,7 @@ import ForgotPasswordPage from "@/pages/auth/forgot-password";
 
 import HomePage from "@/pages/public/home";
 import BrandsPage from "@/pages/public/brands";
+import AgenciesPage from "@/pages/public/agencies";
 import InfluencersCreatorsPage from "@/pages/public/influencers-creators";
 import ServicesPage from "@/pages/public/services";
 import CommunityGuidelinesPage from "@/pages/public/community-guidelines";
@@ -113,6 +114,7 @@ function AppRouter() {
         <>
           <Route path="/" component={HomePage} />
           <Route path="/brands" component={BrandsPage} />
+          <Route path="/agencies" component={AgenciesPage} />
           <Route path="/influencers-creators" component={InfluencersCreatorsPage} />
           <Route path="/services" component={ServicesPage} />
           <Route component={NotFound} />

@@ -15,6 +15,7 @@ export type RegisterInputRole = typeof RegisterInputRole[keyof typeof RegisterIn
 export const RegisterInputRole = {
   brand: 'brand',
   creator: 'creator',
+  agency: 'agency',
 } as const;
 
 export type RegisterInputGender = typeof RegisterInputGender[keyof typeof RegisterInputGender];
@@ -57,7 +58,6 @@ export const UserRole = {
   brand: 'brand',
   creator: 'creator',
   agency: 'agency',
-  admin: 'admin',
 } as const;
 
 /**

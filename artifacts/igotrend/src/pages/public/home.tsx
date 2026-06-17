@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { PublicLayout } from "@/components/layout/public-layout";
 import { GeomDecor } from "@/components/GeomDecor";
-import { ChevronRight, Star, Users, DollarSign, TrendingUp, CheckCircle, Instagram, Youtube, Twitter, Facebook } from "lucide-react";
+import { ChevronRight, Star, Users, DollarSign, TrendingUp, CheckCircle, Instagram, Youtube, Twitter, Facebook, Building2 } from "lucide-react";
 
 const categories = [
   { icon: "💃", label: "Dance" },
@@ -36,6 +36,12 @@ const creatorSteps = [
   { step: "1", title: "Build Profile", desc: "Set up your Trender profile, connect your social handles, and set your content pricing." },
   { step: "2", title: "Get Invited", desc: "Brands discover and invite you to campaigns that match your niche and audience." },
   { step: "3", title: "Create & Earn", desc: "Deliver great content, track your earnings, and withdraw to your bank account." },
+];
+
+const agencySteps = [
+  { step: "1", title: "Register Agency", desc: "Create your agency account and get a dedicated multi-client dashboard from day one." },
+  { step: "2", title: "Add Brand Clients", desc: "Invite your brand clients to the platform. Each gets their own account linked to your agency." },
+  { step: "3", title: "Run at Scale", desc: "Manage campaigns, creators, submissions, and payouts across all clients — one login." },
 ];
 
 const tiers = [
@@ -208,6 +214,66 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── For Agencies ── */}
+      <section className="py-20" style={{ background: "linear-gradient(145deg, #0d0826 0%, #1a0a3e 50%, #1a2a5e 100%)" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-5" style={{ background: "rgba(29,207,179,0.18)", color: "#1DCFB3", border: "1px solid rgba(29,207,179,0.35)" }}>
+                <Building2 className="h-3 w-3" />
+                For Marketing Agencies
+              </div>
+              <h2 className="text-3xl font-extrabold text-white mb-5">
+                Run Influencer Campaigns for All Your Clients — <span style={{ color: "#1DCFB3" }}>One Dashboard</span>
+              </h2>
+              <p className="text-white/65 leading-relaxed mb-8">
+                iGoTrend has a dedicated agency tier. Register as an agency, invite your brand clients, and manage every campaign, creator, and payout from a single login. Billing is built in — choose subscription or commission per client.
+              </p>
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                {[
+                  { label: "Multi-client dashboard", icon: "🏢" },
+                  { label: "Flexible agency billing", icon: "💳" },
+                  { label: "Cross-client analytics", icon: "📊" },
+                ].map((item) => (
+                  <div key={item.label} className="text-center p-4 rounded-xl" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    <div className="text-2xl mb-2">{item.icon}</div>
+                    <div className="text-white/70 text-xs font-medium leading-snug">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+              <Link
+                href="/agencies"
+                className="inline-flex items-center gap-2 text-sm font-semibold"
+                style={{ color: "#1DCFB3" }}
+              >
+                Learn more about the Agency tier <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {agencySteps.map((s) => (
+                <div key={s.step} className="flex items-start gap-4 p-5 rounded-2xl" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-black text-sm" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}>
+                    {s.step}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm mb-1">{s.title}</h3>
+                    <p className="text-white/55 text-xs leading-relaxed">{s.desc}</p>
+                  </div>
+                </div>
+              ))}
+              <Link
+                href="/register"
+                className="mt-2 w-full inline-block text-center py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-90"
+                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
+              >
+                Register Your Agency Free
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Creator tiers ── */}
       <section className="py-20" style={{ background: "#f8faff" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -237,18 +303,25 @@ export default function HomePage() {
         <GeomDecor variant="purple" />
         <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">
-            Ready to Start Your Campaign?
+            Ready to Start?
           </h2>
           <p className="text-white/65 text-lg mb-8 max-w-xl mx-auto">
-            Join thousands of brands and creators already winning on iGoTrend.
+            Join brands, agencies, and creators already winning on iGoTrend across West Africa.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center flex-wrap">
             <Link
               href="/register"
               className="px-8 py-3.5 rounded-xl font-bold text-white transition-all hover:opacity-90 shadow-lg"
               style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}
             >
               Get Started — It's Free
+            </Link>
+            <Link
+              href="/agencies"
+              className="px-8 py-3.5 rounded-xl font-bold text-white transition-all hover:bg-white/10"
+              style={{ border: "1px solid rgba(255,255,255,0.25)" }}
+            >
+              Agency? Start Here
             </Link>
             <Link
               href="/brands"

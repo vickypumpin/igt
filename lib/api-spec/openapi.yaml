@@ -1017,7 +1017,7 @@ components:
         email: { type: string }
         password: { type: string }
         phone: { type: string }
-        role: { type: string, enum: [brand, creator] }
+        role: { type: string, enum: [brand, creator, agency] }
         gender: { type: string, enum: [male, female] }
         countryId: { type: integer }
         stateId: { type: ["integer", "null"] }
@@ -1108,7 +1108,7 @@ components:
         userName: { type: string }
         email: { type: string }
         phone: { type: ["string", "null"] }
-        role: { type: string, enum: [brand, creator] }
+        role: { type: string, enum: [brand, creator, agency] }
         gender: { type: ["string", "null"] }
         badge: { type: ["string", "null"], enum: [nano, micro, mid_tier, macro, mega, elite, null] }
         isActive: { type: boolean }

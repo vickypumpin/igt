@@ -5,8 +5,9 @@ import { Menu, X, ChevronDown, Facebook, Twitter, Instagram, Youtube, Linkedin }
 
 const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Brands & Advertiser", href: "/brands" },
-  { label: "Influencers & Creators", href: "/influencers-creators" },
+  { label: "Brands", href: "/brands" },
+  { label: "Agencies", href: "/agencies" },
+  { label: "Creators", href: "/influencers-creators" },
   { label: "Services", href: "/services" },
 ];
 

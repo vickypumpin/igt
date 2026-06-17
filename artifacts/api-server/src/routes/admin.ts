@@ -154,39 +154,45 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     }
   }
 
-  await db.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
-
-  // Commission hook: fires only when payout has an explicit campaignId.
-  // Errors here abort the response with 500 — billing failures must not be silently swallowed.
+  // Resolve billing BEFORE the transaction (read-only, no need to hold a lock).
+  let billing: Awaited<ReturnType<typeof resolveBilling>> = null;
+  let campaignBrandId: number | null = null;
   if (payout.campaignId) {
     const [campaign] = await db
       .select({ brandId: campaignsTable.brandId })
       .from(campaignsTable)
       .where(eq(campaignsTable.id, payout.campaignId));
-
     if (campaign?.brandId) {
-      const [existing] = await db.select({ id: commissionDeductionsTable.id })
+      campaignBrandId = campaign.brandId;
+      billing = await resolveBilling(campaign.brandId);
+    }
+  }
+
+  // Wrap status update + commission insert atomically.
+  // If the commission insert fails, the payout status rolls back — no approved payout without a record.
+  await db.transaction(async (tx) => {
+    await tx.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
+
+    if (payout.campaignId && billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
+      const [existing] = await tx.select({ id: commissionDeductionsTable.id })
         .from(commissionDeductionsTable)
         .where(eq(commissionDeductionsTable.payoutId, payout.id));
       if (!existing) {
-        const billing = await resolveBilling(campaign.brandId);
-        if (billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
-          const payoutAmount = parseFloat(String(payout.amount));
-          const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
-          if (deductionAmount > 0) {
-            await db.insert(commissionDeductionsTable).values({
-              payoutId: payout.id,
-              userId: campaign.brandId,
-              agencyId: billing.agencyId,
-              campaignId: payout.campaignId,
-              deductionPercent: String(billing.commissionRate),
-              deductionAmount: String(deductionAmount.toFixed(2)),
-            });
-          }
+        const payoutAmount = parseFloat(String(payout.amount));
+        const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
+        if (deductionAmount > 0) {
+          await tx.insert(commissionDeductionsTable).values({
+            payoutId: payout.id,
+            userId: campaignBrandId,
+            agencyId: billing.agencyId,
+            campaignId: payout.campaignId,
+            deductionPercent: String(billing.commissionRate),
+            deductionAmount: String(deductionAmount.toFixed(2)),
+          });
         }
       }
     }
-  }
+  });
 
   res.json({ message: "Approved" });
 });

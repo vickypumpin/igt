@@ -12,4 +12,5 @@ export type UserRole = typeof UserRole[keyof typeof UserRole];
 export const UserRole = {
   brand: 'brand',
   creator: 'creator',
+  agency: 'agency',
 } as const;

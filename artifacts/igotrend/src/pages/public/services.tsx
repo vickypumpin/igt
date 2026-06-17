@@ -30,8 +30,8 @@ const services = [
   },
   {
     title: "Agency & B2B Solutions",
-    desc: "Designed for marketing agencies managing multiple brand clients. One dashboard, multiple clients, centralized billing.",
-    items: ["Multi-client campaign oversight", "White-label reporting options", "Consolidated billing & invoicing", "Dedicated account management"],
+    desc: "iGoTrend has a dedicated agency account tier — not a workaround, but a first-class role built into the platform. Manage every brand client, campaign, and creator payout from a single agency dashboard.",
+    items: ["Dedicated agency dashboard with multi-client view", "Per-client billing: subscription or commission model", "Commission auto-calculated on every creator payout", "Cross-client campaign and creator analytics", "Invite clients to join under your agency account", "Priority support for agency accounts"],
   },
 ];
 
