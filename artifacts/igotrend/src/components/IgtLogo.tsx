@@ -3,32 +3,36 @@ interface IgtLogoProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl";
 }
 
-const sizes = {
-  xs: "text-base",
-  sm: "text-lg",
-  md: "text-2xl",
-  lg: "text-3xl",
-  xl: "text-5xl",
+const heightMap = {
+  xs: 22,
+  sm: 28,
+  md: 36,
+  lg: 48,
+  xl: 72,
 };
 
 export function IgtLogo({ white = false, size = "md" }: IgtLogoProps) {
-  const cls = sizes[size];
+  const h = heightMap[size];
+  const src = white ? "/logo-white.png" : "/logo.png";
   return (
-    <span className={`${cls} font-black tracking-tight select-none leading-none`} style={{ fontFamily: "'Poppins', sans-serif" }}>
-      <span style={{ color: white ? "#ffffff" : "#16875C", fontStyle: "italic" }}>i</span>
-      <span style={{ color: "#1DCFB3" }}>GO</span>
-      <span style={{ color: white ? "rgba(255,255,255,0.92)" : "#145E42" }}>TREND</span>
-    </span>
+    <img
+      src={src}
+      alt="iGoTrend"
+      height={h}
+      style={{ height: h, width: "auto", display: "inline-block", userSelect: "none" }}
+      draggable={false}
+    />
   );
 }
 
 export function IgtLogoBadge() {
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}>
-        <span className="text-white font-black text-sm" style={{ fontFamily: "'Poppins', sans-serif" }}>iG</span>
-      </div>
-      <IgtLogo size="sm" />
-    </div>
+    <img
+      src="/logo.png"
+      alt="iGoTrend"
+      height={36}
+      style={{ height: 36, width: "auto", display: "inline-block", userSelect: "none" }}
+      draggable={false}
+    />
   );
 }
