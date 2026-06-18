@@ -3,7 +3,7 @@ import { eq, ilike, and, sql } from "drizzle-orm";
 import { db, usersTable, campaignInvitesTable, submissionsTable, kycRequestsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
-import { sendEmail, sendSms } from "../lib/notify";
+import { sendEmail, sendSms, tplNewKycRequest } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -124,6 +124,28 @@ router.post("/creator/kyc-request", requireAuth, requireRole("creator"), async (
     idNumber, documentUrl: documentUrl ?? null,
     status: "pending",
   }).returning();
+
+  // Notify admin of new KYC submission
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName })
+      .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
+    db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.role, "admin")),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], admins, [settings]]) => {
+    if (!creator || !admins.length) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const appBase = process.env["APP_BASE_URL"] ?? "https://igotrend.com";
+    const adminUrl = `${appBase}/admin/kyc`;
+    const creatorName = `${creator.firstName ?? ""} ${creator.lastName ?? ""}`.trim() || "a creator";
+    for (const admin of admins) {
+      sendEmail(
+        admin.email,
+        `New KYC verification request — ${siteName}`,
+        tplNewKycRequest(siteName, creatorName, adminUrl),
+      ).catch(console.error);
+    }
+  }).catch(console.error);
+
   res.status(201).json(req_);
 });
 

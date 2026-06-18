@@ -1,9 +1,10 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
-import { db, usersTable, agenciesTable, settingsTable } from "@workspace/db";
+import { randomBytes } from "crypto";
+import { eq, and, gt } from "drizzle-orm";
+import { db, usersTable, agenciesTable, settingsTable, passwordResetTokensTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
-import { sendEmail, tplWelcome } from "../lib/notify";
+import { sendEmail, tplWelcome, tplPasswordReset } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -138,7 +139,77 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
     res.status(400).json({ error: "Email is required" });
     return;
   }
+
+  // Always return same message to avoid email enumeration
+  const [user] = await db.select({ id: usersTable.id, firstName: usersTable.firstName, email: usersTable.email })
+    .from(usersTable).where(eq(usersTable.email, email)).limit(1);
+
+  if (user) {
+    const [settings] = await db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1);
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const appBase = process.env["APP_BASE_URL"] ?? "https://igotrend.com";
+
+    const rawToken = randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await db.insert(passwordResetTokensTable).values({
+      userId: user.id,
+      token: rawToken,
+      expiresAt,
+    });
+
+    const resetUrl = `${appBase}/reset-password?token=${rawToken}`;
+    sendEmail(
+      user.email,
+      `Reset your ${siteName} password`,
+      tplPasswordReset(siteName, user.firstName ?? "there", resetUrl),
+    ).catch(console.error);
+  }
+
   res.json({ message: "If that email is registered, a reset link has been sent." });
+});
+
+router.post("/auth/reset-password", async (req, res): Promise<void> => {
+  const { token, password } = req.body;
+  if (!token || !password) {
+    res.status(400).json({ error: "token and password are required" });
+    return;
+  }
+  if (password.length < 8) {
+    res.status(400).json({ error: "Password must be at least 8 characters" });
+    return;
+  }
+
+  const [resetToken] = await db.select()
+    .from(passwordResetTokensTable)
+    .where(
+      and(
+        eq(passwordResetTokensTable.token, token),
+        gt(passwordResetTokensTable.expiresAt, new Date()),
+      )
+    )
+    .limit(1);
+
+  if (!resetToken) {
+    res.status(400).json({ error: "Invalid or expired reset token" });
+    return;
+  }
+  if (resetToken.usedAt) {
+    res.status(400).json({ error: "This reset link has already been used" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await Promise.all([
+    db.update(usersTable)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(usersTable.id, resetToken.userId)),
+    db.update(passwordResetTokensTable)
+      .set({ usedAt: new Date() })
+      .where(eq(passwordResetTokensTable.id, resetToken.id)),
+  ]);
+
+  res.json({ message: "Password has been reset. You can now log in." });
 });
 
 router.patch("/auth/me/pricing", requireAuth, async (req, res): Promise<void> => {

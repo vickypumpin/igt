@@ -264,6 +264,37 @@ export function tplApplicationDecision(siteName: string, creatorName: string, ca
   `);
 }
 
+export function tplNewApplication(siteName: string, brandName: string, creatorName: string, campaignName: string, campaignUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`New Campaign Application`)}
+    ${p(`Hi ${brandName},`)}
+    ${p(`<strong>${creatorName}</strong> has applied to join your campaign <strong>"${campaignName}"</strong>.`)}
+    ${p(`Log in to review their profile and approve or decline the application.`)}
+    ${btn(campaignUrl, "Review Application")}
+  `);
+}
+
+export function tplPasswordReset(siteName: string, firstName: string, resetUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`Reset Your Password`)}
+    ${p(`Hi ${firstName},`)}
+    ${p(`We received a request to reset your password for your <strong>${siteName}</strong> account.`)}
+    ${p(`Click the button below to set a new password. This link expires in <strong>60 minutes</strong>.`)}
+    ${btn(resetUrl, "Reset Password")}
+    ${p(`If you didn't request a password reset, you can safely ignore this email — your password will remain unchanged.`)}
+  `);
+}
+
+export function tplNewKycRequest(siteName: string, creatorName: string, adminUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`New KYC Verification Request`)}
+    ${p(`A creator has submitted a new identity verification request on <strong>${siteName}</strong>.`)}
+    ${p(`<strong>Creator:</strong> ${creatorName}`)}
+    ${p(`Please log in to the admin panel to review and approve or reject the submission.`)}
+    ${btn(adminUrl, "Review KYC Request")}
+  `);
+}
+
 export function tplTest(siteName: string): string {
   return emailWrapper(siteName, `
     ${h2("Test Email")}

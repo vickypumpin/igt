@@ -12,6 +12,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/auth/login";
 import RegisterPage from "@/pages/auth/register";
 import ForgotPasswordPage from "@/pages/auth/forgot-password";
+import ResetPasswordPage from "@/pages/auth/reset-password";
 
 import HomePage from "@/pages/public/home";
 import BrandsPage from "@/pages/public/brands";
@@ -112,6 +113,7 @@ function AppRouter() {
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
 
       {/* ── Public pages (always accessible to everyone) ── */}
       <Route path="/privacy" component={LegalPage} />

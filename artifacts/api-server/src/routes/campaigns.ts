@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
 import { db, campaignsTable, usersTable, campaignInvitesTable, submissionsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
-import { sendEmail, sendSms, tplCampaignInvite, tplCampaignApproved, tplCampaignRejected, tplApplicationDecision } from "../lib/notify";
+import { sendEmail, sendSms, tplCampaignInvite, tplCampaignApproved, tplCampaignRejected, tplApplicationDecision, tplNewApplication } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -490,6 +490,29 @@ router.post("/creator/campaigns/:id/apply", requireAuth, requireRole("creator"),
     status: "pending",
     source: "creator",
   }).returning();
+
+  // Notify brand of new creator application
+  Promise.all([
+    db.select({ brandId: campaignsTable.brandId }).from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1),
+    db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, userName: usersTable.userName })
+      .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(async ([[camp], [creator], [settings]]) => {
+    if (!camp) return;
+    const [brand] = await db.select({ email: usersTable.email, firstName: usersTable.firstName })
+      .from(usersTable).where(eq(usersTable.id, camp.brandId)).limit(1);
+    if (!brand) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${campaignId}`;
+    const creatorDisplayName = creator
+      ? (`${creator.firstName ?? ""} ${creator.lastName ?? ""}`.trim() || creator.userName)
+      : "A creator";
+    sendEmail(
+      brand.email,
+      `New application for "${campaign.name ?? "your campaign"}" — ${siteName}`,
+      tplNewApplication(siteName, brand.firstName ?? "there", creatorDisplayName, campaign.name ?? "your campaign", campaignUrl),
+    ).catch(console.error);
+  }).catch(console.error);
 
   res.status(201).json({
     id: invite.id,

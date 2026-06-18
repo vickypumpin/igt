@@ -17,3 +17,4 @@ export * from "./gems_transactions";
 export * from "./ai_conversations";
 export * from "./ai_messages";
 export * from "./kyc_requests";
+export * from "./password_reset_tokens";
