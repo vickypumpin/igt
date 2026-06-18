@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import {
   Search, Instagram, Youtube, Twitter, Facebook, Users, Star, X,
-  CheckCircle, Lock, Briefcase, Send, ChevronDown,
+  CheckCircle, Lock, Send, ChevronDown, Briefcase, UserPlus,
 } from "lucide-react";
 import { SiTiktok, SiSnapchat } from "react-icons/si";
 
@@ -92,6 +92,126 @@ function getInitials(c: Creator) {
 
 function getDisplayName(c: Creator) {
   return c.firstName && c.lastName ? `${c.firstName} ${c.lastName}` : c.userName;
+}
+
+/* ────────────────────────────────────────────────
+   Agency Inline Invite Section (inside modal)
+──────────────────────────────────────────────── */
+function AgencyInviteSection({ creator, onClose }: { creator: Creator; onClose: () => void }) {
+  const { toast } = useToast();
+  type AgencyCampaign = { id: number; name: string; status: string };
+
+  const [campaigns, setCampaigns] = useState<AgencyCampaign[]>([]);
+  const [campsLoading, setCampsLoading] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCampsLoading(true);
+    fetch(`${API_BASE}/agency/campaigns`, { credentials: "include" })
+      .then(r => r.json())
+      .then(d => {
+        const arr = Array.isArray(d) ? d : [];
+        setCampaigns(arr);
+        if (arr.length > 0) setSelectedCampaign(String(arr[0].id));
+      })
+      .catch(() => setCampaigns([]))
+      .finally(() => setCampsLoading(false));
+  }, []);
+
+  async function handleAgencyInvite() {
+    if (!selectedCampaign) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/agency/campaigns/${selectedCampaign}/invites`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorId: creator.id }),
+      });
+      if (res.ok) {
+        setSent(true);
+        toast({ title: "Invite sent!", description: `${getDisplayName(creator)} has been invited to the campaign.` });
+      } else {
+        const err = await res.json().catch(() => ({}));
+        const msg = err.error ?? "Something went wrong.";
+        setError(msg);
+        toast({ title: "Failed to send invite", description: msg, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Briefcase className="h-4 w-4" style={{ color: "#6B2FCE" }} />
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Invite to a Client Campaign</p>
+      </div>
+      {campsLoading ? (
+        <div className="h-10 bg-gray-100 rounded-xl animate-pulse mb-3" />
+      ) : campaigns.length === 0 ? (
+        <div className="text-center py-3">
+          <p className="text-sm text-gray-500 mb-1">No active client campaigns found.</p>
+          <Link
+            href="/agency/campaigns"
+            className="text-xs text-purple-600 hover:underline font-medium"
+            onClick={onClose}
+          >
+            Go to Campaigns →
+          </Link>
+        </div>
+      ) : sent ? (
+        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: "rgba(29,207,179,0.1)" }}>
+          <CheckCircle className="h-5 w-5 text-teal-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-teal-700">Invite Sent!</p>
+            <p className="text-xs text-teal-600">{getDisplayName(creator)} has been invited to the campaign.</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="relative mb-3">
+            <select
+              value={selectedCampaign}
+              onChange={e => { setSelectedCampaign(e.target.value); setError(null); }}
+              className="w-full appearance-none pl-3 pr-8 py-2.5 rounded-xl text-sm bg-white border border-gray-200 text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+              {campaigns.map(c => (
+                <option key={c.id} value={String(c.id)}>{c.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          </div>
+          {error && <p className="text-xs text-red-500 mb-2">{error}</p>}
+          <button
+            onClick={handleAgencyInvite}
+            disabled={sending || !selectedCampaign}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ background: "linear-gradient(135deg,#6B2FCE,#4E22A8)" }}
+          >
+            <UserPlus className="h-4 w-4" />
+            {sending ? "Sending…" : "Invite to Campaign"}
+          </button>
+          <div className="mt-2 text-center">
+            <Link
+              href="/agency/campaigns"
+              className="text-xs text-purple-600 hover:underline font-medium"
+              onClick={onClose}
+            >
+              View all campaigns →
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 /* ────────────────────────────────────────────────
@@ -322,21 +442,9 @@ function CreatorModal({
               </div>
             )}
 
-            {/* Agency */}
+            {/* Agency — inline campaign invite */}
             {user?.role === "agency" && (
-              <div className="text-center py-2">
-                <Briefcase className="h-8 w-8 mx-auto mb-2" style={{ color: "#6B2FCE" }} />
-                <p className="font-bold text-gray-800 mb-1">Add to a Client Campaign</p>
-                <p className="text-xs text-gray-500 mb-4">Go to your campaigns dashboard to assign this creator to an active client campaign.</p>
-                <Link
-                  href="/agency/campaigns"
-                  className="inline-block px-6 py-2.5 rounded-xl text-sm font-bold text-white hover:opacity-90 transition"
-                  style={{ background: "linear-gradient(135deg,#6B2FCE,#4E22A8)" }}
-                  onClick={onClose}
-                >
-                  Go to Campaigns →
-                </Link>
-              </div>
+              <AgencyInviteSection creator={creator} onClose={onClose} />
             )}
 
             {/* Creator (shouldn't see this page but just in case) */}

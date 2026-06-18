@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { eq, and, sql, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable, settingsTable } from "@workspace/db";
+import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable, settingsTable, campaignInvitesTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
+import { sendEmail, sendSms, tplCampaignInvite } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -203,6 +204,126 @@ router.get("/agency/campaigns", requireAuth, requireRole("agency"), async (req, 
     client: clientMap.get(c.brandId ?? 0) ?? null,
   }));
   res.json(result);
+});
+
+router.get("/agency/campaigns/:id/invites", requireAuth, requireRole("agency"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const campaignId = parseInt(raw, 10);
+  if (isNaN(campaignId)) { res.status(400).json({ error: "Invalid campaign id" }); return; }
+
+  const [agency] = await db.select().from(agenciesTable).where(eq(agenciesTable.userId, req.userId!));
+  if (!agency) { res.status(404).json({ error: "Agency not found" }); return; }
+
+  const [campaign] = await db.select({ id: campaignsTable.id, brandId: campaignsTable.brandId })
+    .from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+  if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+  const [clientLink] = await db.select({ id: agencyClientsTable.id })
+    .from(agencyClientsTable)
+    .where(and(
+      eq(agencyClientsTable.agencyId, agency.id),
+      eq(agencyClientsTable.brandUserId, campaign.brandId!),
+      eq(agencyClientsTable.inviteStatus, "accepted"),
+    ));
+  if (!clientLink) { res.status(403).json({ error: "Campaign does not belong to one of your clients" }); return; }
+
+  const invites = await db.select({
+    id: campaignInvitesTable.id,
+    campaignId: campaignInvitesTable.campaignId,
+    creatorId: campaignInvitesTable.creatorId,
+    status: campaignInvitesTable.status,
+    createdAt: campaignInvitesTable.createdAt,
+    creatorFirstName: usersTable.firstName,
+    creatorLastName: usersTable.lastName,
+    creatorUserName: usersTable.userName,
+    creatorBadge: usersTable.badge,
+    creatorAvatarUrl: usersTable.avatarUrl,
+  }).from(campaignInvitesTable)
+    .leftJoin(usersTable, eq(campaignInvitesTable.creatorId, usersTable.id))
+    .where(eq(campaignInvitesTable.campaignId, campaignId));
+
+  res.json(invites.map(inv => ({
+    id: inv.id,
+    campaignId: inv.campaignId,
+    creatorId: inv.creatorId,
+    status: inv.status,
+    createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
+    creator: {
+      id: inv.creatorId,
+      firstName: inv.creatorFirstName ?? "",
+      lastName: inv.creatorLastName ?? "",
+      userName: inv.creatorUserName ?? "",
+      badge: inv.creatorBadge ?? null,
+      avatarUrl: inv.creatorAvatarUrl ?? null,
+    },
+  })));
+});
+
+router.post("/agency/campaigns/:id/invites", requireAuth, requireRole("agency"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const campaignId = parseInt(raw, 10);
+  if (isNaN(campaignId)) { res.status(400).json({ error: "Invalid campaign id" }); return; }
+
+  const { creatorId } = req.body;
+  if (!creatorId) { res.status(400).json({ error: "creatorId is required" }); return; }
+
+  const [agency] = await db.select().from(agenciesTable).where(eq(agenciesTable.userId, req.userId!));
+  if (!agency) { res.status(404).json({ error: "Agency not found" }); return; }
+
+  const [campaign] = await db.select({ id: campaignsTable.id, brandId: campaignsTable.brandId, name: campaignsTable.name })
+    .from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+  if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+  const [clientLink] = await db.select({ id: agencyClientsTable.id })
+    .from(agencyClientsTable)
+    .where(and(
+      eq(agencyClientsTable.agencyId, agency.id),
+      eq(agencyClientsTable.brandUserId, campaign.brandId!),
+      eq(agencyClientsTable.inviteStatus, "accepted"),
+    ));
+  if (!clientLink) { res.status(403).json({ error: "Campaign does not belong to one of your clients" }); return; }
+
+  const [existing] = await db.select({ id: campaignInvitesTable.id })
+    .from(campaignInvitesTable)
+    .where(and(
+      eq(campaignInvitesTable.campaignId, campaignId),
+      eq(campaignInvitesTable.creatorId, Number(creatorId)),
+    ));
+  if (existing) { res.status(409).json({ error: "This creator has already been invited to this campaign" }); return; }
+
+  const [invite] = await db.insert(campaignInvitesTable)
+    .values({ campaignId, creatorId: Number(creatorId), status: "pending", source: "brand" })
+    .returning();
+
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, Number(creatorId))).limit(1),
+    db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, companyName: usersTable.companyName })
+      .from(usersTable).where(eq(usersTable.id, campaign.brandId!)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], [brand], [settings]]) => {
+    if (!creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const invitesUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/invites`;
+    const rawName = `${brand?.firstName ?? ""} ${brand?.lastName ?? ""}`.trim();
+    const brandDisplayName = brand?.companyName ?? (rawName || siteName);
+    sendEmail(
+      creator.email,
+      `You've been invited to "${campaign.name}" on ${siteName}`,
+      tplCampaignInvite(siteName, creator.firstName ?? "there", campaign.name, brandDisplayName, invitesUrl),
+    ).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: ${brandDisplayName} has invited you to join the campaign "${campaign.name}". Log in to view.`).catch(console.error);
+    }
+  }).catch(console.error);
+
+  res.status(201).json({
+    id: invite.id,
+    campaignId: invite.campaignId,
+    creatorId: invite.creatorId,
+    status: invite.status,
+    createdAt: invite.createdAt instanceof Date ? invite.createdAt.toISOString() : String(invite.createdAt),
+  });
 });
 
 router.get("/agency/dashboard", requireAuth, requireRole("agency"), async (req, res): Promise<void> => {
