@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
 import { db, campaignsTable, usersTable, campaignInvitesTable, submissionsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
-import { sendEmail, sendSms, tplCampaignInvite, tplCampaignApproved, tplCampaignRejected } from "../lib/notify";
+import { sendEmail, sendSms, tplCampaignInvite, tplCampaignApproved, tplCampaignRejected, tplApplicationDecision } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -328,6 +328,176 @@ router.get("/creator/eligible-campaigns", requireAuth, requireRole("creator"), a
     ))
     .groupBy(submissionsTable.campaignId, campaignsTable.name, campaignsTable.sponsor);
   res.json(rows);
+});
+
+// All active campaigns a creator has NOT been invited to yet — for Discover tab
+router.get("/creator/discover-campaigns", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+  const creatorId = req.userId!;
+
+  const alreadyInvited = db.select({ cid: campaignInvitesTable.campaignId })
+    .from(campaignInvitesTable)
+    .where(eq(campaignInvitesTable.creatorId, creatorId));
+
+  const campaigns = await db.select({
+    id: campaignsTable.id,
+    name: campaignsTable.name,
+    sponsor: campaignsTable.sponsor,
+    description: campaignsTable.description,
+    type: campaignsTable.type,
+    campaignDuration: campaignsTable.campaignDuration,
+    campaignCategoryId: campaignsTable.campaignCategoryId,
+    startDate: campaignsTable.startDate,
+    endDate: campaignsTable.endDate,
+    noOfCreators: campaignsTable.noOfCreators,
+    gemsPerCreator: campaignsTable.gemsPerCreator,
+    coverImageUrl: campaignsTable.coverImageUrl,
+    createdAt: campaignsTable.createdAt,
+  }).from(campaignsTable)
+    .where(and(
+      eq(campaignsTable.status, "active"),
+      sql`${campaignsTable.id} not in (${alreadyInvited})`,
+    ))
+    .orderBy(sql`${campaignsTable.createdAt} desc`);
+
+  res.json(campaigns.map(c => ({
+    id: c.id,
+    name: c.name,
+    sponsor: c.sponsor,
+    description: c.description ?? null,
+    type: c.type,
+    campaignDuration: c.campaignDuration,
+    campaignCategoryId: c.campaignCategoryId ?? null,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    noOfCreators: c.noOfCreators,
+    gemsPerCreator: c.gemsPerCreator ?? null,
+    coverImageUrl: c.coverImageUrl ?? null,
+    createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+  })));
+});
+
+// Brand approves a creator application (source='creator', status='pending') → active
+router.post("/campaigns/:id/applications/:inviteId/approve", requireAuth, requireRole("brand"), async (req, res): Promise<void> => {
+  const campaignId = parseInt(String(req.params.id), 10);
+  const inviteId = parseInt(String(req.params.inviteId), 10);
+  if (isNaN(campaignId) || isNaN(inviteId)) { res.status(400).json({ error: "Invalid ids" }); return; }
+
+  const [campaign] = await db.select({ id: campaignsTable.id, brandId: campaignsTable.brandId, name: campaignsTable.name, gemsPerCreator: campaignsTable.gemsPerCreator })
+    .from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+  if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+  if (campaign.brandId !== req.userId) { res.status(403).json({ error: "Not your campaign" }); return; }
+
+  const [inv] = await db.select({ id: campaignInvitesTable.id, status: campaignInvitesTable.status, source: campaignInvitesTable.source, creatorId: campaignInvitesTable.creatorId })
+    .from(campaignInvitesTable)
+    .where(and(eq(campaignInvitesTable.id, inviteId), eq(campaignInvitesTable.campaignId, campaignId)))
+    .limit(1);
+  if (!inv) { res.status(404).json({ error: "Application not found" }); return; }
+  if ((inv.source ?? "brand") !== "creator") { res.status(400).json({ error: "This is a brand invite, not a creator application" }); return; }
+  if (inv.status !== "pending") { res.status(409).json({ error: "Application already decided" }); return; }
+
+  const gemsRequired = campaign.gemsPerCreator ?? 0;
+  try {
+    await db.transaction(async (tx) => {
+      if (gemsRequired > 0) {
+        const debited = await tx.update(usersTable)
+          .set({ gems: sql`gems - ${gemsRequired}` })
+          .where(and(eq(usersTable.id, campaign.brandId!), sql`gems >= ${gemsRequired}`))
+          .returning({ id: usersTable.id });
+        if (!debited.length) throw Object.assign(new Error("INSUFFICIENT_GEMS"), { code: "INSUFFICIENT_GEMS" });
+      }
+      await tx.update(campaignInvitesTable).set({ status: "active", updatedAt: new Date() }).where(eq(campaignInvitesTable.id, inviteId));
+    });
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === "INSUFFICIENT_GEMS") { res.status(402).json({ error: "Insufficient gems" }); return; }
+    throw err;
+  }
+
+  // Notify creator
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, inv.creatorId)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], [settings]]) => {
+    if (!creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const campaignsUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns`;
+    sendEmail(creator.email, `Your application was approved — ${campaign.name}`, tplApplicationDecision(siteName, creator.firstName ?? "there", campaign.name ?? "the campaign", true, campaignsUrl)).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: Great news! Your application for "${campaign.name ?? "a campaign"}" has been approved. Check your campaigns dashboard.`).catch(console.error);
+    }
+  }).catch(console.error);
+
+  res.json({ message: "Application approved" });
+});
+
+// Brand rejects a creator application
+router.post("/campaigns/:id/applications/:inviteId/reject", requireAuth, requireRole("brand"), async (req, res): Promise<void> => {
+  const campaignId = parseInt(String(req.params.id), 10);
+  const inviteId = parseInt(String(req.params.inviteId), 10);
+  if (isNaN(campaignId) || isNaN(inviteId)) { res.status(400).json({ error: "Invalid ids" }); return; }
+
+  const [campaign] = await db.select({ id: campaignsTable.id, brandId: campaignsTable.brandId, name: campaignsTable.name })
+    .from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+  if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+  if (campaign.brandId !== req.userId) { res.status(403).json({ error: "Not your campaign" }); return; }
+
+  const [inv] = await db.select({ id: campaignInvitesTable.id, status: campaignInvitesTable.status, source: campaignInvitesTable.source, creatorId: campaignInvitesTable.creatorId })
+    .from(campaignInvitesTable)
+    .where(and(eq(campaignInvitesTable.id, inviteId), eq(campaignInvitesTable.campaignId, campaignId)))
+    .limit(1);
+  if (!inv) { res.status(404).json({ error: "Application not found" }); return; }
+  if ((inv.source ?? "brand") !== "creator") { res.status(400).json({ error: "This is a brand invite, not a creator application" }); return; }
+  if (inv.status !== "pending") { res.status(409).json({ error: "Application already decided" }); return; }
+
+  await db.update(campaignInvitesTable).set({ status: "declined", updatedAt: new Date() }).where(eq(campaignInvitesTable.id, inviteId));
+
+  // Notify creator
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, inv.creatorId)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], [settings]]) => {
+    if (!creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const campaignsUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns`;
+    sendEmail(creator.email, `Your application was not approved — ${campaign.name}`, tplApplicationDecision(siteName, creator.firstName ?? "there", campaign.name ?? "the campaign", false, campaignsUrl)).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: Your application for "${campaign.name ?? "a campaign"}" was not selected this time. Discover more campaigns on your dashboard.`).catch(console.error);
+    }
+  }).catch(console.error);
+
+  res.json({ message: "Application rejected" });
+});
+
+// Creator applies to a campaign — creates an invite with pending status
+router.post("/creator/campaigns/:id/apply", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const campaignId = parseInt(raw, 10);
+  if (isNaN(campaignId)) { res.status(400).json({ error: "Invalid campaign id" }); return; }
+
+  const [campaign] = await db.select({ id: campaignsTable.id, status: campaignsTable.status, name: campaignsTable.name })
+    .from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+  if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+  if (campaign.status !== "active") { res.status(400).json({ error: "Campaign is not open for applications" }); return; }
+
+  const [existing] = await db.select({ id: campaignInvitesTable.id })
+    .from(campaignInvitesTable)
+    .where(and(eq(campaignInvitesTable.campaignId, campaignId), eq(campaignInvitesTable.creatorId, req.userId!)))
+    .limit(1);
+  if (existing) { res.status(409).json({ error: "Already applied to this campaign" }); return; }
+
+  const [invite] = await db.insert(campaignInvitesTable).values({
+    campaignId,
+    creatorId: req.userId!,
+    status: "pending",
+    source: "creator",
+  }).returning();
+
+  res.status(201).json({
+    id: invite.id,
+    campaignId: invite.campaignId,
+    creatorId: invite.creatorId,
+    status: invite.status,
+    createdAt: invite.createdAt instanceof Date ? invite.createdAt.toISOString() : String(invite.createdAt),
+  });
 });
 
 export default router;

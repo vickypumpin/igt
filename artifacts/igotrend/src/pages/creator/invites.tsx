@@ -6,7 +6,7 @@ import CreatorLayout from "@/components/layout/creator-layout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, Inbox, Calendar, Users, Megaphone } from "lucide-react";
+import { CheckCircle2, XCircle, Inbox, Calendar, Users, Megaphone, Clock } from "lucide-react";
 
 const STATUS_CFG: Record<string, { bg: string; text: string; dot: string }> = {
   active:    { bg: "rgba(16,185,129,0.12)", text: "#059669", dot: "#10B981" },
@@ -88,19 +88,25 @@ export default function InvitesPage() {
                       </div>
                     </div>
                     {inv.status === "pending" && (
-                      <div className="flex gap-2 flex-shrink-0">
-                        <Button size="sm" variant="outline" onClick={() => handleDecline(inv.id)} disabled={declineMutation.isPending}
-                          className="h-9 px-3 rounded-xl text-xs font-semibold text-destructive border-destructive/30 hover:bg-destructive/10"
-                          data-testid={`button-decline-${inv.id}`}>
-                          <XCircle className="h-3.5 w-3.5 mr-1" /> Decline
-                        </Button>
-                        <Button size="sm" onClick={() => handleAccept(inv.id)} disabled={acceptMutation.isPending}
-                          className="h-9 px-4 rounded-xl text-xs font-semibold"
-                          style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
-                          data-testid={`button-accept-${inv.id}`}>
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Accept
-                        </Button>
-                      </div>
+                      (inv as { source?: string }).source === "creator" ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: "rgba(245,158,11,0.12)", color: "#D97706" }} data-testid={`badge-awaiting-${inv.id}`}>
+                          <Clock className="h-3.5 w-3.5" /> Awaiting Review
+                        </span>
+                      ) : (
+                        <div className="flex gap-2 flex-shrink-0">
+                          <Button size="sm" variant="outline" onClick={() => handleDecline(inv.id)} disabled={declineMutation.isPending}
+                            className="h-9 px-3 rounded-xl text-xs font-semibold text-destructive border-destructive/30 hover:bg-destructive/10"
+                            data-testid={`button-decline-${inv.id}`}>
+                            <XCircle className="h-3.5 w-3.5 mr-1" /> Decline
+                          </Button>
+                          <Button size="sm" onClick={() => handleAccept(inv.id)} disabled={acceptMutation.isPending}
+                            className="h-9 px-4 rounded-xl text-xs font-semibold"
+                            style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+                            data-testid={`button-accept-${inv.id}`}>
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Accept
+                          </Button>
+                        </div>
+                      )
                     )}
                   </div>
                 </div>

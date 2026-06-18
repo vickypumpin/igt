@@ -319,6 +319,141 @@ export const useUpdateAccountProfile = (
     ...options,
   });
 
+// ── KYC / Identity Verification ───────────────────────────────────────────────
+
+export interface KycRequest {
+  id: number;
+  userId: number;
+  legalName: string;
+  country: string;
+  idType: "national_id" | "passport" | "drivers_licence";
+  idNumber: string;
+  documentUrl: string | null;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+}
+
+export interface KycRequestAdmin extends KycRequest {
+  creator: {
+    firstName: string;
+    lastName: string;
+    userName: string;
+    email: string;
+    verified: boolean;
+  };
+}
+
+export const getMyKycRequestQueryKey = () => ["/creator/kyc-request"] as const;
+
+export const useGetMyKycRequest = <TData = KycRequest>(options?: {
+  query?: UseQueryOptions<KycRequest, unknown, TData>;
+}) =>
+  useQuery<KycRequest, unknown, TData>({
+    queryKey: getMyKycRequestQueryKey(),
+    queryFn: () => customFetch<KycRequest>("/api/creator/kyc-request"),
+    retry: false,
+    ...options?.query,
+  });
+
+export const useSubmitKycRequest = (
+  options?: UseMutationOptions<KycRequest, unknown, { legalName: string; country: string; idType: string; idNumber: string; documentUrl?: string | null }>
+) =>
+  useMutation<KycRequest, unknown, { legalName: string; country: string; idType: string; idNumber: string; documentUrl?: string | null }>({
+    mutationFn: (data) =>
+      customFetch<KycRequest>("/api/creator/kyc-request", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
+export const getAdminKycRequestsQueryKey = () => ["/admin/kyc-requests"] as const;
+
+export const useAdminKycRequests = <TData = KycRequestAdmin[]>(options?: {
+  query?: UseQueryOptions<KycRequestAdmin[], unknown, TData>;
+}) =>
+  useQuery<KycRequestAdmin[], unknown, TData>({
+    queryKey: getAdminKycRequestsQueryKey(),
+    queryFn: () => customFetch<KycRequestAdmin[]>("/api/admin/kyc-requests"),
+    ...options?.query,
+  });
+
+export const useAdminApproveKycRequest = (
+  options?: UseMutationOptions<{ message: string }, unknown, { id: number }>
+) =>
+  useMutation<{ message: string }, unknown, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch<{ message: string }>(`/api/admin/kyc-requests/${id}/approve`, { method: "POST" }),
+    ...options,
+  });
+
+export const useAdminRejectKycRequest = (
+  options?: UseMutationOptions<{ message: string }, unknown, { id: number }>
+) =>
+  useMutation<{ message: string }, unknown, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch<{ message: string }>(`/api/admin/kyc-requests/${id}/reject`, { method: "POST" }),
+    ...options,
+  });
+
+// ── Campaign Discovery ─────────────────────────────────────────────────────────
+
+export interface DiscoverCampaign {
+  id: number;
+  name: string;
+  sponsor: string;
+  description: string | null;
+  type: "influencer" | "content_creator";
+  campaignDuration: "day" | "weekly";
+  campaignCategoryId: number | null;
+  startDate: string;
+  endDate: string;
+  noOfCreators: number;
+  gemsPerCreator: number | null;
+  coverImageUrl: string | null;
+  createdAt: string;
+}
+
+export const getDiscoverCampaignsQueryKey = () => ["/creator/discover-campaigns"] as const;
+
+export const useDiscoverCampaigns = <TData = DiscoverCampaign[]>(options?: {
+  query?: UseQueryOptions<DiscoverCampaign[], unknown, TData>;
+}) =>
+  useQuery<DiscoverCampaign[], unknown, TData>({
+    queryKey: getDiscoverCampaignsQueryKey(),
+    queryFn: () => customFetch<DiscoverCampaign[]>("/api/creator/discover-campaigns"),
+    ...options?.query,
+  });
+
+export const useApplyToCampaign = (
+  options?: UseMutationOptions<{ id: number; campaignId: number; creatorId: number; status: string; createdAt: string }, unknown, { campaignId: number }>
+) =>
+  useMutation<{ id: number; campaignId: number; creatorId: number; status: string; createdAt: string }, unknown, { campaignId: number }>({
+    mutationFn: ({ campaignId }) =>
+      customFetch(`/api/creator/campaigns/${campaignId}/apply`, { method: "POST" }),
+    ...options,
+  });
+
+// ── Brand Application Approve / Reject ────────────────────────────────────────
+
+export const useBrandApproveApplication = (
+  options?: UseMutationOptions<{ message: string }, unknown, { campaignId: number; inviteId: number }>
+) =>
+  useMutation<{ message: string }, unknown, { campaignId: number; inviteId: number }>({
+    mutationFn: ({ campaignId, inviteId }) =>
+      customFetch(`/api/campaigns/${campaignId}/applications/${inviteId}/approve`, { method: "POST" }),
+    ...options,
+  });
+
+export const useBrandRejectApplication = (
+  options?: UseMutationOptions<{ message: string }, unknown, { campaignId: number; inviteId: number }>
+) =>
+  useMutation<{ message: string }, unknown, { campaignId: number; inviteId: number }>({
+    mutationFn: ({ campaignId, inviteId }) =>
+      customFetch(`/api/campaigns/${campaignId}/applications/${inviteId}/reject`, { method: "POST" }),
+    ...options,
+  });
+
 // ── Admin Approve & Disburse Payout ───────────────────────────────────────────
 
 export interface PayoutWithGateway {

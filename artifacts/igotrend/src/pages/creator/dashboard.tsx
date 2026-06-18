@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetCreatorDashboard, useGetMe, getGetCreatorDashboardQueryKey } from "@workspace/api-client-react";
+import { useGetCreatorDashboard, useGetMe, getGetCreatorDashboardQueryKey, useGetMyKycRequest } from "@workspace/api-client-react";
 import CreatorLayout from "@/components/layout/creator-layout";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, Star, Inbox, CheckCircle, XCircle, ChevronRight, Eye, Gem } from "lucide-react";
+import { DollarSign, Star, Inbox, CheckCircle, XCircle, ChevronRight, Eye, Gem, ShieldCheck } from "lucide-react";
 
 const PLATFORM_ROWS = [
   { key: "instagram", label: "Instagram", emoji: "📸" },
@@ -50,6 +50,9 @@ export default function CreatorDashboardPage() {
   const { data, isLoading } = useGetCreatorDashboard({ query: { queryKey: getGetCreatorDashboardQueryKey() } });
   const { data: user } = useGetMe();
   const [showEntries, setShowEntries] = useState(10);
+  const { data: kycRequest } = useGetMyKycRequest({ query: { retry: false } });
+
+  const showVerifyBanner = !user?.verified && (!kycRequest || kycRequest.status === "rejected");
 
   const accepted = (data?.totalInvites ?? 0) - (data?.pendingInvites ?? 0) - (data?.declinedInvites ?? 0) - (data?.completedCampaigns ?? 0);
   const badgeLabel = user?.badge ?? "Micro";
@@ -66,6 +69,22 @@ export default function CreatorDashboardPage() {
   return (
     <CreatorLayout>
       <div data-testid="page-creator-dashboard">
+        {/* Get Verified banner */}
+        {showVerifyBanner && (
+          <Link href="/verify">
+            <div className="mb-5 flex items-center gap-3 rounded-2xl px-4 py-3 cursor-pointer hover:opacity-90 transition-opacity" style={{ background: "linear-gradient(135deg, rgba(29,207,179,0.12), rgba(29,207,179,0.06))", border: "1px solid rgba(29,207,179,0.3)" }} data-testid="banner-get-verified">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(29,207,179,0.15)" }}>
+                <ShieldCheck className="h-5 w-5" style={{ color: "#1DCFB3" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold" style={{ color: "#0FA88E" }}>Get Your Verified Badge</div>
+                <div className="text-xs text-muted-foreground">Submit your identity documents to get verified and stand out to brands</div>
+              </div>
+              <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: "#1DCFB3" }} />
+            </div>
+          </Link>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-7">
           <div>

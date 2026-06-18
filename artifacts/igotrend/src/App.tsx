@@ -41,6 +41,7 @@ import EarningsPage from "@/pages/creator/earnings";
 import CreatorBillingPage from "@/pages/creator/billing";
 import CreatorCampaignsPage from "@/pages/creator/campaigns";
 import CreatorAccountEditPage from "@/pages/creator/account-edit";
+import CreatorVerifyPage from "@/pages/creator/verify";
 
 import AdminDashboardPage from "@/pages/admin/dashboard";
 import AdminUsersPage from "@/pages/admin/users";
@@ -48,6 +49,7 @@ import AdminAccountsPage from "@/pages/admin/accounts";
 import AdminCampaignsPage from "@/pages/admin/campaigns";
 import AdminSubmissionsPage from "@/pages/admin/submissions";
 import VerifyRequestsPage from "@/pages/admin/verify-requests";
+import AdminKycRequestsPage from "@/pages/admin/kyc-requests";
 import AdminPayoutsPage from "@/pages/admin/payouts";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminFaqsPage from "@/pages/admin/faqs";
@@ -161,6 +163,11 @@ function AppRouter() {
           <Route path="/admin/verify-requests/approved" component={VerifyRequestsPage} />
           <Route path="/admin/verify-requests/declined" component={VerifyRequestsPage} />
 
+          {/* KYC Identity Verification */}
+          <Route path="/admin/kyc-requests" component={AdminKycRequestsPage} />
+          <Route path="/admin/kyc-requests/pending" component={AdminKycRequestsPage} />
+          <Route path="/admin/kyc-requests/approved" component={AdminKycRequestsPage} />
+
           {/* Reports */}
           <Route path="/admin/reports" component={AdminReportsPage} />
 
@@ -217,6 +224,7 @@ function AppRouter() {
           <Route path="/submissions/new" component={SubmitPage} />
           <Route path="/earnings" component={EarningsPage} />
           <Route path="/messages" component={BrandMessagesPage} />
+          <Route path="/verify" component={CreatorVerifyPage} />
 
           <Route path="/billing" component={CreatorBillingPage} />
           <Route path="/payments" component={CreatorPaymentsPage} />

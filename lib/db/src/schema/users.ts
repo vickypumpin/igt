@@ -76,6 +76,8 @@ export const usersTable = pgTable("users", {
   commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
   subscriptionStatus: text("subscription_status").default("active"),
   billingNotes: text("billing_notes"),
+  // Identity verification
+  verified: boolean("verified").notNull().default(false),
   // Brand website
   websiteUrl: text("website_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

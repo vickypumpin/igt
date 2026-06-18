@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { eq, ilike, and, sql } from "drizzle-orm";
-import { db, usersTable, campaignInvitesTable, submissionsTable } from "@workspace/db";
-import { requireAuth } from "../lib/auth";
+import { db, usersTable, campaignInvitesTable, submissionsTable, kycRequestsTable, settingsTable } from "@workspace/db";
+import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
+import { sendEmail, sendSms } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -84,6 +85,54 @@ router.get("/creators/stats", requireAuth, async (req, res): Promise<void> => {
     totalReach: Number(submissionStats?.totalViews ?? 0),
     totalEngagement: Number(submissionStats?.totalLikes ?? 0),
   });
+});
+
+// KYC — creator submits identity verification request
+router.post("/creator/kyc-request", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+  const { legalName, country, idType, idNumber, documentUrl } = req.body;
+  if (!legalName || !country || !idType || !idNumber || !documentUrl) {
+    res.status(400).json({ error: "Missing required fields: legalName, country, idType, idNumber, documentUrl" });
+    return;
+  }
+
+  const existing = await db.select({ id: kycRequestsTable.id, status: kycRequestsTable.status })
+    .from(kycRequestsTable).where(eq(kycRequestsTable.userId, req.userId!)).limit(1);
+  if (existing.length) {
+    if (existing[0].status === "approved") {
+      res.status(409).json({ error: "Your identity is already verified" });
+      return;
+    }
+    if (existing[0].status === "pending") {
+      res.status(409).json({ error: "You already have a pending verification request" });
+      return;
+    }
+    // rejected — allow re-submission: update the existing row
+    const [updated] = await db.update(kycRequestsTable).set({
+      legalName, country,
+      idType: idType as "national_id" | "passport" | "drivers_licence",
+      idNumber, documentUrl: documentUrl ?? null,
+      status: "pending", updatedAt: new Date(),
+    }).where(eq(kycRequestsTable.id, existing[0].id)).returning();
+    res.json(updated);
+    return;
+  }
+
+  const [req_] = await db.insert(kycRequestsTable).values({
+    userId: req.userId!,
+    legalName, country,
+    idType: idType as "national_id" | "passport" | "drivers_licence",
+    idNumber, documentUrl: documentUrl ?? null,
+    status: "pending",
+  }).returning();
+  res.status(201).json(req_);
+});
+
+// KYC — creator fetches their own request status
+router.get("/creator/kyc-request", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+  const [existing] = await db.select().from(kycRequestsTable)
+    .where(eq(kycRequestsTable.userId, req.userId!)).limit(1);
+  if (!existing) { res.status(404).json({ error: "No verification request found" }); return; }
+  res.json(existing);
 });
 
 router.get("/creators/:id", requireAuth, async (req, res): Promise<void> => {

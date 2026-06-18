@@ -17,6 +17,7 @@ router.get("/invites", requireAuth, requireRole("creator"), async (req, res): Pr
     campaignId: campaignInvitesTable.campaignId,
     creatorId: campaignInvitesTable.creatorId,
     status: campaignInvitesTable.status,
+    source: campaignInvitesTable.source,
     createdAt: campaignInvitesTable.createdAt,
     campaignName: campaignsTable.name,
     campaignSponsor: campaignsTable.sponsor,
@@ -33,7 +34,7 @@ router.get("/invites", requireAuth, requireRole("creator"), async (req, res): Pr
     .orderBy(campaignInvitesTable.createdAt);
 
   res.json(invites.map(inv => ({
-    id: inv.id, campaignId: inv.campaignId, creatorId: inv.creatorId, status: inv.status,
+    id: inv.id, campaignId: inv.campaignId, creatorId: inv.creatorId, status: inv.status, source: inv.source ?? "brand",
     estimatedPayout: null,
     createdAt: inv.createdAt instanceof Date ? inv.createdAt.toISOString() : String(inv.createdAt),
     campaign: {
@@ -54,6 +55,7 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
   const [inv] = await db.select({
     inviteId: campaignInvitesTable.id,
     status: campaignInvitesTable.status,
+    source: campaignInvitesTable.source,
     campaignId: campaignInvitesTable.campaignId,
     brandId: campaignsTable.brandId,
     campaignName: campaignsTable.name,
@@ -64,6 +66,9 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
     .limit(1);
 
   if (!inv) { res.status(404).json({ error: "Invite not found" }); return; }
+  if ((inv.source ?? "brand") === "creator") {
+    res.status(400).json({ error: "You cannot accept your own application — await brand review" }); return;
+  }
   if (inv.status !== "pending") { res.status(409).json({ error: "Invite already responded to" }); return; }
 
   const gemsRequired = inv.gemsPerCreator ?? 0;
@@ -126,12 +131,17 @@ router.post("/invites/:id/decline", requireAuth, requireRole("creator"), async (
 
   const [inv] = await db.select({
     campaignId: campaignInvitesTable.campaignId,
+    source: campaignInvitesTable.source,
     brandId: campaignsTable.brandId,
     campaignName: campaignsTable.name,
   }).from(campaignInvitesTable)
     .leftJoin(campaignsTable, eq(campaignInvitesTable.campaignId, campaignsTable.id))
     .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)))
     .limit(1);
+
+  if ((inv?.source ?? "brand") === "creator") {
+    res.status(400).json({ error: "You cannot decline your own application — await brand review" }); return;
+  }
 
   await db.update(campaignInvitesTable).set({ status: "declined", updatedAt: new Date() })
     .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)));

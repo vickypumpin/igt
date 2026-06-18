@@ -248,6 +248,22 @@ export function tplNewMessage(siteName: string, recipientName: string, senderNam
   `);
 }
 
+export function tplApplicationDecision(siteName: string, creatorName: string, campaignName: string, approved: boolean, campaignsUrl: string): string {
+  return emailWrapper(siteName, approved ? `
+    ${h2(`Application Approved! 🎉`)}
+    ${p(`Hi ${creatorName},`)}
+    ${p(`Great news! Your application for <strong>"${campaignName}"</strong> has been approved by the brand.`)}
+    ${p(`You can now proceed to create your content and submit it through the campaigns dashboard.`)}
+    ${btn(campaignsUrl, "View My Campaigns")}
+  ` : `
+    ${h2(`Application Update`)}
+    ${p(`Hi ${creatorName},`)}
+    ${p(`Thank you for applying to <strong>"${campaignName}"</strong>. Unfortunately, the brand has not selected your application at this time.`)}
+    ${p(`Don't be discouraged — there are many more campaigns to discover!`)}
+    ${btn(campaignsUrl, "Discover More Campaigns")}
+  `);
+}
+
 export function tplTest(siteName: string): string {
   return emailWrapper(siteName, `
     ${h2("Test Email")}

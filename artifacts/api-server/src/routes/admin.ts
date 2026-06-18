@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, ilike, sql, desc } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable } from "@workspace/db";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { initiateDisbursement } from "../lib/gateway";
 import { requireAuth, requireRole } from "../lib/auth";
@@ -116,7 +116,10 @@ router.get("/admin/verify-requests", requireAuth, requireRole("admin"), async (r
 router.post("/admin/verify-requests/:id/approve", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  await db.update(verifyRequestsTable).set({ isApproved: true }).where(eq(verifyRequestsTable.id, id));
+  const [vr] = await db.update(verifyRequestsTable).set({ isApproved: true }).where(eq(verifyRequestsTable.id, id)).returning({ userId: verifyRequestsTable.userId });
+  if (vr?.userId) {
+    await db.update(usersTable).set({ verified: true }).where(eq(usersTable.id, vr.userId));
+  }
   res.json({ message: "Approved" });
 });
 
@@ -125,6 +128,111 @@ router.post("/admin/verify-requests/:id/reject", requireAuth, requireRole("admin
   const id = parseInt(raw, 10);
   await db.update(verifyRequestsTable).set({ isApproved: false }).where(eq(verifyRequestsTable.id, id));
   res.json({ message: "Rejected" });
+});
+
+// ── KYC identity verification ─────────────────────────────────────────────────
+
+router.get("/admin/kyc-requests", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const rows = await db.select({
+    id: kycRequestsTable.id,
+    userId: kycRequestsTable.userId,
+    legalName: kycRequestsTable.legalName,
+    country: kycRequestsTable.country,
+    idType: kycRequestsTable.idType,
+    idNumber: kycRequestsTable.idNumber,
+    documentUrl: kycRequestsTable.documentUrl,
+    status: kycRequestsTable.status,
+    createdAt: kycRequestsTable.createdAt,
+    creatorFirstName: usersTable.firstName,
+    creatorLastName: usersTable.lastName,
+    creatorUserName: usersTable.userName,
+    creatorEmail: usersTable.email,
+    creatorVerified: usersTable.verified,
+  }).from(kycRequestsTable)
+    .leftJoin(usersTable, eq(kycRequestsTable.userId, usersTable.id))
+    .orderBy(desc(kycRequestsTable.createdAt));
+
+  res.json(rows.map(r => ({
+    id: r.id,
+    userId: r.userId,
+    legalName: r.legalName,
+    country: r.country,
+    idType: r.idType,
+    idNumber: r.idNumber,
+    documentUrl: r.documentUrl ?? null,
+    status: r.status,
+    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    creator: {
+      firstName: r.creatorFirstName ?? "",
+      lastName: r.creatorLastName ?? "",
+      userName: r.creatorUserName ?? "",
+      email: r.creatorEmail ?? "",
+      verified: r.creatorVerified ?? false,
+    },
+  })));
+});
+
+router.post("/admin/kyc-requests/:id/approve", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [kyc] = await db.select({ userId: kycRequestsTable.userId })
+    .from(kycRequestsTable).where(eq(kycRequestsTable.id, id)).limit(1);
+  if (!kyc) { res.status(404).json({ error: "KYC request not found" }); return; }
+
+  await db.transaction(async (tx) => {
+    await tx.update(kycRequestsTable).set({ status: "approved", updatedAt: new Date() }).where(eq(kycRequestsTable.id, id));
+    await tx.update(usersTable).set({ verified: true, updatedAt: new Date() }).where(eq(usersTable.id, kyc.userId));
+  });
+
+  // Notify creator
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, kyc.userId)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], [settings]]) => {
+    if (!creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const dashUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/`;
+    const name = creator.firstName ?? "there";
+    const html = `<h2 style="color:#1a1a1a;">Identity Verified!</h2><p style="color:#333;">Hi ${name}, your identity has been verified on ${siteName}. You now have a verified badge on your profile.</p><p><a href="${dashUrl}" style="display:inline-block;background:#1DCFB3;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Go to Dashboard</a></p>`;
+    sendEmail(creator.email, `Your identity has been verified — ${siteName}`, html).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: Your identity has been verified! You now have a verified badge on your profile.`).catch(console.error);
+    }
+  }).catch(console.error);
+
+  res.json({ message: "KYC approved, creator verified" });
+});
+
+router.post("/admin/kyc-requests/:id/reject", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [kyc] = await db.select({ userId: kycRequestsTable.userId })
+    .from(kycRequestsTable).where(eq(kycRequestsTable.id, id)).limit(1);
+  if (!kyc) { res.status(404).json({ error: "KYC request not found" }); return; }
+
+  await db.update(kycRequestsTable).set({ status: "rejected", updatedAt: new Date() }).where(eq(kycRequestsTable.id, id));
+
+  // Notify creator
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, kyc.userId)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], [settings]]) => {
+    if (!creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const verifyUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/verify`;
+    const name = creator.firstName ?? "there";
+    const html = `<h2 style="color:#1a1a1a;">Verification Not Approved</h2><p style="color:#333;">Hi ${name}, your identity verification request on ${siteName} was not approved at this time. Please review your submission and try again.</p><p><a href="${verifyUrl}" style="display:inline-block;background:#1DCFB3;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Resubmit</a></p>`;
+    sendEmail(creator.email, `Verification request not approved — ${siteName}`, html).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: Your identity verification request was not approved. Please resubmit with correct information.`).catch(console.error);
+    }
+  }).catch(console.error);
+
+  res.json({ message: "KYC rejected" });
 });
 
 router.get("/admin/submissions", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {

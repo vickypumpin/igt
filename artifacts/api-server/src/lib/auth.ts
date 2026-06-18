@@ -96,5 +96,6 @@ export function formatUser(u: Record<string, unknown>) {
     bio: u.bio ?? null,
     avatarUrl: u.avatarUrl ?? null,
     createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+    verified: u.verified ?? false,
   };
 }

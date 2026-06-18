@@ -123,6 +123,7 @@ export interface User {
   /** @nullable */
   avatarUrl?: string | null;
   createdAt?: string;
+  verified?: boolean;
 }
 
 export interface AuthResponse {
@@ -402,6 +403,7 @@ export interface CampaignInvite {
   campaignId: number;
   creatorId: number;
   status: CampaignInviteStatus;
+  source?: "brand" | "creator";
   campaign?: Campaign;
   creator?: CreatorProfile;
   /** @nullable */

@@ -87,6 +87,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
 
           <NavGroup
+            icon={Shield}
+            label="KYC Verification"
+            activeColor={ORANGE}
+            activeBg={ORANGE_BG}
+            activeBorder={ORANGE_BORDER}
+            items={[
+              { href: "/admin/kyc-requests", label: "All Requests" },
+              { href: "/admin/kyc-requests/pending", label: "Pending" },
+              { href: "/admin/kyc-requests/approved", label: "Approved" },
+            ]}
+          />
+
+          <NavGroup
             icon={MessageSquare}
             label="Messaging"
             activeColor={ORANGE}

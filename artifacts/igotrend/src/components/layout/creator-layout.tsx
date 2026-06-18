@@ -4,7 +4,7 @@ import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import {
   LayoutDashboard, Megaphone, MessageSquare, LogOut, Bell, ChevronDown,
-  HelpCircle, Bot,
+  HelpCircle, Bot, ShieldCheck,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -69,6 +69,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
           />
 
           <NavLink href="/messages" icon={MessageSquare} label="Messages" />
+          {!user?.verified && <NavLink href="/verify" icon={ShieldCheck} label="Get Verified" />}
           <NavLink href="/trend-ai" icon={Bot} label="Trend Ai" />
           <NavLink href="/faq" icon={HelpCircle} label="FAQ" />
         </nav>
