@@ -7,6 +7,7 @@ import { queryClient } from "@/lib/query-client";
 import { useAuth } from "@/contexts/auth-context";
 import BrandLayout from "@/components/layout/brand-layout";
 import CreatorLayout from "@/components/layout/creator-layout";
+import AgencyLayout from "@/components/layout/agency-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -78,7 +79,7 @@ export default function SettingsPage() {
   };
 
   const role = user?.role;
-  const Layout = role === "creator" ? CreatorLayout : BrandLayout;
+  const Layout = role === "creator" ? CreatorLayout : role === "agency" ? AgencyLayout : BrandLayout;
   const inputCls = "h-10 rounded-xl";
   const labelCls = "font-semibold text-sm";
 

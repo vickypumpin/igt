@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/auth-context";
 import BrandLayout from "@/components/layout/brand-layout";
 import CreatorLayout from "@/components/layout/creator-layout";
+import AgencyLayout from "@/components/layout/agency-layout";
 
 function FaqAccordion({ question, answer, open, onToggle }: {
   question: string; answer: string; open: boolean; onToggle: () => void;
@@ -33,7 +34,7 @@ export default function FaqPage() {
   const { data: faqs = [], isLoading } = useListFaqs({ query: { queryKey: getListFaqsQueryKey() } });
   const [openId, setOpenId] = useState<number | null>(null);
 
-  const Layout = user?.role === "creator" ? CreatorLayout : BrandLayout;
+  const Layout = user?.role === "creator" ? CreatorLayout : user?.role === "agency" ? AgencyLayout : BrandLayout;
 
   const grouped = faqs.reduce<Record<string, typeof faqs>>((acc, faq) => {
     const cat = faq.category ?? "general";
