@@ -1,6 +1,5 @@
 import { PublicLayout } from "@/components/layout/public-layout";
-import { Link } from "wouter";
-import { ChevronDown, ChevronUp, MessageSquare, BookOpen, Mail } from "lucide-react";
+import { ChevronDown, ChevronUp, Mail } from "lucide-react";
 import { useState } from "react";
 
 const TEAL = "#1DCFB3";
@@ -70,24 +69,17 @@ export default function HelpPage() {
         </div>
 
         <div className="max-w-4xl mx-auto px-6 py-16">
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
-            {[
-              { icon: BookOpen, title: "Documentation", desc: "Guides and how-tos for every feature on the platform.", label: "Coming soon" },
-              { icon: MessageSquare, title: "Live Chat", desc: "Chat with our support team Monday – Friday, 9am – 6pm WAT.", label: "Coming soon" },
-              { icon: Mail, title: "Email Support", desc: "Send us a message and we'll respond within one business day.", label: "support@igotrend.com" },
-            ].map((item, i) => {
-              const Icon = item.icon;
-              return (
-                <div key={i} className="border border-gray-100 rounded-2xl p-6 text-center">
-                  <div className="h-12 w-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(29,207,179,0.1)" }}>
-                    <Icon className="h-5 w-5" style={{ color: TEAL }} />
-                  </div>
-                  <h3 className="font-bold text-gray-900 mb-1">{item.title}</h3>
-                  <p className="text-sm text-gray-400 mb-3">{item.desc}</p>
-                  <span className="text-xs font-semibold" style={{ color: TEAL }}>{item.label}</span>
-                </div>
-              );
-            })}
+          <div className="flex justify-center mb-16">
+            <div className="border border-gray-100 rounded-2xl p-8 text-center max-w-sm w-full">
+              <div className="h-12 w-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "rgba(29,207,179,0.1)" }}>
+                <Mail className="h-5 w-5" style={{ color: TEAL }} />
+              </div>
+              <h3 className="font-bold text-gray-900 mb-1">Email Support</h3>
+              <p className="text-sm text-gray-400 mb-3">Send us a message and we'll respond within one business day.</p>
+              <a href="mailto:support@igotrend.com" className="text-sm font-semibold hover:underline" style={{ color: TEAL }}>
+                Email us at support@igotrend.com
+              </a>
+            </div>
           </div>
 
           <h2 className="text-2xl font-black text-gray-900 mb-8">Frequently Asked Questions</h2>

@@ -80,7 +80,7 @@ export default function CreatorProfilePage() {
                   {socials.map(({ profile, Icon, label }) => {
                     const style = PLATFORM_STYLE[label] ?? { bg: "rgba(0,0,0,0.07)", color: "#555" };
                     return (
-                      <a key={label} href={profile ?? "#"} target="_blank" rel="noopener noreferrer"
+                      <a key={label} href={profile} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-semibold transition-all hover:opacity-80"
                         style={{ background: style.bg, color: style.color }}
                         data-testid={`link-${label.toLowerCase()}`}>

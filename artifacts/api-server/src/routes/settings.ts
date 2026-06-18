@@ -22,7 +22,8 @@ router.patch("/settings", requireAuth, requireRole("admin"), async (req, res): P
     "defaultBillingMode","defaultCommissionRate",
     "registrationStatus","loginStatus","smsNotify","facebookUrl","instagramUrl","youtubeUrl","contactEmail",
     "flutterwavePublicKey","flutterwaveSecretKey","flutterwaveEncryptionKey","flutterwaveLive",
-    "twilioAccountSid","twilioAuthToken","twilioPhoneNumber",
+    "paystackPublicKey","paystackSecretKey","paystackLive","preferredPaymentGateway",
+    "smsLive247ApiKey","smsLive247SenderName","smsLive247AccountType",
     "smtpHost","smtpPort","smtpUser","smtpPassword","smtpFromEmail",
   ];
   const updates: Record<string, unknown> = {};

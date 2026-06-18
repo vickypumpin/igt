@@ -145,23 +145,51 @@ export default function AdminSettingsPage() {
           )}
 
           {activeTab === "gateway" && (
-            <Section icon={CreditCard} title="Flutterwave Payment Gateway" desc={<>Get your keys from <a href="https://dashboard.flutterwave.com/dashboard/settings/apis" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#1DCFB3" }}>dashboard.flutterwave.com</a></>}>
-              <Field label="Public key"><MaskedInput name="flutterwavePublicKey" register={register} placeholder="FLWPUBK_TEST-…" /></Field>
-              <Field label="Secret key"><MaskedInput name="flutterwaveSecretKey" register={register} placeholder="FLWSECK_TEST-…" /></Field>
-              <Field label="Encryption key"><MaskedInput name="flutterwaveEncryptionKey" register={register} placeholder="FLWENCRYPTKEY…" /></Field>
-              <div className="flex items-center gap-2.5 pt-1">
-                <input {...register("flutterwaveLive")} type="checkbox" id="fw-live" className="h-4 w-4 rounded border border-input" />
-                <label htmlFor="fw-live" className="text-xs text-muted-foreground font-medium cursor-pointer">Live mode (uncheck for test/sandbox)</label>
-              </div>
-            </Section>
+            <>
+              <Section icon={CreditCard} title="Preferred Gateway" desc="Choose which payment gateway is used for transactions">
+                <Field label="Active gateway">
+                  <select {...register("preferredPaymentGateway")} className="mt-1.5 flex h-10 w-full rounded-xl border border-input bg-transparent px-3 text-sm shadow-sm" data-testid="select-preferred-gateway">
+                    <option value="flutterwave">Flutterwave</option>
+                    <option value="paystack">Paystack</option>
+                    <option value="auto">Auto-balance (round-robin)</option>
+                  </select>
+                </Field>
+              </Section>
+
+              <Section icon={CreditCard} title="Flutterwave Payment Gateway" desc={<>Get your keys from <a href="https://dashboard.flutterwave.com/dashboard/settings/apis" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#1DCFB3" }}>dashboard.flutterwave.com</a></>}>
+                <Field label="Public key"><MaskedInput name="flutterwavePublicKey" register={register} placeholder="FLWPUBK_TEST-…" /></Field>
+                <Field label="Secret key"><MaskedInput name="flutterwaveSecretKey" register={register} placeholder="FLWSECK_TEST-…" /></Field>
+                <Field label="Encryption key"><MaskedInput name="flutterwaveEncryptionKey" register={register} placeholder="FLWENCRYPTKEY…" /></Field>
+                <div className="flex items-center gap-2.5 pt-1">
+                  <input {...register("flutterwaveLive")} type="checkbox" id="fw-live" className="h-4 w-4 rounded border border-input" />
+                  <label htmlFor="fw-live" className="text-xs text-muted-foreground font-medium cursor-pointer">Live mode (uncheck for test/sandbox)</label>
+                </div>
+              </Section>
+
+              <Section icon={CreditCard} title="Paystack Payment Gateway" desc={<>Get your keys from <a href="https://dashboard.paystack.com/#/settings/developers" target="_blank" rel="noopener noreferrer" className="hover:underline" style={{ color: "#1DCFB3" }}>dashboard.paystack.com</a></>}>
+                <Field label="Public key"><MaskedInput name="paystackPublicKey" register={register} placeholder="pk_test_…" /></Field>
+                <Field label="Secret key"><MaskedInput name="paystackSecretKey" register={register} placeholder="sk_test_…" /></Field>
+                <div className="flex items-center gap-2.5 pt-1">
+                  <input {...register("paystackLive")} type="checkbox" id="ps-live" className="h-4 w-4 rounded border border-input" />
+                  <label htmlFor="ps-live" className="text-xs text-muted-foreground font-medium cursor-pointer">Live mode (uncheck for test/sandbox)</label>
+                </div>
+              </Section>
+            </>
           )}
 
           {activeTab === "smtp" && (
             <>
-              <Section icon={MessageSquare} title="Twilio SMS" desc="Optional — for SMS notifications to creators">
-                <Field label="Account SID"><MaskedInput name="twilioAccountSid" register={register} placeholder="AC…" /></Field>
-                <Field label="Auth token"><MaskedInput name="twilioAuthToken" register={register} placeholder="Auth token" /></Field>
-                <Field label="Phone number"><Input {...register("twilioPhoneNumber")} className="mt-1.5 h-10 rounded-xl" placeholder="+1234567890" /></Field>
+              <Section icon={MessageSquare} title="SMSLive247" desc="Optional — for SMS notifications to creators">
+                <Field label="API key"><MaskedInput name="smsLive247ApiKey" register={register} placeholder="Your SMSLive247 API key" /></Field>
+                <Field label="Sender name"><Input {...register("smsLive247SenderName")} className="mt-1.5 h-10 rounded-xl" placeholder="iGoTrend" /></Field>
+                <Field label="Account type">
+                  <select {...register("smsLive247AccountType")} className="mt-1.5 flex h-10 w-full rounded-xl border border-input bg-transparent px-3 text-sm shadow-sm" data-testid="select-sms-account-type">
+                    <option value="">Select account type</option>
+                    <option value="Classic">Classic</option>
+                    <option value="Corporate">Corporate</option>
+                    <option value="Premium">Premium</option>
+                  </select>
+                </Field>
               </Section>
               <Section icon={Mail} title="Email (SMTP)" desc="Optional — for email notifications">
                 <div className="grid grid-cols-2 gap-3">
