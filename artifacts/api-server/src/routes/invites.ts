@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, campaignInvitesTable, campaignsTable, usersTable, gemsTransactionsTable } from "@workspace/db";
+import { db, campaignInvitesTable, campaignsTable, usersTable, gemsTransactionsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
+import { sendEmail, sendSms, tplInviteResponse } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -50,7 +51,6 @@ router.get("/invites", requireAuth, requireRole("creator"), async (req, res): Pr
 router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
 
-  // Load invite + campaign together to get gems cost
   const [inv] = await db.select({
     inviteId: campaignInvitesTable.id,
     status: campaignInvitesTable.status,
@@ -72,7 +72,6 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
   try {
     await db.transaction(async (tx) => {
       if (gemsRequired > 0) {
-        // Atomic conditional debit: only updates when gems >= required, returns 0 rows if insufficient
         const debited = await tx.update(usersTable)
           .set({ gems: sql`gems - ${gemsRequired}` })
           .where(and(eq(usersTable.id, brandId), sql`gems >= ${gemsRequired}`))
@@ -80,7 +79,6 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
         if (!debited.length) {
           throw Object.assign(new Error("INSUFFICIENT_GEMS"), { code: "INSUFFICIENT_GEMS" });
         }
-        // Record gems transaction for brand
         await tx.insert(gemsTransactionsTable).values({
           userId: brandId,
           gemsDelta: -gemsRequired,
@@ -88,7 +86,6 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
           description: `Gems held for invite – Campaign: ${inv.campaignName ?? inv.campaignId}`,
         });
       }
-      // Accept the invite
       await tx.update(campaignInvitesTable)
         .set({ status: "active", updatedAt: new Date() })
         .where(eq(campaignInvitesTable.id, id));
@@ -100,14 +97,66 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
     throw err;
   }
 
+  // Notify brand that creator accepted
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, brandId)).limit(1),
+    db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
+      .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[brand], [creator], [settings]]) => {
+    if (!brand || !creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${inv.campaignId}`;
+    const creatorName = `${creator.firstName} ${creator.lastName}`.trim();
+    const brandFirstName = brand.firstName ?? "there";
+    sendEmail(
+      brand.email,
+      `Creator accepted your campaign invite — ${inv.campaignName}`,
+      tplInviteResponse(siteName, brandFirstName, creatorName, inv.campaignName ?? "your campaign", true, campaignUrl),
+    ).catch(console.error);
+  }).catch(console.error);
+
   res.json({ message: "Accepted", gemsDebited: gemsRequired });
 });
 
 router.post("/invites/:id/decline", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+
+  const [inv] = await db.select({
+    campaignId: campaignInvitesTable.campaignId,
+    brandId: campaignsTable.brandId,
+    campaignName: campaignsTable.name,
+  }).from(campaignInvitesTable)
+    .leftJoin(campaignsTable, eq(campaignInvitesTable.campaignId, campaignsTable.id))
+    .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)))
+    .limit(1);
+
   await db.update(campaignInvitesTable).set({ status: "declined", updatedAt: new Date() })
     .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)));
+
+  // Notify brand that creator declined
+  if (inv?.brandId) {
+    Promise.all([
+      db.select({ email: usersTable.email, firstName: usersTable.firstName })
+        .from(usersTable).where(eq(usersTable.id, inv.brandId)).limit(1),
+      db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
+        .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
+      db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+    ]).then(([[brand], [creator], [settings]]) => {
+      if (!brand || !creator) return;
+      const siteName = settings?.siteName ?? "iGoTrend";
+      const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${inv.campaignId}`;
+      const creatorName = `${creator.firstName} ${creator.lastName}`.trim();
+      sendEmail(
+        brand.email,
+        `Creator declined your campaign invite — ${inv.campaignName}`,
+        tplInviteResponse(siteName, brand.firstName ?? "there", creatorName, inv.campaignName ?? "your campaign", false, campaignUrl),
+      ).catch(console.error);
+    }).catch(console.error);
+  }
+
   res.json({ message: "Declined" });
 });
 

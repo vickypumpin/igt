@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { eq, and, ilike, sql, desc } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable } from "@workspace/db";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { initiateDisbursement } from "../lib/gateway";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
+import { sendEmail, sendSms, tplPayoutDisbursed, tplCampaignApproved, tplCampaignRejected } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -68,7 +69,38 @@ router.patch("/admin/campaigns/:id/status", requireAuth, requireRole("admin"), a
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const { status } = req.body;
-  await db.update(campaignsTable).set({ status, updatedAt: new Date() }).where(eq(campaignsTable.id, id));
+  const [campaign] = await db.update(campaignsTable).set({ status, updatedAt: new Date() }).where(eq(campaignsTable.id, id)).returning();
+
+  // Notify brand of approval/rejection
+  if (campaign && (status === "active" || status === "declined")) {
+    Promise.all([
+      db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, campaign.brandId)).limit(1),
+      db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+    ]).then(([[brand], [settings]]) => {
+      if (!brand) return;
+      const siteName = settings?.siteName ?? "iGoTrend";
+      const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${id}`;
+      const brandFirstName = brand.firstName ?? "there";
+      if (status === "active") {
+        sendEmail(
+          brand.email,
+          `Your campaign was approved — ${campaign.name}`,
+          tplCampaignApproved(siteName, brandFirstName, campaign.name, campaignUrl),
+        ).catch(console.error);
+        if (brand.phone) {
+          sendSms(brand.phone, `${siteName}: Your campaign "${campaign.name}" has been approved! Log in to start inviting creators.`).catch(console.error);
+        }
+      } else {
+        sendEmail(
+          brand.email,
+          `Your campaign was not approved — ${campaign.name}`,
+          tplCampaignRejected(siteName, brandFirstName, campaign.name, campaignUrl),
+        ).catch(console.error);
+      }
+    }).catch(console.error);
+  }
+
   res.json({ message: "Updated" });
 });
 
@@ -147,7 +179,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
   if (payout.status === "disbursed") { res.json({ message: "Already disbursed" }); return; }
   if (payout.status === "processing") { res.status(409).json({ error: "Payout is already being processed. Please wait." }); return; }
 
-  // Pre-approval gate: if the brand is on commission billing, campaignId MUST be set.
   if (!payout.campaignId) {
     const [campaign] = await db.select({ brandId: campaignsTable.brandId }).from(campaignsTable)
       .innerJoin(submissionsTable, eq(submissionsTable.campaignId, campaignsTable.id))
@@ -162,7 +193,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     }
   }
 
-  // Resolve billing BEFORE the transaction (read-only).
   let billing: Awaited<ReturnType<typeof resolveBilling>> = null;
   let campaignBrandId: number | null = null;
   if (payout.campaignId) {
@@ -176,7 +206,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     }
   }
 
-  // Resolve creator bank account
   const [bankAccount] = await db.select()
     .from(bankAccountsTable)
     .where(and(eq(bankAccountsTable.userId, payout.creatorId), eq(bankAccountsTable.isDefault, true)))
@@ -187,10 +216,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     return;
   }
 
-  // ── Atomic claim: flip pending → processing ──────────────────────────────
-  // Concurrent requests both reading "pending" above will race here.
-  // Only the first UPDATE to match (status = 'pending') wins; the others
-  // get 0 rows returned and receive a 409 — no gateway call is made.
   const claimed = await db
     .update(payoutsTable)
     .set({ status: "processing" })
@@ -198,8 +223,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     .returning({ id: payoutsTable.id });
 
   if (!claimed.length) {
-    // Another request already claimed (or the row was modified between our
-    // first read and now). Re-read to return a descriptive message.
     const [current] = await db.select({ status: payoutsTable.status })
       .from(payoutsTable).where(eq(payoutsTable.id, id));
     if (current?.status === "disbursed") { res.json({ message: "Already disbursed" }); return; }
@@ -207,8 +230,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     return;
   }
 
-  // Stable idempotency key — deterministic on payout ID only so retries
-  // presented to the gateway carry the same reference.
   const disbursementRef = `DISBURSE-${payout.id}`;
   const payoutAmount = parseFloat(String(payout.amount));
   let transferRef: string;
@@ -226,7 +247,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     transferRef = result.transferRef;
     usedGateway = result.gateway;
   } catch (err) {
-    // Gateway call failed — revert to pending so the admin can retry
     await db.update(payoutsTable)
       .set({ status: "pending" })
       .where(eq(payoutsTable.id, id));
@@ -235,7 +255,6 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     return;
   }
 
-  // Wrap final status update + commission insert atomically.
   await db.transaction(async (tx) => {
     await tx.update(payoutsTable)
       .set({ status: "disbursed", gateway: usedGateway, transferRef })
@@ -260,6 +279,26 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
       }
     }
   });
+
+  // Notify creator of disbursement
+  Promise.all([
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, payout.creatorId)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(([[creator], [settings]]) => {
+    if (!creator) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const payoutsUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/payouts`;
+    const amountStr = `₦${payoutAmount.toLocaleString()}`;
+    sendEmail(
+      creator.email,
+      `Payout of ${amountStr} disbursed — ${siteName}`,
+      tplPayoutDisbursed(siteName, creator.firstName ?? "there", amountStr, payoutsUrl),
+    ).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: Your payout of ${amountStr} has been disbursed to your bank account. Allow 1–3 business days.`).catch(console.error);
+    }
+  }).catch(console.error);
 
   res.json({ message: "Approved & disbursed", gateway: usedGateway, transferRef });
 });

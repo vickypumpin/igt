@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, usersTable, agenciesTable, settingsTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
+import { sendEmail, tplWelcome } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -24,13 +25,14 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     return;
   }
   const passwordHash = await bcrypt.hash(password, 10);
-  // Load platform defaults for new account billing
   let [platformSettings] = await db.select({
     defaultBillingMode: settingsTable.defaultBillingMode,
     defaultCommissionRate: settingsTable.defaultCommissionRate,
+    siteName: settingsTable.siteName,
   }).from(settingsTable).limit(1);
   const defaultBillingMode = platformSettings?.defaultBillingMode ?? "commission";
   const defaultCommissionRate = platformSettings?.defaultCommissionRate ?? "5.00";
+  const siteName = platformSettings?.siteName ?? "iGoTrend";
 
   const normalizedRole = role === "creator" ? "creator" : role === "agency" ? "agency" : "brand";
   const [user] = await db.insert(usersTable).values({
@@ -48,6 +50,10 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       contactEmail: email, billingMode: defaultBillingMode, commissionRate: defaultCommissionRate,
     });
   }
+
+  const dashboardUrl = process.env["APP_BASE_URL"] ?? "https://igotrend.com";
+  sendEmail(email, `Welcome to ${siteName}!`, tplWelcome(siteName, firstName, dashboardUrl)).catch(console.error);
+
   const token = signToken(user.id);
   res.status(201).json({ token, user: formatUser(user as unknown as Record<string, unknown>) });
 });

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq, or, and, sql, desc } from "drizzle-orm";
-import { db, messagesTable, usersTable } from "@workspace/db";
+import { db, messagesTable, usersTable, settingsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import { sendEmail, tplNewMessage } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -79,9 +80,32 @@ router.get("/messages/:userId", requireAuth, async (req, res): Promise<void> => 
 router.post("/messages/:userId", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
   const toUserId = parseInt(raw, 10);
+  const fromUserId = req.userId!;
   const { body } = req.body;
   if (!body) { res.status(400).json({ error: "Missing body" }); return; }
-  const [msg] = await db.insert(messagesTable).values({ fromUserId: req.userId!, toUserId, body, isRead: false }).returning();
+  const [msg] = await db.insert(messagesTable).values({ fromUserId, toUserId, body, isRead: false }).returning();
+
+  // Schedule unread-email check after 5 minutes
+  const msgId = msg.id;
+  setTimeout(() => {
+    Promise.all([
+      db.select({ isRead: messagesTable.isRead }).from(messagesTable).where(eq(messagesTable.id, msgId)).limit(1),
+      db.select({ email: usersTable.email, firstName: usersTable.firstName }).from(usersTable).where(eq(usersTable.id, toUserId)).limit(1),
+      db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName }).from(usersTable).where(eq(usersTable.id, fromUserId)).limit(1),
+      db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+    ]).then(([[msgRow], [recipient], [sender], [settings]]) => {
+      if (!msgRow || msgRow.isRead || !recipient || !sender) return;
+      const siteName = settings?.siteName ?? "iGoTrend";
+      const messagesUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/messages`;
+      const senderName = `${sender.firstName} ${sender.lastName}`.trim();
+      sendEmail(
+        recipient.email,
+        `Unread message from ${senderName} on ${siteName}`,
+        tplNewMessage(siteName, recipient.firstName ?? "there", senderName, messagesUrl),
+      ).catch(console.error);
+    }).catch(console.error);
+  }, 5 * 60 * 1000);
+
   res.status(201).json({
     id: msg.id, fromUserId: msg.fromUserId, toUserId: msg.toUserId, body: msg.body, isRead: msg.isRead,
     createdAt: msg.createdAt instanceof Date ? msg.createdAt.toISOString() : String(msg.createdAt),

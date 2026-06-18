@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, campaignsTable, usersTable, campaignInvitesTable, submissionsTable } from "@workspace/db";
+import { db, campaignsTable, usersTable, campaignInvitesTable, submissionsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
+import { sendEmail, sendSms, tplCampaignInvite, tplCampaignApproved, tplCampaignRejected } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -146,6 +147,38 @@ router.patch("/campaigns/:id", requireAuth, requireRole("brand", "admin"), async
   updates.updatedAt = new Date();
   const [campaign] = await db.update(campaignsTable).set(updates).where(eq(campaignsTable.id, id)).returning();
   if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
+
+  // Notify brand of status change (approved / rejected) — admin route uses this too
+  const newStatus = req.body.status as string | undefined;
+  if (newStatus === "active" || newStatus === "declined") {
+    Promise.all([
+      db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+        .from(usersTable).where(eq(usersTable.id, campaign.brandId)).limit(1),
+      db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+    ]).then(([[brand], [settings]]) => {
+      if (!brand) return;
+      const siteName = settings?.siteName ?? "iGoTrend";
+      const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${id}`;
+      const brandFirstName = brand.firstName ?? "there";
+      if (newStatus === "active") {
+        sendEmail(
+          brand.email,
+          `Your campaign was approved — ${campaign.name}`,
+          tplCampaignApproved(siteName, brandFirstName, campaign.name, campaignUrl),
+        ).catch(console.error);
+        if (brand.phone) {
+          sendSms(brand.phone, `${siteName}: Your campaign "${campaign.name}" has been approved! Log in to start inviting creators.`).catch(console.error);
+        }
+      } else {
+        sendEmail(
+          brand.email,
+          `Your campaign was not approved — ${campaign.name}`,
+          tplCampaignRejected(siteName, brandFirstName, campaign.name, campaignUrl),
+        ).catch(console.error);
+      }
+    }).catch(console.error);
+  }
+
   res.json(formatCampaign({ ...campaign, invitesCount: 0, submissionsCount: 0 } as unknown as Record<string, unknown>));
 });
 
@@ -197,6 +230,32 @@ router.post("/campaigns/:id/invites", requireAuth, requireRole("brand"), async (
   const { creatorId } = req.body;
   if (!creatorId) { res.status(400).json({ error: "Missing creatorId" }); return; }
   const [invite] = await db.insert(campaignInvitesTable).values({ campaignId, creatorId, status: "pending" }).returning();
+
+  // Notify creator of invite
+  Promise.all([
+    db.select({ name: campaignsTable.name, brandId: campaignsTable.brandId })
+      .from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1),
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+      .from(usersTable).where(eq(usersTable.id, Number(creatorId))).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(async ([[campaign], [creator], [settings]]) => {
+    if (!campaign || !creator) return;
+    const [brand] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, companyName: usersTable.companyName })
+      .from(usersTable).where(eq(usersTable.id, campaign.brandId)).limit(1);
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const invitesUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/invites`;
+    const rawName = `${brand?.firstName ?? ""} ${brand?.lastName ?? ""}`.trim();
+    const brandDisplayName = brand?.companyName ?? (rawName || siteName);
+    sendEmail(
+      creator.email,
+      `You've been invited to "${campaign.name}" on ${siteName}`,
+      tplCampaignInvite(siteName, creator.firstName ?? "there", campaign.name, brandDisplayName, invitesUrl),
+    ).catch(console.error);
+    if (creator.phone) {
+      sendSms(creator.phone, `${siteName}: ${brandDisplayName} has invited you to join the campaign "${campaign.name}". Log in to view the invitation.`).catch(console.error);
+    }
+  }).catch(console.error);
+
   res.status(201).json({
     id: invite.id, campaignId: invite.campaignId, creatorId: invite.creatorId, status: invite.status,
     estimatedPayout: null,

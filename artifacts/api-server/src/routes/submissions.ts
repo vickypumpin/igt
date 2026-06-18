@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, submissionsTable, usersTable } from "@workspace/db";
+import { db, submissionsTable, usersTable, campaignsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
+import { sendEmail, sendSms, tplSubmissionReceived, tplSubmissionApproved, tplSubmissionRejected } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -19,6 +20,26 @@ router.post("/submissions", requireAuth, requireRole("creator"), async (req, res
     platform: platform ?? null,
     views: views ?? null, likes: likes ?? null, caption: caption ?? null,
   }).returning();
+
+  // Notify brand of new submission
+  Promise.all([
+    db.select({ brandId: campaignsTable.brandId, name: campaignsTable.name })
+      .from(campaignsTable).where(eq(campaignsTable.id, Number(campaignId))).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(async ([[campaign], [settings]]) => {
+    if (!campaign) return;
+    const [brand] = await db.select({ email: usersTable.email, firstName: usersTable.firstName })
+      .from(usersTable).where(eq(usersTable.id, campaign.brandId)).limit(1);
+    if (!brand) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const dashboardUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${campaignId}`;
+    sendEmail(
+      brand.email,
+      `New submission received — ${campaign.name}`,
+      tplSubmissionReceived(siteName, brand.firstName ?? "there", campaign.name, dashboardUrl),
+    ).catch(console.error);
+  }).catch(console.error);
+
   res.status(201).json({
     id: sub.id, campaignId: sub.campaignId, creatorId: sub.creatorId,
     screenshotUrl: sub.screenshotUrl, fileData: null, fileName: sub.fileName,
@@ -42,8 +63,41 @@ router.patch("/submissions/:id", requireAuth, requireRole("brand", "admin"), asy
   updates.updatedAt = new Date();
   const [sub] = await db.update(submissionsTable).set(updates).where(eq(submissionsTable.id, id)).returning();
   if (!sub) { res.status(404).json({ error: "Not found" }); return; }
-  const [creator] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, userName: usersTable.userName })
+  const [creator] = await db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName, userName: usersTable.userName, email: usersTable.email, phone: usersTable.phone })
     .from(usersTable).where(eq(usersTable.id, sub.creatorId));
+
+  // Notify creator on approval/rejection
+  if ((status === "approved" || status === "rejected") && creator) {
+    Promise.all([
+      db.select({ name: campaignsTable.name }).from(campaignsTable).where(eq(campaignsTable.id, sub.campaignId)).limit(1),
+      db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+    ]).then(([[campaign], [settings]]) => {
+      const siteName = settings?.siteName ?? "iGoTrend";
+      const dashboardUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/submissions`;
+      const campaignName = campaign?.name ?? "your campaign";
+      const creatorFirstName = creator.firstName ?? "there";
+      if (status === "approved") {
+        sendEmail(
+          creator.email,
+          `Your submission was approved — ${campaignName}`,
+          tplSubmissionApproved(siteName, creatorFirstName, campaignName, dashboardUrl),
+        ).catch(console.error);
+        if (creator.phone) {
+          sendSms(creator.phone, `${siteName}: Your submission for "${campaignName}" was approved! Log in to request your payout.`).catch(console.error);
+        }
+      } else {
+        sendEmail(
+          creator.email,
+          `Your submission was not approved — ${campaignName}`,
+          tplSubmissionRejected(siteName, creatorFirstName, campaignName, dashboardUrl),
+        ).catch(console.error);
+        if (creator.phone) {
+          sendSms(creator.phone, `${siteName}: Your submission for "${campaignName}" was not approved. Log in to review and resubmit.`).catch(console.error);
+        }
+      }
+    }).catch(console.error);
+  }
+
   res.json({
     id: sub.id, campaignId: sub.campaignId, creatorId: sub.creatorId,
     screenshotUrl: sub.screenshotUrl, platform: sub.platform, status: sub.status,

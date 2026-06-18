@@ -8,7 +8,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Settings2, CreditCard, MessageSquare, Mail, Globe, DollarSign } from "lucide-react";
+import { Eye, EyeOff, Settings2, CreditCard, MessageSquare, Mail, Globe, DollarSign, Send } from "lucide-react";
+import { getToken } from "@/lib/auth-store";
+
+const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+
+async function apiPost(path: string, body: unknown) {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw { response: { data } };
+  }
+  return res.json();
+}
 
 function MaskedInput({ name, register, placeholder }: { name: string; register: ReturnType<typeof useForm>["register"]; placeholder?: string }) {
   const [show, setShow] = useState(false);
@@ -22,7 +42,7 @@ function MaskedInput({ name, register, placeholder }: { name: string; register: 
   );
 }
 
-function Section({ icon: Icon, title, desc, children }: { icon: React.ElementType; title: string; desc?: string; children: React.ReactNode }) {
+function Section({ icon: Icon, title, desc, children }: { icon: React.ElementType; title: string; desc?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="bg-white rounded-2xl border border-border/60 overflow-hidden shadow-sm">
       <div className="px-5 py-4 border-b border-border/60 flex items-center gap-3">
@@ -66,6 +86,9 @@ export default function AdminSettingsPage() {
   const { data: settings, isLoading } = useGetSettings({ query: { queryKey: getGetSettingsQueryKey() } });
   const updateMutation = useUpdateSettings();
   const { register, handleSubmit, reset } = useForm();
+  const [testSmsPhone, setTestSmsPhone] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendingSms, setSendingSms] = useState(false);
 
   useEffect(() => { if (settings) reset(settings); }, [settings, reset]);
 
@@ -74,6 +97,36 @@ export default function AdminSettingsPage() {
       onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() }); toast({ title: "Settings saved ✓" }); },
       onError: () => { toast({ title: "Failed to save settings", variant: "destructive" }); },
     });
+  };
+
+  const handleTestEmail = async () => {
+    setSendingEmail(true);
+    try {
+      await apiPost("/settings/test-email", {});
+      toast({ title: "Test email sent ✓", description: "Check your contact email inbox." });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to send test email";
+      toast({ title: "Email test failed", description: msg, variant: "destructive" });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleTestSms = async () => {
+    if (!testSmsPhone.trim()) {
+      toast({ title: "Enter a phone number first", variant: "destructive" });
+      return;
+    }
+    setSendingSms(true);
+    try {
+      await apiPost("/settings/test-sms", { phone: testSmsPhone.trim() });
+      toast({ title: "Test SMS sent ✓", description: `Sent to ${testSmsPhone}` });
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to send test SMS";
+      toast({ title: "SMS test failed", description: msg, variant: "destructive" });
+    } finally {
+      setSendingSms(false);
+    }
   };
 
   if (isLoading) return <AdminLayout><div className="space-y-4">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}</div></AdminLayout>;
@@ -179,7 +232,7 @@ export default function AdminSettingsPage() {
 
           {activeTab === "smtp" && (
             <>
-              <Section icon={MessageSquare} title="SMSLive247" desc="Optional — for SMS notifications to creators">
+              <Section icon={MessageSquare} title="SMSLive247" desc="Optional — for SMS notifications to creators and brands">
                 <Field label="API key"><MaskedInput name="smsLive247ApiKey" register={register} placeholder="Your SMSLive247 API key" /></Field>
                 <Field label="Sender name"><Input {...register("smsLive247SenderName")} className="mt-1.5 h-10 rounded-xl" placeholder="iGoTrend" /></Field>
                 <Field label="Account type">
@@ -190,8 +243,37 @@ export default function AdminSettingsPage() {
                     <option value="Premium">Premium</option>
                   </select>
                 </Field>
+                <div className="flex items-center gap-2.5 pt-1">
+                  <input {...register("smsNotify")} type="checkbox" id="sms-notify" className="h-4 w-4 rounded border border-input" />
+                  <label htmlFor="sms-notify" className="text-xs text-muted-foreground font-medium cursor-pointer">Enable SMS notifications</label>
+                </div>
+                <div className="pt-2 border-t border-border/40">
+                  <p className="text-xs text-muted-foreground mb-2">Send a test SMS to verify your credentials:</p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={testSmsPhone}
+                      onChange={e => setTestSmsPhone(e.target.value)}
+                      placeholder="+2348012345678"
+                      className="h-9 rounded-xl text-sm flex-1"
+                      data-testid="input-test-sms-phone"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleTestSms}
+                      disabled={sendingSms}
+                      size="sm"
+                      className="h-9 rounded-xl px-3 gap-1.5 text-xs font-semibold"
+                      style={{ background: "linear-gradient(135deg, #FF8C42, #E47128)", border: "none", color: "#fff" }}
+                      data-testid="button-test-sms"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      {sendingSms ? "Sending…" : "Send test"}
+                    </Button>
+                  </div>
+                </div>
               </Section>
-              <Section icon={Mail} title="Email (SMTP)" desc="Optional — for email notifications">
+
+              <Section icon={Mail} title="Email (SMTP)" desc="Optional — for transactional email notifications">
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="SMTP host"><Input {...register("smtpHost")} className="mt-1.5 h-10 rounded-xl" placeholder="smtp.mailgun.org" /></Field>
                   <Field label="Port"><Input {...register("smtpPort", { valueAsNumber: true })} type="number" className="mt-1.5 h-10 rounded-xl" placeholder="587" /></Field>
@@ -199,6 +281,21 @@ export default function AdminSettingsPage() {
                 <Field label="SMTP username"><Input {...register("smtpUser")} className="mt-1.5 h-10 rounded-xl" /></Field>
                 <Field label="SMTP password"><MaskedInput name="smtpPassword" register={register} placeholder="Password" /></Field>
                 <Field label="From email"><Input {...register("smtpFromEmail")} type="email" className="mt-1.5 h-10 rounded-xl" placeholder="noreply@igotrend.com" /></Field>
+                <div className="pt-2 border-t border-border/40">
+                  <p className="text-xs text-muted-foreground mb-2">Send a test email to the contact email configured in General settings:</p>
+                  <Button
+                    type="button"
+                    onClick={handleTestEmail}
+                    disabled={sendingEmail}
+                    size="sm"
+                    className="h-9 rounded-xl px-4 gap-1.5 text-xs font-semibold"
+                    style={{ background: "linear-gradient(135deg, #FF8C42, #E47128)", border: "none", color: "#fff" }}
+                    data-testid="button-test-email"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {sendingEmail ? "Sending…" : "Send test email"}
+                  </Button>
+                </div>
               </Section>
             </>
           )}
