@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq, and, ilike, sql, desc } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable } from "@workspace/db";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
+import { initiateDisbursement } from "../lib/gateway";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
 import type { IRouter } from "express";
@@ -110,13 +111,15 @@ router.get("/admin/submissions", requireAuth, requireRole("admin"), async (req, 
 router.get("/admin/payouts", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const payouts = await db.select({
     id: payoutsTable.id, creatorId: payoutsTable.creatorId, amount: payoutsTable.amount,
-    status: payoutsTable.status, createdAt: payoutsTable.createdAt,
+    status: payoutsTable.status, gateway: payoutsTable.gateway, transferRef: payoutsTable.transferRef,
+    createdAt: payoutsTable.createdAt,
     creatorFirstName: usersTable.firstName, creatorLastName: usersTable.lastName, creatorUserName: usersTable.userName, creatorBadge: usersTable.badge,
   }).from(payoutsTable)
     .leftJoin(usersTable, eq(payoutsTable.creatorId, usersTable.id))
     .orderBy(payoutsTable.createdAt);
   res.json(payouts.map(p => ({
-    id: p.id, creatorId: p.creatorId, amount: parseFloat(String(p.amount)), status: p.status,
+    id: p.id, creatorId: p.creatorId, amount: parseFloat(String(p.amount)),
+    status: p.status, gateway: p.gateway ?? null, transferRef: p.transferRef ?? null,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
     creator: {
       id: p.creatorId, firstName: p.creatorFirstName ?? "", lastName: p.creatorLastName ?? "",
@@ -134,12 +137,17 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
 
-  const [payout] = await db.select({ id: payoutsTable.id, creatorId: payoutsTable.creatorId, campaignId: payoutsTable.campaignId, amount: payoutsTable.amount, status: payoutsTable.status }).from(payoutsTable).where(eq(payoutsTable.id, id));
+  const [payout] = await db.select({
+    id: payoutsTable.id, creatorId: payoutsTable.creatorId, campaignId: payoutsTable.campaignId,
+    amount: payoutsTable.amount, status: payoutsTable.status,
+    bankCode: payoutsTable.bankCode, accountNumber: payoutsTable.accountNumber,
+  }).from(payoutsTable).where(eq(payoutsTable.id, id));
+
   if (!payout) { res.status(404).json({ error: "Payout not found" }); return; }
-  if (payout.status === "approved") { res.json({ message: "Already approved" }); return; }
+  if (payout.status === "disbursed") { res.json({ message: "Already disbursed" }); return; }
+  if (payout.status === "processing") { res.status(409).json({ error: "Payout is already being processed. Please wait." }); return; }
 
   // Pre-approval gate: if the brand is on commission billing, campaignId MUST be set.
-  // Without it we cannot attribute the commission correctly — block rather than mischarge.
   if (!payout.campaignId) {
     const [campaign] = await db.select({ brandId: campaignsTable.brandId }).from(campaignsTable)
       .innerJoin(submissionsTable, eq(submissionsTable.campaignId, campaignsTable.id))
@@ -154,7 +162,7 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     }
   }
 
-  // Resolve billing BEFORE the transaction (read-only, no need to hold a lock).
+  // Resolve billing BEFORE the transaction (read-only).
   let billing: Awaited<ReturnType<typeof resolveBilling>> = null;
   let campaignBrandId: number | null = null;
   if (payout.campaignId) {
@@ -168,17 +176,76 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     }
   }
 
-  // Wrap status update + commission insert atomically.
-  // If the commission insert fails, the payout status rolls back — no approved payout without a record.
+  // Resolve creator bank account
+  const [bankAccount] = await db.select()
+    .from(bankAccountsTable)
+    .where(and(eq(bankAccountsTable.userId, payout.creatorId), eq(bankAccountsTable.isDefault, true)))
+    .limit(1);
+
+  if (!bankAccount) {
+    res.status(400).json({ error: "Creator has no default bank account on file. Ask them to add a bank account before disbursing." });
+    return;
+  }
+
+  // ── Atomic claim: flip pending → processing ──────────────────────────────
+  // Concurrent requests both reading "pending" above will race here.
+  // Only the first UPDATE to match (status = 'pending') wins; the others
+  // get 0 rows returned and receive a 409 — no gateway call is made.
+  const claimed = await db
+    .update(payoutsTable)
+    .set({ status: "processing" })
+    .where(and(eq(payoutsTable.id, id), eq(payoutsTable.status, "pending")))
+    .returning({ id: payoutsTable.id });
+
+  if (!claimed.length) {
+    // Another request already claimed (or the row was modified between our
+    // first read and now). Re-read to return a descriptive message.
+    const [current] = await db.select({ status: payoutsTable.status })
+      .from(payoutsTable).where(eq(payoutsTable.id, id));
+    if (current?.status === "disbursed") { res.json({ message: "Already disbursed" }); return; }
+    res.status(409).json({ error: "Payout is already being processed by another request." });
+    return;
+  }
+
+  // Stable idempotency key — deterministic on payout ID only so retries
+  // presented to the gateway carry the same reference.
+  const disbursementRef = `DISBURSE-${payout.id}`;
+  const payoutAmount = parseFloat(String(payout.amount));
+  let transferRef: string;
+  let usedGateway: string;
+
+  try {
+    const result = await initiateDisbursement({
+      bankCode: bankAccount.bankCode ?? bankAccount.bankName,
+      accountNumber: bankAccount.accountNumber,
+      accountName: bankAccount.accountName,
+      amount: payoutAmount,
+      reference: disbursementRef,
+      currency: "NGN",
+    });
+    transferRef = result.transferRef;
+    usedGateway = result.gateway;
+  } catch (err) {
+    // Gateway call failed — revert to pending so the admin can retry
+    await db.update(payoutsTable)
+      .set({ status: "pending" })
+      .where(eq(payoutsTable.id, id));
+    const msg = err instanceof Error ? err.message : "Disbursement failed";
+    res.status(502).json({ error: `Gateway disbursement failed: ${msg}` });
+    return;
+  }
+
+  // Wrap final status update + commission insert atomically.
   await db.transaction(async (tx) => {
-    await tx.update(payoutsTable).set({ status: "approved" }).where(eq(payoutsTable.id, id));
+    await tx.update(payoutsTable)
+      .set({ status: "disbursed", gateway: usedGateway, transferRef })
+      .where(eq(payoutsTable.id, id));
 
     if (payout.campaignId && billing && billing.billingMode === "commission" && billing.commissionRate > 0) {
       const [existing] = await tx.select({ id: commissionDeductionsTable.id })
         .from(commissionDeductionsTable)
         .where(eq(commissionDeductionsTable.payoutId, payout.id));
       if (!existing) {
-        const payoutAmount = parseFloat(String(payout.amount));
         const deductionAmount = (payoutAmount * billing.commissionRate) / 100;
         if (deductionAmount > 0) {
           await tx.insert(commissionDeductionsTable).values({
@@ -194,7 +261,7 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     }
   });
 
-  res.json({ message: "Approved" });
+  res.json({ message: "Approved & disbursed", gateway: usedGateway, transferRef });
 });
 
 export default router;

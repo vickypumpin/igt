@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAdminListPayouts, useAdminApprovePayout, getAdminListPayoutsQueryKey } from "@workspace/api-client-react";
+import { useAdminListPayouts, getAdminListPayoutsQueryKey, useAdminApproveAndDisburse, type DisburseResult } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
@@ -7,7 +7,7 @@ import AdminLayout from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Wallet, CreditCard, Percent } from "lucide-react";
+import { Wallet, CreditCard, Percent, Send } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -28,11 +28,45 @@ interface CommissionRow {
   firstName: string | null; lastName: string | null; email: string | null;
 }
 
+function GatewayBadge({ gateway }: { gateway: string | null }) {
+  if (!gateway) return null;
+  const isPS = gateway === "paystack";
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{
+        background: isPS ? "rgba(0,114,239,0.10)" : "rgba(245,158,11,0.10)",
+        color: isPS ? "#0072EF" : "#D97706",
+      }}
+    >
+      {isPS ? "Paystack" : "Flutterwave"}
+    </span>
+  );
+}
+
+function PayoutStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, { bg: string; color: string; dot: string }> = {
+    pending:   { bg: "rgba(245,158,11,0.12)",  color: "#D97706", dot: "#F59E0B" },
+    approved:  { bg: "rgba(16,185,129,0.12)",  color: "#059669", dot: "#10B981" },
+    disbursed: { bg: "rgba(29,207,179,0.12)",  color: "#0FA88E", dot: "#1DCFB3" },
+    failed:    { bg: "rgba(239,68,68,0.12)",   color: "#DC2626", dot: "#EF4444" },
+    rejected:  { bg: "rgba(239,68,68,0.12)",   color: "#DC2626", dot: "#EF4444" },
+  };
+  const s = styles[status] ?? styles.pending;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: s.bg, color: s.color }}>
+      <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.dot }} />
+      {status}
+    </span>
+  );
+}
+
 export default function AdminPayoutsPage() {
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("payouts");
+  const [disbursing, setDisbursing] = useState<number | null>(null);
   const { data = [], isLoading } = useAdminListPayouts({ query: { queryKey: getAdminListPayoutsQueryKey() } });
-  const approveMutation = useAdminApprovePayout();
+  const approveMutation = useAdminApproveAndDisburse();
 
   const { data: subscriptions = [], isLoading: subsLoading } = useQuery<SubUser[]>({
     queryKey: ["/admin/payments/subscriptions"],
@@ -46,8 +80,23 @@ export default function AdminPayoutsPage() {
     enabled: tab === "commissions",
   });
 
-  const handleApprove = (id: number) => {
-    approveMutation.mutate({ id }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getAdminListPayoutsQueryKey() }); toast({ title: "Payout approved ✓" }); } });
+  const handleApproveAndDisburse = (id: number) => {
+    setDisbursing(id);
+    approveMutation.mutate(
+      { id },
+      {
+        onSuccess: (data: DisburseResult) => {
+          queryClient.invalidateQueries({ queryKey: getAdminListPayoutsQueryKey() });
+          const gw = data?.gateway ? ` via ${data.gateway}` : "";
+          toast({ title: `Approved & disbursed${gw} ✓` });
+        },
+        onError: (err: unknown) => {
+          const msg = (err as { data?: { error?: string } })?.data?.error ?? "Disbursement failed";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
+        onSettled: () => setDisbursing(null),
+      }
+    );
   };
 
   const pending = data.filter(p => p.status === "pending");
@@ -90,11 +139,12 @@ export default function AdminPayoutsPage() {
         {tab === "payouts" && (
           <>
             {!isLoading && data.length > 0 && (
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-4 gap-4 mb-6">
                 {[
                   { label: "Total requests", value: data.length, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
                   { label: "Pending amount", value: `₦${totalPending.toLocaleString()}`, gradient: "linear-gradient(135deg, #F59E0B, #D97706)" },
                   { label: "Approved", value: data.filter(p => p.status === "approved").length, gradient: "linear-gradient(135deg, #10B981, #059669)" },
+                  { label: "Disbursed", value: data.filter(p => p.status === "disbursed").length, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
                 ].map(({ label, value, gradient }) => (
                   <Card key={label} className="border-0 shadow-sm">
                     <CardContent className="p-4">
@@ -122,6 +172,7 @@ export default function AdminPayoutsPage() {
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Creator</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Amount</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Gateway</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Requested</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Actions</th>
                       </tr>
@@ -142,16 +193,30 @@ export default function AdminPayoutsPage() {
                           </td>
                           <td className="px-5 py-3.5 text-lg font-extrabold">₦{p.amount.toLocaleString()}</td>
                           <td className="px-5 py-3.5">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
-                              style={p.status === "approved" ? { background: "rgba(16,185,129,0.12)", color: "#059669" } : p.status === "rejected" ? { background: "rgba(239,68,68,0.12)", color: "#DC2626" } : { background: "rgba(245,158,11,0.12)", color: "#D97706" }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: p.status === "approved" ? "#10B981" : p.status === "rejected" ? "#EF4444" : "#F59E0B" }} />
-                              {p.status}
-                            </span>
+                            <PayoutStatusBadge status={p.status ?? "pending"} />
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <GatewayBadge gateway={(p as { gateway?: string | null }).gateway ?? null} />
                           </td>
                           <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(p.createdAt).toLocaleDateString()}</td>
                           <td className="px-5 py-3.5">
                             {p.status === "pending" && (
-                              <Button size="sm" className="h-8 text-xs rounded-xl font-semibold" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }} onClick={() => handleApprove(p.id)} data-testid={`button-approve-${p.id}`}><CheckCircle className="h-3 w-3 mr-1" />Approve</Button>
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs rounded-xl font-semibold gap-1.5"
+                                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+                                onClick={() => handleApproveAndDisburse(p.id)}
+                                disabled={disbursing === p.id}
+                                data-testid={`button-approve-${p.id}`}
+                              >
+                                <Send className="h-3 w-3" />
+                                {disbursing === p.id ? "Processing…" : "Approve & Disburse"}
+                              </Button>
+                            )}
+                            {p.status === "disbursed" && (
+                              <div className="text-xs text-muted-foreground font-mono truncate max-w-[120px]" title={(p as { transferRef?: string | null }).transferRef ?? ""}>
+                                {(p as { transferRef?: string | null }).transferRef ? `ref: ${(p as { transferRef?: string | null }).transferRef}` : "—"}
+                              </div>
                             )}
                           </td>
                         </tr>

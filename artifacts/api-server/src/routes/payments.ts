@@ -1,50 +1,11 @@
 import { Router } from "express";
 import { eq, sql, desc, and } from "drizzle-orm";
-import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, settingsTable, submissionsTable } from "@workspace/db";
+import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, submissionsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
+import { initiateCollection, verifyCollection } from "../lib/gateway";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
-
-async function getFlutterwaveKeys() {
-  const [settings] = await db.select({
-    publicKey: settingsTable.flutterwavePublicKey,
-    secretKey: settingsTable.flutterwaveSecretKey,
-    encKey: settingsTable.flutterwaveEncryptionKey,
-    live: settingsTable.flutterwaveLive,
-  }).from(settingsTable).limit(1);
-  return settings ?? { publicKey: null, secretKey: null, encKey: null, live: false };
-}
-
-async function flutterwaveInitiatePayment(params: {
-  secretKey: string;
-  txRef: string;
-  amount: number;
-  currency: string;
-  redirectUrl: string;
-  customerEmail: string;
-  customerName: string;
-  description: string;
-}) {
-  const response = await fetch("https://api.flutterwave.com/v3/payments", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${params.secretKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      tx_ref: params.txRef,
-      amount: params.amount,
-      currency: params.currency,
-      redirect_url: params.redirectUrl,
-      customer: { email: params.customerEmail, name: params.customerName },
-      customizations: { title: "iGoTrend", description: params.description },
-    }),
-  });
-  const data = await response.json() as { status: string; data?: { link: string }; message?: string };
-  if (data.status === "success" && data.data?.link) return { paymentUrl: data.data.link };
-  throw new Error(data.message ?? "Flutterwave payment initiation failed");
-}
 
 router.get("/payments", requireAuth, async (req, res): Promise<void> => {
   const payments = await db.select().from(paymentsTable)
@@ -54,6 +15,7 @@ router.get("/payments", requireAuth, async (req, res): Promise<void> => {
     id: p.id, campaignId: p.campaignId ?? null,
     amount: parseFloat(String(p.amount)), taxAmount: parseFloat(String(p.taxAmount)),
     paymentType: p.paymentType, paymentStatus: p.paymentStatus, txRef: p.txRef,
+    gateway: p.gateway ?? null,
     campaignName: null,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
   })));
@@ -67,54 +29,49 @@ router.post("/payments/campaign", requireAuth, requireRole("brand"), async (req,
   const [user] = await db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName })
     .from(usersTable).where(eq(usersTable.id, req.userId!));
 
-  const keys = await getFlutterwaveKeys();
+  try {
+    const { paymentUrl, gateway } = await initiateCollection({
+      txRef,
+      amount: Number(amount),
+      currency: "USD",
+      redirectUrl: `${req.headers.origin ?? "https://igotrend.com"}/payments?tx_ref=${txRef}`,
+      customerEmail: user?.email ?? "brand@igotrend.com",
+      customerName: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+      description: `Campaign payment — ${txRef}`,
+    });
 
-  let paymentUrl = `https://checkout.flutterwave.com/v3/hosted/pay?tx_ref=${txRef}`;
+    await db.insert(paymentsTable).values({
+      userId: req.userId!, campaignId, amount: String(amount), taxAmount: "0",
+      paymentType: "campaign", paymentStatus: false, txRef, gateway,
+    });
 
-  if (keys.secretKey) {
-    try {
-      const result = await flutterwaveInitiatePayment({
-        secretKey: keys.secretKey,
-        txRef,
-        amount: Number(amount),
-        currency: "USD",
-        redirectUrl: `${req.headers.origin ?? "https://igotrend.com"}/payments?tx_ref=${txRef}`,
-        customerEmail: user?.email ?? "brand@igotrend.com",
-        customerName: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
-        description: `Campaign payment — ${txRef}`,
-      });
-      paymentUrl = result.paymentUrl;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      res.status(502).json({ error: `Payment gateway error: ${msg}` });
-      return;
-    }
+    res.json({ paymentUrl, txRef, gateway });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Payment gateway error";
+    res.status(502).json({ error: msg });
   }
-
-  await db.insert(paymentsTable).values({
-    userId: req.userId!, campaignId, amount: String(amount), taxAmount: "0",
-    paymentType: "campaign", paymentStatus: false, txRef,
-  });
-
-  res.json({ paymentUrl, txRef });
 });
 
 router.post("/payments/verify/:txRef", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.txRef) ? req.params.txRef[0] : req.params.txRef;
-  const keys = await getFlutterwaveKeys();
-  if (!keys.secretKey) {
-    res.json({ status: "no_gateway", message: "No payment gateway configured" });
-    return;
-  }
-  const response = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${raw}`, {
-    headers: { "Authorization": `Bearer ${keys.secretKey}` },
-  });
-  const data = await response.json() as { status: string; data?: { status: string; amount: number; currency: string } };
-  if (data.status === "success" && data.data?.status === "successful") {
-    await db.update(paymentsTable).set({ paymentStatus: true }).where(eq(paymentsTable.txRef, raw));
-    res.json({ verified: true, amount: data.data.amount, currency: data.data.currency });
-  } else {
-    res.json({ verified: false });
+
+  // Look up which gateway handled this payment
+  const [payment] = await db.select({ gateway: paymentsTable.gateway })
+    .from(paymentsTable)
+    .where(eq(paymentsTable.txRef, raw))
+    .limit(1);
+
+  try {
+    const result = await verifyCollection(raw, payment?.gateway ?? null);
+    if (result.verified) {
+      await db.update(paymentsTable).set({ paymentStatus: true }).where(eq(paymentsTable.txRef, raw));
+      res.json({ verified: true, amount: result.amount, currency: result.currency, gateway: payment?.gateway ?? null });
+    } else {
+      res.json({ verified: false });
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Verification error";
+    res.status(502).json({ error: msg });
   }
 });
 
@@ -139,26 +96,25 @@ router.post("/rewards", requireAuth, requireRole("brand"), async (req, res): Pro
   if (!creatorIds?.length || !amount || !rewardType) { res.status(400).json({ error: "Missing fields" }); return; }
 
   const txRef = `RWD-${Date.now()}`;
-  const keys = await getFlutterwaveKeys();
-  let paymentUrl = `https://checkout.flutterwave.com/v3/hosted/pay?tx_ref=${txRef}`;
+  const [user] = await db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName })
+    .from(usersTable).where(eq(usersTable.id, req.userId!));
 
-  if (keys.secretKey) {
-    const [user] = await db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName })
-      .from(usersTable).where(eq(usersTable.id, req.userId!));
-    try {
-      const result = await flutterwaveInitiatePayment({
-        secretKey: keys.secretKey,
-        txRef,
-        amount: Number(amount) * creatorIds.length,
-        currency: "USD",
-        redirectUrl: `${req.headers.origin ?? "https://igotrend.com"}/payments?tx_ref=${txRef}`,
-        customerEmail: user?.email ?? "brand@igotrend.com",
-        customerName: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
-        description: `${rewardType} reward for ${creatorIds.length} creator(s)`,
-      });
-      paymentUrl = result.paymentUrl;
-    } catch (_) { /* fall through to stub URL */ }
-  }
+  let paymentUrl = "";
+  let gateway: string | null = null;
+
+  try {
+    const result = await initiateCollection({
+      txRef,
+      amount: Number(amount) * creatorIds.length,
+      currency: "USD",
+      redirectUrl: `${req.headers.origin ?? "https://igotrend.com"}/payments?tx_ref=${txRef}`,
+      customerEmail: user?.email ?? "brand@igotrend.com",
+      customerName: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+      description: `${rewardType} reward for ${creatorIds.length} creator(s)`,
+    });
+    paymentUrl = result.paymentUrl;
+    gateway = result.gateway;
+  } catch (_) { /* fall through — still create the reward records */ }
 
   for (const creatorId of creatorIds) {
     await db.insert(rewardsTable).values({
@@ -166,7 +122,7 @@ router.post("/rewards", requireAuth, requireRole("brand"), async (req, res): Pro
       type: rewardType, amount: String(amount), status: false,
     });
   }
-  res.json({ paymentUrl, txRef });
+  res.json({ paymentUrl, txRef, gateway });
 });
 
 router.get("/payouts", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
@@ -176,6 +132,7 @@ router.get("/payouts", requireAuth, requireRole("creator"), async (req, res): Pr
   res.json(payouts.map(p => ({
     id: p.id, amount: p.amount, status: p.status,
     bankCode: p.bankCode ?? null, accountNumber: p.accountNumber ?? null,
+    gateway: p.gateway ?? null, transferRef: p.transferRef ?? null,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
   })));
 });
@@ -184,8 +141,6 @@ router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, 
   const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
 
-  // campaignId must be explicitly supplied and verified against a creator submission.
-  // No heuristic fallback — guessing the wrong campaign would misattribute commission.
   if (!campaignId) { res.status(400).json({ error: "campaignId is required for a payout request" }); return; }
   const [validSub] = await db
     .select({ campaignId: submissionsTable.campaignId })

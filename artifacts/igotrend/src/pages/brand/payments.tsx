@@ -4,6 +4,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { CreditCard, CheckCircle, Clock, DollarSign, TrendingUp } from "lucide-react";
 
+function GatewayBadge({ gateway }: { gateway: string | null }) {
+  if (!gateway) return null;
+  const isPS = gateway === "paystack";
+  return (
+    <span
+      className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full"
+      style={{
+        background: isPS ? "rgba(0,114,239,0.10)" : "rgba(245,158,11,0.10)",
+        color: isPS ? "#0072EF" : "#D97706",
+      }}
+    >
+      {isPS ? "Paystack" : "Flutterwave"}
+    </span>
+  );
+}
+
 export default function PaymentsPage() {
   const { data = [], isLoading } = useListPayments({ query: { queryKey: getListPaymentsQueryKey() } });
 
@@ -57,6 +73,7 @@ export default function PaymentsPage() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Campaign</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Amount</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Type</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Gateway</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Date</th>
                   </tr>
@@ -77,6 +94,9 @@ export default function PaymentsPage() {
                       </td>
                       <td className="px-5 py-3.5 font-bold text-base">${p.amount.toLocaleString()}</td>
                       <td className="px-5 py-3.5 text-xs font-medium capitalize text-muted-foreground">{p.paymentType}</td>
+                      <td className="px-5 py-3.5">
+                        <GatewayBadge gateway={(p as { gateway?: string | null }).gateway ?? null} />
+                      </td>
                       <td className="px-5 py-3.5">
                         {p.paymentStatus ? (
                           <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Paid</span>

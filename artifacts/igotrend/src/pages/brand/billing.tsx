@@ -6,7 +6,7 @@ import BrandLayout from "@/components/layout/brand-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Gem, Zap, Star, Crown, ArrowDownCircle, ArrowUpCircle, Gift, CheckCircle } from "lucide-react";
+import { Gem, Zap, Star, Crown, ArrowDownCircle, ArrowUpCircle, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const GEM_PACKAGES = [
@@ -19,6 +19,22 @@ const GEM_PACKAGES = [
 const TXN_ICONS: Record<string, React.ElementType> = { purchase: ArrowDownCircle, reward: Gift, spend: ArrowUpCircle };
 const TXN_COLORS: Record<string, string> = { purchase: "#059669", reward: "#6B2FCE", spend: "#DC2626" };
 
+function GatewayBadge({ gateway }: { gateway: string | null }) {
+  if (!gateway) return null;
+  const isPS = gateway === "paystack";
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ml-2"
+      style={{
+        background: isPS ? "rgba(0,114,239,0.10)" : "rgba(245,158,11,0.10)",
+        color: isPS ? "#0072EF" : "#D97706",
+      }}
+    >
+      {isPS ? "Paystack" : "Flutterwave"}
+    </span>
+  );
+}
+
 export default function BrandBillingPage() {
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const { data: billing, isLoading } = useBillingBalance();
@@ -26,14 +42,13 @@ export default function BrandBillingPage() {
   const verifyMutation = useVerifyGemsPurchase();
   const { toast } = useToast();
 
-  // Auto-verify after Flutterwave redirect (?verify=<txRef>)
+  // Auto-verify after gateway redirect (?verify=<txRef> or ?tx_ref=<txRef>)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const txRef = params.get("verify") ?? params.get("tx_ref");
+    const txRef = params.get("verify") ?? params.get("tx_ref") ?? params.get("reference");
     if (!txRef) return;
     // Clean up the URL so a reload doesn't re-trigger
-    const cleanUrl = window.location.pathname;
-    window.history.replaceState({}, "", cleanUrl);
+    window.history.replaceState({}, "", window.location.pathname);
     verifyMutation.mutate(
       { txRef },
       {
@@ -60,7 +75,7 @@ export default function BrandBillingPage() {
           if (data.paymentUrl) {
             window.open(data.paymentUrl, "_blank");
           } else {
-            toast({ title: `${pkg.gems.toLocaleString()} gems for ₦${pkg.amountNGN.toLocaleString()}`, description: "Payment gateway not configured yet. Contact support to set up Flutterwave." });
+            toast({ title: `${pkg.gems.toLocaleString()} gems for ₦${pkg.amountNGN.toLocaleString()}`, description: "Payment gateway not configured yet. Contact support." });
           }
           queryClient.invalidateQueries({ queryKey: getBillingBalanceQueryKey() });
         },
@@ -149,13 +164,17 @@ export default function BrandBillingPage() {
                 const Icon = TXN_ICONS[txn.type] ?? Gem;
                 const color = TXN_COLORS[txn.type] ?? "#6B7280";
                 const sign = txn.type === "spend" ? "-" : "+";
+                const gateway = (txn as { gateway?: string | null }).gateway ?? null;
                 return (
                   <div key={txn.id} className="px-5 py-4 flex items-center gap-4" data-testid={`txn-row-${txn.id}`}>
                     <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}18` }}>
                       <Icon className="h-4 w-4" style={{ color }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{txn.description ?? txn.type}</div>
+                      <div className="text-sm font-medium flex items-center flex-wrap gap-1">
+                        {txn.description ?? txn.type}
+                        <GatewayBadge gateway={gateway} />
+                      </div>
                       <div className="text-xs text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
                     </div>
                     <div className="font-bold text-sm flex-shrink-0" style={{ color }}>
@@ -170,7 +189,7 @@ export default function BrandBillingPage() {
 
         <div className="mt-4 p-4 rounded-2xl border border-border/60 bg-muted/30">
           <p className="text-xs text-muted-foreground text-center">
-            💳 Payments powered by Flutterwave. All transactions are secure and encrypted.
+            💳 Payments powered by Paystack & Flutterwave. All transactions are secure and encrypted.
             Gems never expire and can be used across all your campaigns.
           </p>
         </div>

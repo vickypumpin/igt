@@ -11,6 +11,7 @@ export const gemsTransactionsTable = pgTable("gems_transactions", {
   amount: numeric("amount", { precision: 12, scale: 2 }),
   description: text("description"),
   reference: text("reference"),
+  gateway: text("gateway"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -12,6 +12,7 @@ export const paymentsTable = pgTable("payments", {
   paymentType: text("payment_type").notNull().default("campaign"),
   paymentStatus: boolean("payment_status").notNull().default(false),
   txRef: text("tx_ref").notNull(),
+  gateway: text("gateway"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

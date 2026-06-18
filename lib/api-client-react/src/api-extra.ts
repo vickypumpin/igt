@@ -21,6 +21,7 @@ export interface GemsTransaction {
   amount: number | null;
   description: string | null;
   reference: string | null;
+  gateway: string | null;
   createdAt: string;
 }
 
@@ -315,5 +316,36 @@ export const useUpdateAccountProfile = (
         method: "PUT",
         body: JSON.stringify(data),
       }),
+    ...options,
+  });
+
+// ── Admin Approve & Disburse Payout ───────────────────────────────────────────
+
+export interface PayoutWithGateway {
+  id: number;
+  creatorId: number;
+  amount: number;
+  status: string;
+  gateway: string | null;
+  transferRef: string | null;
+  createdAt: string;
+  creator?: {
+    id: number; firstName: string; lastName: string; userName: string;
+    badge: string | null; avatarUrl: string | null;
+  } | null;
+}
+
+export interface DisburseResult {
+  message: string;
+  gateway: string;
+  transferRef: string;
+}
+
+export const useAdminApproveAndDisburse = (
+  options?: UseMutationOptions<DisburseResult, unknown, { id: number }>
+) =>
+  useMutation<DisburseResult, unknown, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch<DisburseResult>(`/api/admin/payouts/${id}/approve`, { method: "POST" }),
     ...options,
   });

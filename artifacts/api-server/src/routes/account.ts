@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import { initiateCollection, verifyCollection } from "../lib/gateway";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -150,6 +151,7 @@ router.get("/billing/balance", requireAuth, async (req, res): Promise<void> => {
         id: t.id, type: t.type, gemsDelta: t.gemsDelta,
         amount: t.amount ? parseFloat(String(t.amount)) : null,
         description: t.description ?? null, reference: t.reference ?? null,
+        gateway: t.gateway ?? null,
         createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : String(t.createdAt),
       })),
   });
@@ -169,7 +171,6 @@ router.post("/billing/purchase", requireAuth, async (req, res): Promise<void> =>
   }
 
   const [user] = await db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName }).from(usersTable).where(eq(usersTable.id, req.userId!));
-  const [settings] = await db.select({ secretKey: settingsTable.flutterwaveSecretKey, live: settingsTable.flutterwaveLive }).from(settingsTable).limit(1);
 
   const txRef = `IGT-GEMS-${req.userId}-${packageId}-${Date.now()}`;
   const { gems, amountNGN: amount } = pkg;
@@ -180,34 +181,29 @@ router.post("/billing/purchase", requireAuth, async (req, res): Promise<void> =>
     amount: String(amount), description: `Pending: ${gems} gems for ₦${amount}`, reference: txRef,
   });
 
-  if (!settings?.secretKey) {
-    res.status(503).json({ error: "Payment gateway not configured", paymentUrl: null, txRef });
-    return;
-  }
-
   try {
-    const response = await fetch("https://api.flutterwave.com/v3/payments", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${settings.secretKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tx_ref: txRef, amount, currency,
-        redirect_url: `${process.env.APP_URL ?? "https://igotrend.com"}/billing?verify=${txRef}`,
-        customer: { email: user.email, name: `${user.firstName} ${user.lastName}` },
-        meta: { packageId },
-        customizations: { title: "iGoTrend Gems", description: `${gems} gems — ${packageId} package` },
-      }),
+    const { paymentUrl, gateway } = await initiateCollection({
+      txRef,
+      amount,
+      currency,
+      redirectUrl: `${process.env.APP_URL ?? "https://igotrend.com"}/billing?verify=${txRef}`,
+      customerEmail: user?.email ?? "brand@igotrend.com",
+      customerName: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+      description: `${gems} gems — ${packageId} package`,
+      meta: { packageId },
     });
-    const data = await response.json() as { status: string; data?: { link: string }; message?: string };
-    if (data.status === "success" && data.data?.link) {
-      res.json({ paymentUrl: data.data.link, txRef });
-    } else {
-      // Clean up pending record on failure
-      await db.delete(gemsTransactionsTable).where(eq(gemsTransactionsTable.reference, txRef));
-      res.status(502).json({ error: data.message ?? "Payment initiation failed", txRef: null, paymentUrl: null });
-    }
-  } catch {
+
+    // Store gateway used so verify can call the right provider
+    await db.update(gemsTransactionsTable)
+      .set({ gateway })
+      .where(eq(gemsTransactionsTable.reference, txRef));
+
+    res.json({ paymentUrl, txRef, gateway });
+  } catch (err) {
+    // Clean up pending record on failure
     await db.delete(gemsTransactionsTable).where(eq(gemsTransactionsTable.reference, txRef));
-    res.status(502).json({ error: "Payment gateway error", txRef: null, paymentUrl: null });
+    const msg = err instanceof Error ? err.message : "Payment gateway error";
+    res.status(502).json({ error: msg, txRef: null, paymentUrl: null });
   }
 });
 
@@ -224,7 +220,6 @@ router.post("/billing/verify", requireAuth, async (req, res): Promise<void> => {
     .limit(1);
 
   if (!pendingRecord) {
-    // Check if already completed (idempotency)
     res.status(404).json({ error: "Purchase record not found. Initiate a purchase first." });
     return;
   }
@@ -237,73 +232,80 @@ router.post("/billing/verify", requireAuth, async (req, res): Promise<void> => {
   const expectedGems = pendingRecord.gemsDelta;
   const expectedAmount = pendingRecord.amount ? parseFloat(String(pendingRecord.amount)) : 0;
 
-  const [settings] = await db.select({ secretKey: settingsTable.flutterwaveSecretKey }).from(settingsTable).limit(1);
-  if (!settings?.secretKey) { res.status(503).json({ error: "Payment gateway not configured" }); return; }
-
   try {
-    const response = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${txRef as string}`, {
-      headers: { "Authorization": `Bearer ${settings.secretKey}` },
-    });
-    const data = await response.json() as {
-      status: string;
-      data?: { status: string; amount?: number; currency?: string; charged_amount?: number }
-    };
+    const result = await verifyCollection(txRef as string, pendingRecord.gateway ?? null);
 
-    if (data.status === "success" && data.data?.status === "successful") {
-      const fwAmount = data.data.charged_amount ?? data.data.amount ?? 0;
-      const fwCurrency = data.data.currency ?? "";
-
-      // Validate currency — must be NGN; any other currency indicates underpayment abuse
-      if (fwCurrency !== "NGN") {
-        res.status(400).json({ error: `Payment currency mismatch: expected NGN, received ${fwCurrency}` });
-        return;
-      }
-
-      // Verify the paid amount matches what was promised (allow small tolerance for FW fees)
-      if (fwAmount < expectedAmount * 0.99) {
-        res.status(400).json({ error: `Payment amount mismatch: expected ₦${expectedAmount}, received ₦${fwAmount}` });
-        return;
-      }
-
-      // Atomic credit inside a DB transaction — conditional UPDATE guards against concurrent verify
-      let gemsAdded = 0;
-      try {
-        await db.transaction(async (tx) => {
-          // Atomically mark as 'purchase' ONLY if still 'pending' — returns 0 rows if already processed
-          const updated = await tx.update(gemsTransactionsTable)
-            .set({ type: "purchase", description: `Purchased ${expectedGems} gems` })
-            .where(and(
-              eq(gemsTransactionsTable.id, pendingRecord.id),
-              eq(gemsTransactionsTable.type, "pending"),
-            ))
-            .returning({ id: gemsTransactionsTable.id });
-
-          if (!updated.length) {
-            // Another concurrent request already processed this txRef
-            throw Object.assign(new Error("ALREADY_PROCESSED"), { code: "ALREADY_PROCESSED" });
-          }
-
-          // Atomically credit gems (sql template avoids read-modify-write race)
-          await tx.update(usersTable)
-            .set({ gems: sql`gems + ${expectedGems}` })
-            .where(eq(usersTable.id, req.userId!));
-
-          gemsAdded = expectedGems;
-        });
-      } catch (txErr: unknown) {
-        if ((txErr as { code?: string }).code === "ALREADY_PROCESSED") {
-          res.status(409).json({ error: "Transaction already processed", alreadyProcessed: true }); return;
-        }
-        throw txErr;
-      }
-
-      res.json({ success: true, gemsAdded });
-    } else {
+    if (!result.verified) {
       res.status(400).json({ error: "Payment not successful" });
+      return;
     }
-  } catch {
-    res.status(502).json({ error: "Payment verification error" });
+
+    const fwAmount = result.amount ?? 0;
+    const fwCurrency = result.currency ?? "";
+
+    // Validate currency — must be NGN
+    if (fwCurrency && fwCurrency !== "NGN") {
+      res.status(400).json({ error: `Payment currency mismatch: expected NGN, received ${fwCurrency}` });
+      return;
+    }
+
+    // Verify the paid amount matches what was promised (allow small tolerance for fees)
+    if (fwAmount > 0 && fwAmount < expectedAmount * 0.99) {
+      res.status(400).json({ error: `Payment amount mismatch: expected ₦${expectedAmount}, received ₦${fwAmount}` });
+      return;
+    }
+
+    // Atomic credit inside a DB transaction — conditional UPDATE guards against concurrent verify
+    let gemsAdded = 0;
+    try {
+      await db.transaction(async (tx) => {
+        // Atomically mark as 'purchase' ONLY if still 'pending'
+        const updated = await tx.update(gemsTransactionsTable)
+          .set({ type: "purchase", description: `Purchased ${expectedGems} gems` })
+          .where(and(
+            eq(gemsTransactionsTable.id, pendingRecord.id),
+            eq(gemsTransactionsTable.type, "pending"),
+          ))
+          .returning({ id: gemsTransactionsTable.id });
+
+        if (!updated.length) {
+          throw Object.assign(new Error("ALREADY_PROCESSED"), { code: "ALREADY_PROCESSED" });
+        }
+
+        // Atomically credit gems
+        await tx.update(usersTable)
+          .set({ gems: sql`gems + ${expectedGems}` })
+          .where(eq(usersTable.id, req.userId!));
+
+        gemsAdded = expectedGems;
+      });
+    } catch (txErr: unknown) {
+      if ((txErr as { code?: string }).code === "ALREADY_PROCESSED") {
+        res.status(409).json({ error: "Transaction already processed", alreadyProcessed: true }); return;
+      }
+      throw txErr;
+    }
+
+    res.json({ success: true, gemsAdded, gateway: pendingRecord.gateway ?? null });
+  } catch (err) {
+    if (res.headersSent) return;
+    const msg = err instanceof Error ? err.message : "Payment verification error";
+    res.status(502).json({ error: msg });
   }
+});
+
+// ── Settings (read public key for frontend) ──────────────────────────────────
+router.get("/billing/gateway-info", requireAuth, async (_req, res): Promise<void> => {
+  const [s] = await db.select({
+    preferred: settingsTable.preferredPaymentGateway,
+    fwPublicKey: settingsTable.flutterwavePublicKey,
+    psPublicKey: settingsTable.paystackPublicKey,
+  }).from(settingsTable).limit(1);
+  res.json({
+    preferred: s?.preferred ?? "flutterwave",
+    flutterwaveConfigured: !!s?.fwPublicKey,
+    paystackConfigured: !!s?.psPublicKey,
+  });
 });
 
 export default router;

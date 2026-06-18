@@ -24,6 +24,8 @@ export const payoutsTable = pgTable("payouts", {
   status: text("status").notNull().default("pending"),
   bankCode: text("bank_code"),
   accountNumber: text("account_number"),
+  gateway: text("gateway"),
+  transferRef: text("transfer_ref"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
