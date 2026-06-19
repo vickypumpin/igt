@@ -292,7 +292,7 @@ export default function SettingsPage() {
         <Section icon={User} title="Profile Information">
           <Form {...profileForm}>
             <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField control={profileForm.control} name="firstName" render={({ field }) => (
                   <FormItem><FormLabel className={labelCls}>First name</FormLabel><FormControl><Input {...field} className={inputCls} data-testid="input-first-name" /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -343,7 +343,7 @@ export default function SettingsPage() {
                   <div className="pt-1 pb-0.5">
                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Social profiles</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <FormField control={profileForm.control} name="instagramProfile" render={({ field }) => (
                       <FormItem><FormLabel className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "#E1306C" }}><SiInstagram className="h-3.5 w-3.5" />Instagram URL</FormLabel><FormControl><Input {...field} className={inputCls} data-testid="input-instagram" /></FormControl></FormItem>
                     )} />

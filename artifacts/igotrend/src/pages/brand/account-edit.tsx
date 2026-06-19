@@ -125,7 +125,7 @@ export default function BrandAccountEditPage() {
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Email address</label>
                 <Input value={form.email} onChange={field("email")} type="email" placeholder="you@brand.com" className="h-10 rounded-xl" data-testid="input-email" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([["First name", "firstName"], ["Last name", "lastName"]] as [string, keyof FormState][]).map(([label, key]) => (
                   <div key={key}>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
@@ -175,7 +175,7 @@ export default function BrandAccountEditPage() {
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #F59E0B, #D97706)" }}><MapPin className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Location</div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country ID</label>
                 <Input type="number" value={form.countryId} onChange={field("countryId")} placeholder="Country ID" className="h-10 rounded-xl" data-testid="input-countryId" />

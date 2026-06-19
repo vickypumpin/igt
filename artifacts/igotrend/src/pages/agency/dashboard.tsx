@@ -71,11 +71,11 @@ export default function AgencyDashboardPage() {
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
             {Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
           </div>
         ) : (
-          <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
             {stats.map(({ label, value, icon: Icon, gradient }) => (
               <div key={label} className="bg-white rounded-2xl border border-border/60 p-5 shadow-sm flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white" style={{ background: gradient }}>

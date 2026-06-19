@@ -185,7 +185,7 @@ export default function CreatorDashboardPage() {
           <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">Overview</h2>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* 2×2 stat boxes */}
-            <div className="lg:col-span-2 grid grid-cols-2 gap-4">
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {isLoading ? (
                 Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
               ) : (

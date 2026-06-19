@@ -4,12 +4,13 @@ import { useLogout, useGetMe } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import {
   LayoutDashboard, Megaphone, Users, Wallet, LogOut, Bell,
-  ChevronDown, HelpCircle, Bot, Settings, MessageSquare, BarChart2,
+  ChevronDown, HelpCircle, Bot, Settings, MessageSquare, BarChart2, Menu, X,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { IgtLogo } from "@/components/IgtLogo";
 import { NavGroup, NavLink } from "./nav-group";
+import { useMobileSidebar } from "@/hooks/use-mobile-sidebar";
 
 const PURPLE = "#6B2FCE";
 const PURPLE_BG = "rgba(107,47,206,0.18)";
@@ -26,6 +27,7 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
   const { logout } = useAuth();
   const logoutMutation = useLogout();
   const { data: user } = useGetMe();
+  const { isOpen, toggle, close } = useMobileSidebar();
 
   const handleLogout = () => {
     logoutMutation.mutate(undefined as unknown as void, { onSettled: () => { logout(); queryClient.clear(); } });
@@ -36,10 +38,28 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex h-screen bg-background overflow-hidden" data-testid="layout-agency">
-      <aside className="w-64 flex flex-col flex-shrink-0" style={{ background: "linear-gradient(180deg, #1A1440 0%, #141C35 100%)" }}>
-        <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-          <IgtLogo size="sm" white />
-          <div className="text-xs mt-1.5 font-semibold" style={{ color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>Agency Portal</div>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={close}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col flex-shrink-0 transition-transform duration-300 lg:relative lg:translate-x-0 lg:z-auto ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ background: "linear-gradient(180deg, #1A1440 0%, #141C35 100%)" }}
+      >
+        <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+          <div>
+            <IgtLogo size="sm" white />
+            <div className="text-xs mt-1.5 font-semibold" style={{ color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>Agency Portal</div>
+          </div>
+          <button onClick={close} className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors" aria-label="Close menu">
+            <X className="h-4 w-4 text-white/60" />
+          </button>
         </div>
 
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
@@ -101,20 +121,31 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="border-b border-border flex items-center justify-between px-6 bg-white" style={{ height: 52 }}>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-semibold uppercase tracking-wide" style={{ color: PURPLE }}>HOME</span>
-            <span>/</span>
-            <span className="uppercase tracking-wide font-medium text-foreground">
-              {location.replace(/^\/agency\/?/, "").replace(/-/g, " ").toUpperCase() || "DASHBOARD"}
-            </span>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <header className="border-b border-border flex items-center justify-between px-4 lg:px-6 bg-white flex-shrink-0" style={{ height: 52 }}>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggle}
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Toggle menu"
+              data-testid="button-hamburger"
+            >
+              <Menu className="h-5 w-5 text-muted-foreground" />
+            </button>
+            <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-semibold uppercase tracking-wide" style={{ color: PURPLE }}>HOME</span>
+              <span>/</span>
+              <span className="uppercase tracking-wide font-medium text-foreground">
+                {location.replace(/^\/agency\/?/, "").replace(/-/g, " ").toUpperCase() || "DASHBOARD"}
+              </span>
+            </div>
           </div>
           <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors" data-testid="button-notifications">
             <Bell className="h-4 w-4 text-muted-foreground" />
           </button>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 bg-background">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 bg-background">{children}</main>
       </div>
     </div>
   );

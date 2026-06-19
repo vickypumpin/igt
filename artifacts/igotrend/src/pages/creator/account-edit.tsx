@@ -190,8 +190,8 @@ export default function CreatorAccountEditPage() {
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}><User className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Basic Information</div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Email address</label>
                 <Input value={form.email} onChange={field("email")} type="email" placeholder="you@email.com" className="h-10 rounded-xl" data-testid="input-email" />
               </div>
@@ -209,7 +209,7 @@ export default function CreatorAccountEditPage() {
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Content category</label>
                 <Input value={form.contentCategory} onChange={field("contentCategory")} placeholder="e.g. Lifestyle, Reviews" className="h-10 rounded-xl" data-testid="input-contentCategory" />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-1 sm:col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Bio</label>
                 <textarea value={form.bio} onChange={field("bio")} rows={3} className="w-full rounded-xl border border-input px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring" data-testid="input-bio" />
               </div>
@@ -222,7 +222,7 @@ export default function CreatorAccountEditPage() {
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #6B2FCE, #5B21B6)" }}><MapPin className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Location</div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country ID</label>
                 <Input type="number" value={form.countryId} onChange={field("countryId")} placeholder="Country ID" className="h-10 rounded-xl" data-testid="input-countryId" />
@@ -280,7 +280,7 @@ export default function CreatorAccountEditPage() {
               ].map(({ platform, fields }) => (
                 <div key={platform}>
                   <div className="text-xs font-bold text-muted-foreground mb-2">{platform}</div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {(fields as readonly (readonly [string, keyof FormState])[]).map(([label, key]) => (
                       <div key={key}>
                         <label className="text-xs text-muted-foreground mb-1 block">{label}</label>

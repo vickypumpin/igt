@@ -142,7 +142,7 @@ export default function CampaignNewPage() {
                   <FormField control={form.control} name="sponsor" render={({ field }) => (
                     <FormItem><FormLabel className={labelCls}>Sponsor / Brand</FormLabel><FormControl><Input {...field} className={inputCls} placeholder="Acme Corp" data-testid="input-sponsor" /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="type" render={({ field }) => (
                       <FormItem><FormLabel className={labelCls}>Campaign type</FormLabel><FormControl><select {...field} className={selectCls} data-testid="select-type"><option value="influencer">Influencer</option><option value="content_creator">Content Creator</option></select></FormControl><FormMessage /></FormItem>
                     )} />
@@ -150,7 +150,7 @@ export default function CampaignNewPage() {
                       <FormItem><FormLabel className={labelCls}>Duration type</FormLabel><FormControl><select {...field} className={selectCls} data-testid="select-duration"><option value="day">Daily</option><option value="weekly">Weekly</option></select></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="startDate" render={({ field }) => (
                       <FormItem><FormLabel className={labelCls}>Start date</FormLabel><FormControl><Input {...field} type="date" className={inputCls} data-testid="input-start-date" /></FormControl><FormMessage /></FormItem>
                     )} />
@@ -158,7 +158,7 @@ export default function CampaignNewPage() {
                       <FormItem><FormLabel className={labelCls}>End date</FormLabel><FormControl><Input {...field} type="date" className={inputCls} data-testid="input-end-date" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="noOfCreators" render={({ field }) => (
                       <FormItem><FormLabel className={labelCls}>Number of creators</FormLabel><FormControl><Input {...field} type="number" min={1} className={inputCls} onChange={e => field.onChange(parseInt(e.target.value, 10))} data-testid="input-creators-count" /></FormControl><FormMessage /></FormItem>
                     )} />
@@ -220,7 +220,7 @@ export default function CampaignNewPage() {
               {step === 1 && (
                 <div className="space-y-4">
                   <p className="text-sm text-muted-foreground mb-2">Set post counts per platform. Leave at 0 if not applicable.</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {[
                       { name: "dailyInstagramPost" as const, label: "IG Posts / day", color: "#E1306C" },
                       { name: "dailyInstagramStoryPost" as const, label: "IG Stories / day", color: "#E1306C" },
@@ -252,7 +252,7 @@ export default function CampaignNewPage() {
                   <FormField control={form.control} name="handlesHash" render={({ field }) => (
                     <FormItem><FormLabel className={labelCls}>Required handles & hashtags</FormLabel><FormControl><Input {...field} className={inputCls} placeholder="@brand #campaign" data-testid="input-handles" /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="dos" render={({ field }) => (
                       <FormItem><FormLabel className={`${labelCls} text-emerald-600`}>Do's ✓</FormLabel><FormControl><Textarea {...field} rows={4} className="rounded-xl border-emerald-200" data-testid="input-dos" /></FormControl><FormMessage /></FormItem>
                     )} />

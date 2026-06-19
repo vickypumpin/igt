@@ -175,7 +175,7 @@ export default function AdminSettingsPage() {
 
           {activeTab === "fees" && (
             <Section icon={DollarSign} title="Fees & Pricing">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Gem price ($)"><Input {...register("gemPrice", { valueAsNumber: true })} type="number" className="mt-1.5 h-10 rounded-xl" data-testid="input-gem-price" /></Field>
                 <Field label="Gem service fee (%)"><Input {...register("gemServiceFee", { valueAsNumber: true })} type="number" className="mt-1.5 h-10 rounded-xl" data-testid="input-gem-fee" /></Field>
                 <Field label="Creator fee (%)"><Input {...register("creatorServiceFee", { valueAsNumber: true })} type="number" className="mt-1.5 h-10 rounded-xl" data-testid="input-creator-fee" /></Field>
@@ -274,7 +274,7 @@ export default function AdminSettingsPage() {
               </Section>
 
               <Section icon={Mail} title="Email (SMTP)" desc="Optional — for transactional email notifications">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="SMTP host"><Input {...register("smtpHost")} className="mt-1.5 h-10 rounded-xl" placeholder="smtp.mailgun.org" /></Field>
                   <Field label="Port"><Input {...register("smtpPort", { valueAsNumber: true })} type="number" className="mt-1.5 h-10 rounded-xl" placeholder="587" /></Field>
                 </div>
