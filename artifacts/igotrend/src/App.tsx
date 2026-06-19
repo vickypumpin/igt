@@ -29,6 +29,7 @@ import CampaignDetailPage from "@/pages/brand/campaign-detail";
 import CreatorsPage from "@/pages/brand/creators";
 import CreatorProfilePage from "@/pages/brand/creator-profile";
 import BrandMessagesPage from "@/pages/brand/messages";
+import CreatorMessagesPage from "@/pages/creator/messages";
 import PaymentsPage from "@/pages/brand/payments";
 import BrandBillingPage from "@/pages/brand/billing";
 import BrandAccountEditPage from "@/pages/brand/account-edit";
@@ -229,7 +230,7 @@ function AppRouter() {
 
           <Route path="/submissions/new" component={SubmitPage} />
           <Route path="/earnings" component={EarningsPage} />
-          <Route path="/messages" component={BrandMessagesPage} />
+          <Route path="/messages" component={CreatorMessagesPage} />
           <Route path="/verify" component={CreatorVerifyPage} />
 
           <Route path="/billing" component={CreatorBillingPage} />
