@@ -105,12 +105,21 @@ export default function BrandAccountEditPage() {
               <AvatarUpload
                 currentUrl={form.avatarUrl}
                 initials={form.companyName[0] ?? "B"}
-                onUpload={(url) => setForm(f => ({ ...f, avatarUrl: url }))}
+                onUpload={(url) => {
+                  setForm(f => ({ ...f, avatarUrl: url }));
+                  updateMutation.mutate({ avatarUrl: url } as Parameters<typeof updateMutation.mutate>[0], {
+                    onSuccess: () => {
+                      queryClient.invalidateQueries({ queryKey: getAccountProfileQueryKey() });
+                      toast({ title: "Profile photo saved ✓" });
+                    },
+                    onError: () => toast({ title: "Failed to save photo", variant: "destructive" }),
+                  });
+                }}
                 size={80}
               />
               <div>
                 <p className="text-sm font-semibold">Brand Logo / Profile Photo</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Click the circle to upload a photo (JPEG, PNG, or WEBP · max 5 MB). The URL is saved when you click Save Changes.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Click the circle to upload a photo (JPEG, PNG, or WEBP · max 5 MB). Saves instantly on upload.</p>
               </div>
             </div>
           </div>
