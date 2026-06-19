@@ -137,7 +137,7 @@ function AppRouter() {
       {!user && <Route path="/" component={HomePage} />}
 
       {/* ── Admin routes ── */}
-      {user && (role as string) === "admin" && (
+      {user && role === "admin" && (
         <>
           <Route path="/" component={() => <Redirect to="/admin" />} />
           <Route path="/admin" component={AdminDashboardPage} />

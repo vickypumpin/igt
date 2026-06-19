@@ -479,6 +479,204 @@ export const useUpdateBankDetails = (
     ...options,
   });
 
+// ── Agency Dashboard ──────────────────────────────────────────────────────────
+
+export interface AgencyDashboardData {
+  agency: {
+    id: number;
+    name: string;
+    billingMode: string;
+    commissionRate: string;
+    subscriptionStatus: string;
+  };
+  clientCount: number;
+  pendingInvites: number;
+  activeCampaigns: number;
+  totalCampaigns: number;
+  monthlySpend: number;
+  totalCommissionOwed: number;
+}
+
+export const getAgencyDashboardQueryKey = () => ["/agency/dashboard"] as const;
+
+export const useAgencyDashboard = <TData = AgencyDashboardData>(options?: {
+  query?: UseQueryOptions<AgencyDashboardData, unknown, TData>;
+}) =>
+  useQuery<AgencyDashboardData, unknown, TData>({
+    queryKey: getAgencyDashboardQueryKey(),
+    queryFn: () => customFetch<AgencyDashboardData>("/api/agency/dashboard"),
+    ...options?.query,
+  });
+
+// ── Agency Campaigns ──────────────────────────────────────────────────────────
+
+export interface AgencyCampaign {
+  id: number;
+  name: string;
+  sponsor: string;
+  status: string;
+  type: string;
+  noOfCreators: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  coverImageUrl: string | null;
+  brandId: number | null;
+  createdAt: string;
+  submissionsCount: number;
+  client: {
+    brandUserId: number | null;
+    companyName: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  } | null;
+}
+
+export interface AgencyCampaignInvite {
+  id: number;
+  campaignId: number;
+  creatorId: number;
+  status: string;
+  createdAt: string;
+  creator: {
+    id: number;
+    firstName: string;
+    lastName: string;
+    userName: string;
+    badge: string | null;
+    avatarUrl: string | null;
+  };
+}
+
+export const getAgencyCampaignsQueryKey = () => ["/agency/campaigns"] as const;
+
+export const useAgencyCampaigns = <TData = AgencyCampaign[]>(options?: {
+  query?: UseQueryOptions<AgencyCampaign[], unknown, TData>;
+}) =>
+  useQuery<AgencyCampaign[], unknown, TData>({
+    queryKey: getAgencyCampaignsQueryKey(),
+    queryFn: () => customFetch<AgencyCampaign[]>("/api/agency/campaigns"),
+    ...options?.query,
+  });
+
+export const getAgencyCampaignInvitesQueryKey = (campaignId: number) =>
+  [`/agency/campaigns/${campaignId}/invites`] as const;
+
+export const useAgencyCampaignInvites = (campaignId: number, options?: {
+  query?: UseQueryOptions<AgencyCampaignInvite[], unknown>;
+}) =>
+  useQuery<AgencyCampaignInvite[], unknown>({
+    queryKey: getAgencyCampaignInvitesQueryKey(campaignId),
+    queryFn: () => customFetch<AgencyCampaignInvite[]>(`/api/agency/campaigns/${campaignId}/invites`),
+    ...options?.query,
+  });
+
+// ── Agency Clients ─────────────────────────────────────────────────────────────
+
+export interface AgencyClient {
+  id: number;
+  agencyId: number;
+  brandUserId: number;
+  inviteStatus: string;
+  invitedAt: string;
+  joinedAt: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  companyName: string | null;
+  isActive: boolean | null;
+  billingMode: string | null;
+  commissionRate: number | null;
+  activeCampaigns: number;
+  totalCampaigns: number;
+  totalSpend: number;
+}
+
+export const getAgencyClientsQueryKey = () => ["/agency/clients"] as const;
+
+export const useAgencyClients = <TData = AgencyClient[]>(options?: {
+  query?: UseQueryOptions<AgencyClient[], unknown, TData>;
+}) =>
+  useQuery<AgencyClient[], unknown, TData>({
+    queryKey: getAgencyClientsQueryKey(),
+    queryFn: () => customFetch<AgencyClient[]>("/api/agency/clients"),
+    ...options?.query,
+  });
+
+export const useAgencyInviteClient = (
+  options?: UseMutationOptions<{ message: string }, unknown, { email: string }>
+) =>
+  useMutation<{ message: string }, unknown, { email: string }>({
+    mutationFn: (data) =>
+      customFetch<{ message: string }>("/api/agency/clients/invite", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
+export const useAgencyCreateClient = (
+  options?: UseMutationOptions<
+    { message: string },
+    unknown,
+    { firstName: string; lastName: string; email: string; password: string; companyName?: string }
+  >
+) =>
+  useMutation<
+    { message: string },
+    unknown,
+    { firstName: string; lastName: string; email: string; password: string; companyName?: string }
+  >({
+    mutationFn: (data) =>
+      customFetch<{ message: string }>("/api/agency/clients/create", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
+export const useAgencyRemoveClient = (
+  options?: UseMutationOptions<{ message: string }, unknown, { id: number }>
+) =>
+  useMutation<{ message: string }, unknown, { id: number }>({
+    mutationFn: ({ id }) =>
+      customFetch<{ message: string }>(`/api/agency/clients/${id}`, { method: "DELETE" }),
+    ...options,
+  });
+
+// ── Agency Pending Invites (brand-side) ───────────────────────────────────────
+
+export interface AgencyPendingInvite {
+  id: number;
+  agencyId: number;
+  agencyName: string;
+  commissionRate: number | null;
+  invitedAt: string;
+}
+
+export const getAgencyPendingInvitesQueryKey = () => ["/agency/invites/pending"] as const;
+
+export const useAgencyPendingInvites = <TData = AgencyPendingInvite[]>(options?: {
+  query?: UseQueryOptions<AgencyPendingInvite[], unknown, TData>;
+}) =>
+  useQuery<AgencyPendingInvite[], unknown, TData>({
+    queryKey: getAgencyPendingInvitesQueryKey(),
+    queryFn: () => customFetch<AgencyPendingInvite[]>("/api/agency/invites/pending"),
+    ...options?.query,
+  });
+
+export const useRespondToAgencyInvite = (
+  options?: UseMutationOptions<{ message: string }, unknown, { id: number; accept: boolean }>
+) =>
+  useMutation<{ message: string }, unknown, { id: number; accept: boolean }>({
+    mutationFn: ({ id, accept }) =>
+      customFetch<{ message: string }>(`/api/agency/clients/${id}/respond`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: accept ? "accept" : "decline" }),
+      }),
+    ...options,
+  });
+
 // ── Admin Approve & Disburse Payout ───────────────────────────────────────────
 
 export interface PayoutWithGateway {

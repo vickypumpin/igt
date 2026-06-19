@@ -58,6 +58,7 @@ export const UserRole = {
   brand: 'brand',
   creator: 'creator',
   agency: 'agency',
+  admin: 'admin',
 } as const;
 
 /**
