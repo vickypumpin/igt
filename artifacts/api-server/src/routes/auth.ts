@@ -98,7 +98,13 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
     accountName: bankAccount.accountName,
     maskedAccountNumber: `****${bankAccount.accountNumber.slice(-4)}`,
   } : null;
-  res.json({ ...formatUser(user as unknown as Record<string, unknown>), bankDetails });
+  let agencyName: string | null = null;
+  if (user.agencyId) {
+    const [agency] = await db.select({ name: agenciesTable.name })
+      .from(agenciesTable).where(eq(agenciesTable.id, user.agencyId));
+    agencyName = agency?.name ?? null;
+  }
+  res.json({ ...formatUser(user as unknown as Record<string, unknown>), bankDetails, agencyName });
 });
 
 router.patch("/auth/me/profile", requireAuth, async (req, res): Promise<void> => {

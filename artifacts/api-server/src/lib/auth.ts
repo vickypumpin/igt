@@ -95,6 +95,7 @@ export function formatUser(u: Record<string, unknown>) {
     balance: parseFloat(String(u.balance ?? "0")),
     bio: u.bio ?? null,
     avatarUrl: u.avatarUrl ?? null,
+    agencyId: u.agencyId ?? null,
     createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
     verified: u.verified ?? false,
   };

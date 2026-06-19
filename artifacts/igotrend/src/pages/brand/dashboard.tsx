@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useGetBrandDashboard, getGetBrandDashboardQueryKey } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { useGetBrandDashboard, getGetBrandDashboardQueryKey, customFetch } from "@workspace/api-client-react";
 import { useGetMe } from "@workspace/api-client-react";
 import BrandLayout from "@/components/layout/brand-layout";
 import { Link } from "wouter";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Megaphone, CheckCircle, XCircle, Inbox, DollarSign, Star,
-  Eye, BookOpen, Gift, ChevronDown, Plus,
+  Eye, BookOpen, Gift, Plus, Building2, Bell, X,
 } from "lucide-react";
 
 const AVATAR_GRADIENTS = [
@@ -77,17 +78,65 @@ const CREATE_CARDS = [
   },
 ];
 
+interface PendingInvite {
+  id: number;
+  agencyId: number;
+  agencyName: string | null;
+  commissionRate: number | null;
+  invitedAt: string;
+}
+
 export default function BrandDashboardPage() {
   const { data, isLoading } = useGetBrandDashboard({ query: { queryKey: getGetBrandDashboardQueryKey() } });
   const { data: user } = useGetMe();
   const [campaignFilter, setCampaignFilter] = useState("all");
   const [showEntries, setShowEntries] = useState(10);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const { data: pendingInvites = [] } = useQuery<PendingInvite[]>({
+    queryKey: ["/agency/invites/pending"],
+    queryFn: () => customFetch("/api/agency/invites/pending"),
+    enabled: !!(user && (user as unknown as { role?: string }).role === "brand"),
+  });
 
   const totalSpendStr = `₦${(data?.totalSpend ?? 0).toLocaleString()}`;
+  const hasPendingInvites = pendingInvites.length > 0 && !bannerDismissed;
+  const managedByAgency = (user as unknown as { agencyId?: number | null; agencyName?: string | null })?.agencyId
+    ? (user as unknown as { agencyName?: string | null })?.agencyName
+    : null;
 
   return (
     <BrandLayout>
       <div data-testid="page-brand-dashboard">
+        {/* Pending Agency Invite Banner */}
+        {hasPendingInvites && (
+          <div
+            className="mb-5 flex items-center gap-3 rounded-2xl px-5 py-3.5"
+            style={{ background: "linear-gradient(135deg, rgba(107,47,206,0.1), rgba(107,47,206,0.06))", border: "1px solid rgba(107,47,206,0.25)" }}
+            data-testid="agency-invite-banner"
+          >
+            <Bell className="h-4 w-4 flex-shrink-0" style={{ color: "#6B2FCE" }} />
+            <div className="flex-1 text-sm" style={{ color: "#6B2FCE" }}>
+              <span className="font-bold">
+                {pendingInvites.length === 1
+                  ? `${pendingInvites[0].agencyName ?? "An agency"} has invited you to become a managed client.`
+                  : `You have ${pendingInvites.length} pending agency invites.`}
+              </span>
+              {" "}
+              <Link href="/settings">
+                <span className="underline cursor-pointer font-semibold">Review in Settings →</span>
+              </Link>
+            </div>
+            <button
+              onClick={() => setBannerDismissed(true)}
+              className="flex-shrink-0 p-1 rounded-lg hover:bg-purple-100 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" style={{ color: "#6B2FCE" }} />
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-7">
           <div>
@@ -96,7 +145,17 @@ export default function BrandDashboardPage() {
               Welcome back, <span className="font-semibold text-foreground">{user?.companyName ?? user?.firstName}</span>
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {managedByAgency && (
+              <div
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold"
+                style={{ background: "rgba(107,47,206,0.12)", color: "#6B2FCE", border: "1px solid rgba(107,47,206,0.25)" }}
+                data-testid="managed-by-chip"
+              >
+                <Building2 className="h-3 w-3" />
+                Managed by {managedByAgency}
+              </div>
+            )}
             <div className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{ background: "rgba(29,207,179,0.12)", color: "#1DCFB3", border: "1px solid rgba(29,207,179,0.25)" }}>
               <DollarSign className="h-3 w-3 inline mr-1" />
               Expenditure: {totalSpendStr}

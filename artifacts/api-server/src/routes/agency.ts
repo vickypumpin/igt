@@ -28,6 +28,32 @@ router.put("/agency/me", requireAuth, requireRole("agency"), async (req, res): P
   res.json(updated);
 });
 
+router.get("/agency/invites/pending", requireAuth, requireRole("brand"), async (req, res): Promise<void> => {
+  const invites = await db
+    .select({
+      id: agencyClientsTable.id,
+      agencyId: agencyClientsTable.agencyId,
+      inviteStatus: agencyClientsTable.inviteStatus,
+      invitedAt: agencyClientsTable.invitedAt,
+      agencyName: agenciesTable.name,
+      agencyLogoUrl: agenciesTable.logoUrl,
+      agencyContactName: agenciesTable.contactName,
+      agencyContactEmail: agenciesTable.contactEmail,
+      commissionRate: agenciesTable.commissionRate,
+    })
+    .from(agencyClientsTable)
+    .leftJoin(agenciesTable, eq(agencyClientsTable.agencyId, agenciesTable.id))
+    .where(and(
+      eq(agencyClientsTable.brandUserId, req.userId!),
+      eq(agencyClientsTable.inviteStatus, "pending"),
+    ));
+  res.json(invites.map(inv => ({
+    ...inv,
+    commissionRate: inv.commissionRate != null ? parseFloat(String(inv.commissionRate)) : null,
+    invitedAt: inv.invitedAt instanceof Date ? inv.invitedAt.toISOString() : String(inv.invitedAt),
+  })));
+});
+
 router.get("/agency/clients", requireAuth, requireRole("agency"), async (req, res): Promise<void> => {
   const [agency] = await db.select().from(agenciesTable).where(eq(agenciesTable.userId, req.userId!));
   if (!agency) { res.status(404).json({ error: "Agency not found" }); return; }
