@@ -171,6 +171,7 @@ export default function AdminPayoutsPage() {
                       <tr>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Creator</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Amount</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Bank Details</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Gateway</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Requested</th>
@@ -178,7 +179,9 @@ export default function AdminPayoutsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
-                      {data.map((p, idx) => (
+                      {data.map((p, idx) => {
+                        const bank = (p as { bankDetails?: { bankName: string; accountName: string; accountNumber: string } | null }).bankDetails;
+                        return (
                         <tr key={p.id} className="hover:bg-muted/30 transition-colors" data-testid={`payout-row-${p.id}`}>
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
@@ -192,6 +195,17 @@ export default function AdminPayoutsPage() {
                             </div>
                           </td>
                           <td className="px-5 py-3.5 text-lg font-extrabold">₦{p.amount.toLocaleString()}</td>
+                          <td className="px-5 py-3.5">
+                            {bank ? (
+                              <div>
+                                <div className="text-xs font-semibold text-foreground">{bank.bankName}</div>
+                                <div className="text-xs text-muted-foreground font-mono">{bank.accountNumber}</div>
+                                <div className="text-xs text-muted-foreground">{bank.accountName}</div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-amber-600 font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(245,158,11,0.10)" }}>No bank on file</span>
+                            )}
+                          </td>
                           <td className="px-5 py-3.5">
                             <PayoutStatusBadge status={p.status ?? "pending"} />
                           </td>
@@ -220,7 +234,8 @@ export default function AdminPayoutsPage() {
                             )}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

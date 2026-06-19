@@ -2,7 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { eq, and, gt } from "drizzle-orm";
-import { db, usersTable, agenciesTable, settingsTable, passwordResetTokensTable } from "@workspace/db";
+import { db, usersTable, agenciesTable, settingsTable, passwordResetTokensTable, bankAccountsTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
 import { sendEmail, tplWelcome, tplPasswordReset } from "../lib/notify";
 import type { IRouter } from "express";
@@ -90,7 +90,15 @@ router.post("/auth/logout", (_req, res): void => {
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
   if (!user) { res.status(404).json({ error: "User not found" }); return; }
-  res.json(formatUser(user as unknown as Record<string, unknown>));
+  const [bankAccount] = await db.select().from(bankAccountsTable)
+    .where(and(eq(bankAccountsTable.userId, req.userId!), eq(bankAccountsTable.isDefault, true)))
+    .limit(1);
+  const bankDetails = bankAccount ? {
+    bankName: bankAccount.bankName,
+    accountName: bankAccount.accountName,
+    maskedAccountNumber: `****${bankAccount.accountNumber.slice(-4)}`,
+  } : null;
+  res.json({ ...formatUser(user as unknown as Record<string, unknown>), bankDetails });
 });
 
 router.patch("/auth/me/profile", requireAuth, async (req, res): Promise<void> => {
@@ -210,6 +218,33 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
   ]);
 
   res.json({ message: "Password has been reset. You can now log in." });
+});
+
+router.patch("/auth/me/bank-details", requireAuth, async (req, res): Promise<void> => {
+  if (req.userRole !== "creator") { res.status(403).json({ error: "Only creators can set bank details" }); return; }
+  const { bankName, accountNumber, accountName } = req.body;
+  if (!bankName || !accountNumber || !accountName) {
+    res.status(400).json({ error: "bankName, accountNumber, and accountName are required" });
+    return;
+  }
+  if (!/^\d{10}$/.test(accountNumber)) {
+    res.status(400).json({ error: "Account number must be exactly 10 digits" });
+    return;
+  }
+  const [existing] = await db.select({ id: bankAccountsTable.id })
+    .from(bankAccountsTable)
+    .where(and(eq(bankAccountsTable.userId, req.userId!), eq(bankAccountsTable.isDefault, true)))
+    .limit(1);
+  if (existing) {
+    await db.update(bankAccountsTable)
+      .set({ bankName, accountNumber, accountName })
+      .where(eq(bankAccountsTable.id, existing.id));
+  } else {
+    await db.insert(bankAccountsTable).values({
+      userId: req.userId!, bankName, accountNumber, accountName, isDefault: true,
+    });
+  }
+  res.json({ message: "Bank details saved" });
 });
 
 router.patch("/auth/me/pricing", requireAuth, async (req, res): Promise<void> => {

@@ -454,6 +454,20 @@ export const useBrandRejectApplication = (
     ...options,
   });
 
+// ── Update Bank Details (creator) ─────────────────────────────────────────────
+
+export const useUpdateBankDetails = (
+  options?: UseMutationOptions<{ message: string }, unknown, { bankName: string; accountNumber: string; accountName: string }>
+) =>
+  useMutation<{ message: string }, unknown, { bankName: string; accountNumber: string; accountName: string }>({
+    mutationFn: (data) =>
+      customFetch<{ message: string }>("/api/auth/me/bank-details", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
 // ── Admin Approve & Disburse Payout ───────────────────────────────────────────
 
 export interface PayoutWithGateway {
@@ -467,6 +481,11 @@ export interface PayoutWithGateway {
   creator?: {
     id: number; firstName: string; lastName: string; userName: string;
     badge: string | null; avatarUrl: string | null;
+  } | null;
+  bankDetails?: {
+    bankName: string;
+    accountName: string;
+    accountNumber: string;
   } | null;
 }
 

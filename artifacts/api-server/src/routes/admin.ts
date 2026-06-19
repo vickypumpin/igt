@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, and, ilike, sql, desc } from "drizzle-orm";
+import { eq, and, ilike, sql, desc, inArray } from "drizzle-orm";
 import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { initiateDisbursement } from "../lib/gateway";
@@ -257,20 +257,36 @@ router.get("/admin/payouts", requireAuth, requireRole("admin"), async (req, res)
   }).from(payoutsTable)
     .leftJoin(usersTable, eq(payoutsTable.creatorId, usersTable.id))
     .orderBy(payoutsTable.createdAt);
-  res.json(payouts.map(p => ({
-    id: p.id, creatorId: p.creatorId, amount: parseFloat(String(p.amount)),
-    status: p.status, gateway: p.gateway ?? null, transferRef: p.transferRef ?? null,
-    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
-    creator: {
-      id: p.creatorId, firstName: p.creatorFirstName ?? "", lastName: p.creatorLastName ?? "",
-      userName: p.creatorUserName ?? "", badge: p.creatorBadge ?? null, avatarUrl: null, bio: null,
-      contentCategoryNames: null, creatorCategoryNames: null, instagramProfile: null, facebookProfile: null,
-      twitterProfile: null, youtubeProfile: null, tiktokProfile: null, snapchatProfile: null,
-      country: null, totalReach: 0, totalEngagement: 0, avgRating: null, campaignsCompleted: 0,
-      instagramDayPostPrice: null, instagramWeekPostPrice: null, tiktokDayPostPrice: null, tiktokWeekPostPrice: null,
-      youtubeDayPostPrice: null, youtubeWeekPostPrice: null, gems: 0,
-    },
-  })));
+
+  const creatorIds = [...new Set(payouts.map(p => p.creatorId))];
+  const bankAccounts = creatorIds.length
+    ? await db.select().from(bankAccountsTable)
+        .where(and(eq(bankAccountsTable.isDefault, true), inArray(bankAccountsTable.userId, creatorIds)))
+    : [];
+  const bankByCreator = Object.fromEntries(bankAccounts.map(b => [b.userId, b]));
+
+  res.json(payouts.map(p => {
+    const bank = bankByCreator[p.creatorId];
+    return {
+      id: p.id, creatorId: p.creatorId, amount: parseFloat(String(p.amount)),
+      status: p.status, gateway: p.gateway ?? null, transferRef: p.transferRef ?? null,
+      createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt),
+      creator: {
+        id: p.creatorId, firstName: p.creatorFirstName ?? "", lastName: p.creatorLastName ?? "",
+        userName: p.creatorUserName ?? "", badge: p.creatorBadge ?? null, avatarUrl: null, bio: null,
+        contentCategoryNames: null, creatorCategoryNames: null, instagramProfile: null, facebookProfile: null,
+        twitterProfile: null, youtubeProfile: null, tiktokProfile: null, snapchatProfile: null,
+        country: null, totalReach: 0, totalEngagement: 0, avgRating: null, campaignsCompleted: 0,
+        instagramDayPostPrice: null, instagramWeekPostPrice: null, tiktokDayPostPrice: null, tiktokWeekPostPrice: null,
+        youtubeDayPostPrice: null, youtubeWeekPostPrice: null, gems: 0,
+      },
+      bankDetails: bank ? {
+        bankName: bank.bankName,
+        accountName: bank.accountName,
+        accountNumber: bank.accountNumber,
+      } : null,
+    };
+  }));
 });
 
 router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {

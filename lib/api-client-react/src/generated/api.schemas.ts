@@ -124,6 +124,12 @@ export interface User {
   avatarUrl?: string | null;
   createdAt?: string;
   verified?: boolean;
+  /** @nullable */
+  bankDetails?: {
+    bankName: string;
+    accountName: string;
+    maskedAccountNumber: string;
+  } | null;
 }
 
 export interface AuthResponse {

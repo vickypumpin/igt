@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Gem, DollarSign, ArrowDownToLine, TrendingUp } from "lucide-react";
+import { Gem, DollarSign, ArrowDownToLine, TrendingUp, Landmark, AlertCircle } from "lucide-react";
+import { Link } from "wouter";
 
 type EligibleCampaign = { campaignId: number; campaignName: string; sponsor: string | null };
 
@@ -22,6 +23,8 @@ export default function EarningsPage() {
   });
   const [amount, setAmount] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+
+  const hasBankDetails = Boolean(me?.bankDetails);
 
   const payoutMutation = useMutation({
     mutationFn: (data: { amount: number; campaignId: number }) =>
@@ -39,6 +42,7 @@ export default function EarningsPage() {
   });
 
   const handlePayout = () => {
+    if (!hasBankDetails) return;
     if (!amount || parseFloat(amount) <= 0) return;
     if (!selectedCampaignId) { toast({ title: "Please select a campaign", variant: "destructive" }); return; }
     payoutMutation.mutate({ amount: parseFloat(amount), campaignId: Number(selectedCampaignId) });
@@ -73,6 +77,34 @@ export default function EarningsPage() {
           ))}
         </div>
 
+        {/* No bank details warning */}
+        {me && !hasBankDetails && (
+          <div className="mb-6 flex items-start gap-3 p-4 rounded-2xl border border-amber-200 bg-amber-50" data-testid="no-bank-warning">
+            <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800">Bank account required for payouts</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Add your Nigerian bank account details before requesting a payout.{" "}
+                <Link href="/settings" className="underline font-semibold">Go to Settings →</Link>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Bank account summary (if on file) */}
+        {me?.bankDetails && (
+          <div className="mb-6 flex items-center gap-3 p-4 rounded-2xl border border-emerald-200 bg-emerald-50" data-testid="bank-details-summary">
+            <Landmark className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-emerald-800">{me.bankDetails.bankName}</p>
+              <p className="text-xs text-emerald-700">{me.bankDetails.accountName} &mdash; {me.bankDetails.maskedAccountNumber}</p>
+            </div>
+            <Link href="/settings">
+              <span className="text-xs text-emerald-700 underline font-semibold cursor-pointer">Edit</span>
+            </Link>
+          </div>
+        )}
+
         {/* Payout request */}
         <Card className="mb-6 border-0 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-border/60">
@@ -85,7 +117,8 @@ export default function EarningsPage() {
               <select
                 value={selectedCampaignId}
                 onChange={e => setSelectedCampaignId(e.target.value)}
-                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                disabled={!hasBankDetails}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="select-payout-campaign"
               >
                 <option value="">Select a campaign with approved submission…</option>
@@ -99,19 +132,36 @@ export default function EarningsPage() {
             <div className="flex gap-3 items-end">
               <div className="flex-1 max-w-xs">
                 <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Amount (USD)</label>
-                <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} className="h-10 rounded-xl" data-testid="input-payout-amount" />
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  disabled={!hasBankDetails}
+                  className="h-10 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-testid="input-payout-amount"
+                />
               </div>
-              <Button
-                onClick={handlePayout}
-                disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10 || !selectedCampaignId}
-                className="h-10 px-5 rounded-xl font-semibold gap-2"
-                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
-                data-testid="button-request-payout"
-              >
-                <ArrowDownToLine className="h-4 w-4" />
-                {payoutMutation.isPending ? "Requesting…" : "Request Payout"}
-              </Button>
+              <div title={!hasBankDetails ? "Add your bank account first" : undefined}>
+                <Button
+                  onClick={handlePayout}
+                  disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10 || !selectedCampaignId || !hasBankDetails}
+                  className="h-10 px-5 rounded-xl font-semibold gap-2 disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+                  data-testid="button-request-payout"
+                >
+                  <ArrowDownToLine className="h-4 w-4" />
+                  {payoutMutation.isPending ? "Requesting…" : "Request Payout"}
+                </Button>
+              </div>
             </div>
+            {!hasBankDetails && me && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                <Link href="/settings" className="text-amber-600 underline font-semibold">Add your bank account</Link>
+                <span>to enable payouts</span>
+              </p>
+            )}
           </CardContent>
         </Card>
 
