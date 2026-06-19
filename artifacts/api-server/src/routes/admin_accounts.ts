@@ -11,7 +11,7 @@ const userShape = (u: typeof usersTable.$inferSelect) => ({
   id: u.id, firstName: u.firstName, lastName: u.lastName, userName: u.userName,
   email: u.email, phone: u.phone ?? null, role: u.role, gender: u.gender ?? null,
   badge: u.badge ?? null, isActive: u.isActive, isLocked: u.isLocked,
-  gems: u.gems, balance: u.balance, avatarUrl: u.avatarUrl ?? null,
+  gems: u.gems, reservedBalance: u.reservedBalance ?? 0, balance: u.balance, avatarUrl: u.avatarUrl ?? null,
   companyName: u.companyName ?? null, bio: u.bio ?? null,
   agencyId: u.agencyId ?? null,
   billingMode: u.billingMode ?? null,

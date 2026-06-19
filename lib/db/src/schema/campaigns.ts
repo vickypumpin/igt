@@ -33,6 +33,7 @@ export const campaignsTable = pgTable("campaigns", {
   dos: text("dos"),
   donts: text("donts"),
   coverImageUrl: text("cover_image_url"),
+  isFunded: boolean("is_funded").notNull().default(false),
   // Daily deliverables
   dailyInstagramPost: integer("daily_instagram_post").notNull().default(0),
   dailyInstagramStoryPost: integer("daily_instagram_story_post").notNull().default(0),

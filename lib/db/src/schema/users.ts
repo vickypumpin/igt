@@ -76,6 +76,8 @@ export const usersTable = pgTable("users", {
   commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }).default("5.00"),
   subscriptionStatus: text("subscription_status").default("active"),
   billingNotes: text("billing_notes"),
+  // Campaign gem reserve (gems committed to active campaigns, not yet available)
+  reservedBalance: integer("reserved_balance").notNull().default(0),
   // Identity verification
   verified: boolean("verified").notNull().default(false),
   // Brand website

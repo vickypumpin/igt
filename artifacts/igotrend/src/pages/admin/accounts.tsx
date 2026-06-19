@@ -7,13 +7,13 @@ import AdminLayout from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Search, ShieldBan, ShieldCheck, Trash2, Pencil } from "lucide-react";
+import { Users, Search, ShieldBan, ShieldCheck, Trash2, Pencil, Gem } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface User {
   id: number; firstName: string; lastName: string; userName: string; email: string;
   phone: string | null; role: "brand" | "creator" | "admin" | "agency"; badge: string | null;
-  isActive: boolean; isLocked: boolean; gems: number; avatarUrl: string | null;
+  isActive: boolean; isLocked: boolean; gems: number; reservedBalance: number; avatarUrl: string | null;
   companyName: string | null; createdAt: string;
   agencyId: number | null;
   billingMode: string | null;
@@ -165,6 +165,7 @@ export default function AdminAccountsPage() {
                   <tr>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">User</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Role</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Gems / Reserved</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Billing Mode</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Status</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground">Joined</th>
@@ -191,6 +192,26 @@ export default function AdminAccountsPage() {
                         </td>
                         <td className="px-5 py-3.5">
                           <span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: roleStyle.bg, color: roleStyle.color }}>{u.role}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          {u.role === "brand" ? (
+                            <div className="space-y-0.5" data-testid={`gems-balance-${u.id}`}>
+                              <div className="flex items-center gap-1 text-xs">
+                                <Gem className="h-3 w-3 text-amber-500" />
+                                <span className="font-semibold">{(u.gems ?? 0).toLocaleString()}</span>
+                                <span className="text-muted-foreground">available</span>
+                              </div>
+                              {(u.reservedBalance ?? 0) > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span className="w-3 h-3" />
+                                  <span className="font-medium" style={{ color: "#6B2FCE" }}>{(u.reservedBalance ?? 0).toLocaleString()}</span>
+                                  <span>reserved</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </td>
                         <td className="px-5 py-3.5">
                           <button onClick={() => openBilling(u)} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors group" title="Edit billing">

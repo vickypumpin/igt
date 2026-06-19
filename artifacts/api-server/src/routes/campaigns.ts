@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, campaignsTable, usersTable, campaignInvitesTable, submissionsTable, settingsTable } from "@workspace/db";
+import { db, campaignsTable, usersTable, campaignInvitesTable, submissionsTable, settingsTable, gemsTransactionsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { sendEmail, sendSms, tplCampaignInvite, tplCampaignApproved, tplCampaignRejected, tplApplicationDecision, tplNewApplication } from "../lib/notify";
 import type { IRouter } from "express";
@@ -19,12 +19,44 @@ function formatCampaign(c: Record<string, unknown>) {
     startDate: c.startDate,
     endDate: c.endDate,
     noOfCreators: c.noOfCreators,
+    gemsPerCreator: c.gemsPerCreator ?? 0,
+    isFunded: c.isFunded ?? false,
     estimatedBudget: null,
     coverImageUrl: c.coverImageUrl ?? null,
     invitesCount: Number(c.invitesCount ?? 0),
     submissionsCount: Number(c.submissionsCount ?? 0),
     createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
   };
+}
+
+async function releaseReserve(campaignId: number): Promise<void> {
+  const [camp] = await db.select({
+    brandId: campaignsTable.brandId,
+    isFunded: campaignsTable.isFunded,
+    noOfCreators: campaignsTable.noOfCreators,
+    gemsPerCreator: campaignsTable.gemsPerCreator,
+    name: campaignsTable.name,
+  }).from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+
+  if (!camp?.isFunded) return;
+  const budget = (camp.noOfCreators ?? 1) * (camp.gemsPerCreator ?? 0);
+  if (budget <= 0) return;
+
+  await db.transaction(async (tx) => {
+    await tx.update(usersTable).set({
+      gems: sql`gems + ${budget}`,
+      reservedBalance: sql`GREATEST(reserved_balance - ${budget}, 0)`,
+    }).where(eq(usersTable.id, camp.brandId));
+
+    await tx.update(campaignsTable).set({ isFunded: false }).where(eq(campaignsTable.id, campaignId));
+
+    await tx.insert(gemsTransactionsTable).values({
+      userId: camp.brandId,
+      type: "campaign_refund",
+      gemsDelta: budget,
+      description: `Campaign Refund: ${camp.name ?? "Campaign"}`,
+    });
+  });
 }
 
 router.get("/campaigns", requireAuth, requireRole("brand", "admin"), async (req, res): Promise<void> => {
@@ -54,6 +86,7 @@ router.post("/campaigns", requireAuth, requireRole("brand"), async (req, res): P
     campaignDuration: (campaignDuration ?? "day") as "day" | "weekly",
     startDate, endDate,
     noOfCreators: noOfCreators ?? 1,
+    gemsPerCreator: Math.max(0, parseInt(req.body.gemsPerCreator ?? "0", 10) || 0),
     mood: req.body.mood ?? null, ageRange: req.body.ageRange ?? null,
     campaignCategoryId: req.body.campaignCategoryId ?? null, creatorCategoryId: req.body.creatorCategoryId ?? null,
     noOfDay: req.body.noOfDay ?? null, noOfWeek: req.body.noOfWeek ?? null,
@@ -140,16 +173,95 @@ router.patch("/campaigns/:id", requireAuth, requireRole("brand", "admin"), async
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const newStatus = req.body.status as string | undefined;
+  const budgetFieldsChanging = req.body.gemsPerCreator != null || req.body.noOfCreators != null;
+
+  // Always load campaign state when we need it for funding/immutability checks
+  const needsExistingLoad = (newStatus === "active" && req.userRole === "brand") ||
+    (newStatus === "completed" || newStatus === "declined") ||
+    budgetFieldsChanging;
+
+  let existing: { brandId: number; noOfCreators: number | null; gemsPerCreator: number | null; isFunded: boolean | null; name: string | null } | null = null;
+  if (needsExistingLoad) {
+    const [row] = await db.select({
+      brandId: campaignsTable.brandId,
+      noOfCreators: campaignsTable.noOfCreators,
+      gemsPerCreator: campaignsTable.gemsPerCreator,
+      isFunded: campaignsTable.isFunded,
+      name: campaignsTable.name,
+    }).from(campaignsTable).where(eq(campaignsTable.id, id)).limit(1);
+    existing = row ?? null;
+    if (!existing) { res.status(404).json({ error: "Campaign not found" }); return; }
+  }
+
+  // GUARD 1 (runs BEFORE any money moves): budget immutability on funded campaigns
+  if (budgetFieldsChanging && existing?.isFunded) {
+    res.status(409).json({
+      error: "Cannot change budget on a funded campaign. Cancel the campaign first to release the reserve.",
+      code: "BUDGET_IMMUTABLE_WHILE_FUNDED",
+    });
+    return;
+  }
+
+  // GUARD 2: Funding gate — reserve gems when brand publishes (status → active)
+  if (newStatus === "active" && req.userRole === "brand" && existing) {
+    if (existing.brandId !== req.userId) { res.status(403).json({ error: "Not your campaign" }); return; }
+
+    if (!existing.isFunded) {
+      const budget = (existing.noOfCreators ?? 1) * (existing.gemsPerCreator ?? 0);
+
+      if (budget > 0) {
+        const [brand] = await db.select({ gems: usersTable.gems }).from(usersTable).where(eq(usersTable.id, existing.brandId)).limit(1);
+        const available = brand?.gems ?? 0;
+
+        if (available < budget) {
+          const shortfall = budget - available;
+          res.status(402).json({
+            error: "Insufficient gems to publish campaign",
+            code: "INSUFFICIENT_GEMS",
+            required: budget,
+            available,
+            shortfall,
+            redirectTo: `/billing?shortfall=${shortfall}`,
+          });
+          return;
+        }
+
+        // Reserve the gems atomically
+        await db.transaction(async (tx) => {
+          await tx.update(usersTable).set({
+            gems: sql`gems - ${budget}`,
+            reservedBalance: sql`reserved_balance + ${budget}`,
+          }).where(eq(usersTable.id, existing!.brandId));
+
+          await tx.insert(gemsTransactionsTable).values({
+            userId: existing!.brandId,
+            type: "campaign_reserve",
+            gemsDelta: -budget,
+            description: `Campaign Reserve: ${existing!.name ?? "Campaign"}`,
+          });
+
+          await tx.update(campaignsTable).set({ isFunded: true }).where(eq(campaignsTable.id, id));
+        });
+      }
+    }
+  }
+
+  // GUARD 3: Refund reserve on cancel/complete — fail closed to protect financial integrity
+  if ((newStatus === "completed" || newStatus === "declined") && req.userRole !== "brand") {
+    await releaseReserve(id);
+  }
+
   const updates: Record<string, unknown> = {};
-  const allowed = ["name","sponsor","description","kpis","endDate","postCaptionText","handlesHash","dos","donts"];
+  const allowed = ["name","sponsor","description","kpis","endDate","postCaptionText","handlesHash","dos","donts","gemsPerCreator","noOfCreators"];
   for (const f of allowed) { if (req.body[f] != null) updates[f] = req.body[f]; }
-  if (req.body.status) updates.status = req.body.status;
+  if (newStatus) updates.status = newStatus;
   updates.updatedAt = new Date();
   const [campaign] = await db.update(campaignsTable).set(updates).where(eq(campaignsTable.id, id)).returning();
   if (!campaign) { res.status(404).json({ error: "Campaign not found" }); return; }
 
   // Notify brand of status change (approved / rejected) — admin route uses this too
-  const newStatus = req.body.status as string | undefined;
   if (newStatus === "active" || newStatus === "declined") {
     Promise.all([
       db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
@@ -186,7 +298,21 @@ router.delete("/campaigns/:id", requireAuth, requireRole("brand"), async (req, r
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-  await db.delete(campaignsTable).where(and(eq(campaignsTable.id, id), eq(campaignsTable.brandId, req.userId!)));
+
+  // Verify ownership FIRST before any state mutation
+  const [existing] = await db.select({ brandId: campaignsTable.brandId })
+    .from(campaignsTable).where(eq(campaignsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Campaign not found" }); return; }
+  if (existing.brandId !== req.userId) { res.status(403).json({ error: "Not your campaign" }); return; }
+
+  // Now safe to release reserved gems and delete — fail closed if release fails
+  try {
+    await releaseReserve(id);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to release campaign reserve. Please try again." });
+    return;
+  }
+  await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
   res.json({ message: "Deleted" });
 });
 

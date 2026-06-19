@@ -5,7 +5,7 @@ import BrandLayout from "@/components/layout/brand-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Calendar, Users, Megaphone } from "lucide-react";
+import { Plus, Search, Calendar, Users, Megaphone, Gem } from "lucide-react";
 
 const STATUS_CFG: Record<string, { bg: string; text: string; dot: string }> = {
   active:    { bg: "rgba(16,185,129,0.12)", text: "#059669", dot: "#10B981" },
@@ -106,7 +106,16 @@ export default function CampaignsPage() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-1.5 text-xs font-medium"><span className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs">{c.invitesCount}</span><span className="text-muted-foreground">/ {c.noOfCreators}</span></div>
                     </td>
-                    <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <StatusBadge status={c.status} />
+                        {(c as typeof c & { isFunded?: boolean }).isFunded && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }} data-testid={`badge-funded-${c.id}`}>
+                            <Gem className="h-2.5 w-2.5" /> Funded ✓
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-5 py-3.5">
                       <Link href={`/campaigns/${c.id}`}>
                         <Button variant="ghost" size="sm" className="h-7 px-3 text-xs rounded-lg font-semibold" style={{ color: "#1DCFB3" }} data-testid={`button-view-campaign-${c.id}`}>View →</Button>

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, ilike, sql, desc, inArray } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable } from "@workspace/db";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable, gemsTransactionsTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { initiateDisbursement } from "../lib/gateway";
 import { requireAuth, requireRole } from "../lib/auth";
@@ -69,6 +69,79 @@ router.patch("/admin/campaigns/:id/status", requireAuth, requireRole("admin"), a
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
   const { status } = req.body;
+
+  // Funding gate: when admin activates a campaign, reserve gems from brand's account
+  if (status === "active") {
+    const [existing] = await db.select({
+      brandId: campaignsTable.brandId,
+      noOfCreators: campaignsTable.noOfCreators,
+      gemsPerCreator: campaignsTable.gemsPerCreator,
+      isFunded: campaignsTable.isFunded,
+      name: campaignsTable.name,
+    }).from(campaignsTable).where(eq(campaignsTable.id, id)).limit(1);
+
+    if (existing && !existing.isFunded) {
+      const budget = (existing.noOfCreators ?? 1) * (existing.gemsPerCreator ?? 0);
+      if (budget > 0) {
+        const [brand] = await db.select({ gems: usersTable.gems })
+          .from(usersTable).where(eq(usersTable.id, existing.brandId)).limit(1);
+        if ((brand?.gems ?? 0) < budget) {
+          res.status(402).json({
+            error: "Brand has insufficient gems to fund this campaign",
+            code: "INSUFFICIENT_GEMS",
+            required: budget,
+            available: brand?.gems ?? 0,
+            shortfall: budget - (brand?.gems ?? 0),
+          });
+          return;
+        }
+        await db.transaction(async (tx) => {
+          await tx.update(usersTable).set({
+            gems: sql`gems - ${budget}`,
+            reservedBalance: sql`reserved_balance + ${budget}`,
+          }).where(eq(usersTable.id, existing.brandId));
+          await tx.insert(gemsTransactionsTable).values({
+            userId: existing.brandId,
+            type: "campaign_reserve",
+            gemsDelta: -budget,
+            description: `Campaign Reserve: ${existing.name ?? "Campaign"}`,
+          });
+          await tx.update(campaignsTable).set({ isFunded: true }).where(eq(campaignsTable.id, id));
+        });
+      }
+    }
+  }
+
+  // Refund reserve when admin declines or completes a funded campaign
+  if (status === "declined" || status === "completed") {
+    const [existing] = await db.select({
+      brandId: campaignsTable.brandId,
+      isFunded: campaignsTable.isFunded,
+      noOfCreators: campaignsTable.noOfCreators,
+      gemsPerCreator: campaignsTable.gemsPerCreator,
+      name: campaignsTable.name,
+    }).from(campaignsTable).where(eq(campaignsTable.id, id)).limit(1);
+
+    if (existing?.isFunded) {
+      const budget = (existing.noOfCreators ?? 1) * (existing.gemsPerCreator ?? 0);
+      if (budget > 0) {
+        await db.transaction(async (tx) => {
+          await tx.update(usersTable).set({
+            gems: sql`gems + ${budget}`,
+            reservedBalance: sql`GREATEST(reserved_balance - ${budget}, 0)`,
+          }).where(eq(usersTable.id, existing.brandId));
+          await tx.insert(gemsTransactionsTable).values({
+            userId: existing.brandId,
+            type: "campaign_refund",
+            gemsDelta: budget,
+            description: `Campaign Refund: ${existing.name ?? "Campaign"}`,
+          });
+          await tx.update(campaignsTable).set({ isFunded: false }).where(eq(campaignsTable.id, id));
+        });
+      }
+    }
+  }
+
   const [campaign] = await db.update(campaignsTable).set({ status, updatedAt: new Date() }).where(eq(campaignsTable.id, id)).returning();
 
   // Notify brand of approval/rejection

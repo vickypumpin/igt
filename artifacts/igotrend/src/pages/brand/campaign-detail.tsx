@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, FileCheck, Calendar, ExternalLink } from "lucide-react";
+import { Users, FileCheck, Calendar, ExternalLink, Gem } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -30,7 +30,10 @@ export default function CampaignDetailPage() {
   if (isLoading) return <BrandLayout><div className="space-y-4">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-16 rounded-2xl" />)}</div></BrandLayout>;
   if (!campaign) return <BrandLayout><div className="text-muted-foreground py-12 text-center">Campaign not found</div></BrandLayout>;
 
-  const c = campaign as typeof campaign & { kpis?: string; dos?: string; donts?: string; postCaptionText?: string; handlesHash?: string };
+  const c = campaign as typeof campaign & { kpis?: string; dos?: string; donts?: string; postCaptionText?: string; handlesHash?: string; isFunded?: boolean; gemsPerCreator?: number };
+  const isFunded = (c.isFunded ?? false) as boolean;
+  const gemsPerCreator = (c.gemsPerCreator ?? 0) as number;
+  const totalBudget = (campaign.noOfCreators ?? 0) * gemsPerCreator;
 
   return (
     <BrandLayout>
@@ -38,9 +41,14 @@ export default function CampaignDetailPage() {
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h1 className="text-2xl font-extrabold">{campaign.name}</h1>
               <StatusBadge status={campaign.status} />
+              {isFunded && (
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }} data-testid="badge-funded">
+                  <Gem className="h-3 w-3" /> Funded ✓
+                </span>
+              )}
             </div>
             <p className="text-sm text-muted-foreground">Sponsored by <span className="font-semibold text-foreground">{campaign.sponsor}</span></p>
           </div>
@@ -56,6 +64,7 @@ export default function CampaignDetailPage() {
             { label: "End date", value: campaign.endDate, gradient: "linear-gradient(135deg, #3B82F6, #2563EB)", Icon: Calendar },
             { label: "Creators", value: `${invites.length} / ${campaign.noOfCreators}`, gradient: "linear-gradient(135deg, #8B5CF6, #6D28D9)", Icon: Users },
             { label: "Submissions", value: submissions.length, gradient: "linear-gradient(135deg, #F59E0B, #D97706)", Icon: FileCheck },
+            ...(totalBudget > 0 ? [{ label: isFunded ? "Budget reserved" : "Budget required", value: `${totalBudget.toLocaleString()} gems`, gradient: isFunded ? "linear-gradient(135deg, #10B981, #059669)" : "linear-gradient(135deg, #F59E0B, #D97706)", Icon: Gem }] : []),
           ].map(({ label, value, gradient, Icon }) => (
             <Card key={label} className="border-0 shadow-sm">
               <CardContent className="p-4 flex items-center gap-3">

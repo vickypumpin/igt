@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useCreateCampaign, getListCampaignsQueryKey } from "@workspace/api-client-react";
+import { useCreateCampaign, useGetMe, getListCampaignsQueryKey, getGetMeQueryKey } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import BrandLayout from "@/components/layout/brand-layout";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Gem, AlertTriangle, ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 
 const schema = z.object({
   name: z.string().min(1, "Campaign name is required"),
@@ -23,6 +24,7 @@ const schema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   noOfCreators: z.number().min(1),
+  gemsPerCreator: z.number().min(0).default(0),
   postCaptionText: z.string().optional(),
   handlesHash: z.string().optional(),
   dos: z.string().optional(),
@@ -52,23 +54,32 @@ export default function CampaignNewPage() {
   const [step, setStep] = useState(0);
   const { toast } = useToast();
   const createMutation = useCreateCampaign();
+  const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: "", sponsor: "", description: "", kpis: "", type: "influencer", campaignDuration: "day",
-      startDate: "", endDate: "", noOfCreators: 5, postCaptionText: "", handlesHash: "", dos: "", donts: "",
+      startDate: "", endDate: "", noOfCreators: 5, gemsPerCreator: 0,
+      postCaptionText: "", handlesHash: "", dos: "", donts: "",
       dailyInstagramPost: 0, dailyInstagramStoryPost: 0, dailyInstagramReel: 0, dailyTiktokPost: 0,
       dailyYoutubePost: 0, dailyTwitterPost: 0, weeklyInstagramPost: 0, weeklyTiktokPost: 0,
       weeklyYoutubePost: 0, weeklyTwitterPost: 0,
     },
   });
 
+  const noOfCreators = form.watch("noOfCreators") ?? 0;
+  const gemsPerCreator = form.watch("gemsPerCreator") ?? 0;
+  const totalBudget = noOfCreators * gemsPerCreator;
+  const availableGems = me?.gems ?? 0;
+  const hasEnoughGems = totalBudget === 0 || availableGems >= totalBudget;
+  const shortfall = hasEnoughGems ? 0 : totalBudget - availableGems;
+
   const onSubmit = (values: FormData) => {
     createMutation.mutate({ data: {
       name: values.name, sponsor: values.sponsor, description: values.description, kpis: values.kpis,
       type: values.type, campaignDuration: values.campaignDuration, startDate: values.startDate,
-      endDate: values.endDate, noOfCreators: values.noOfCreators,
+      endDate: values.endDate, noOfCreators: values.noOfCreators, gemsPerCreator: values.gemsPerCreator,
       postCaptionText: values.postCaptionText ?? null, handlesHash: values.handlesHash ?? null,
       dos: values.dos ?? null, donts: values.donts ?? null,
       dailyInstagramPost: values.dailyInstagramPost, dailyInstagramStoryPost: values.dailyInstagramStoryPost,
@@ -80,7 +91,11 @@ export default function CampaignNewPage() {
       weeklyInstagramReel: 0, weeklyFbPost: 0, weeklyTiktokPost: values.weeklyTiktokPost,
       weeklyYoutubePost: values.weeklyYoutubePost, weeklyTwitterPost: values.weeklyTwitterPost, weeklySnapchatStory: 0,
     } }, {
-      onSuccess: (campaign) => { queryClient.invalidateQueries({ queryKey: getListCampaignsQueryKey() }); toast({ title: "Campaign created! 🎉" }); setLocation(`/campaigns/${campaign.id}`); },
+      onSuccess: (campaign) => {
+        queryClient.invalidateQueries({ queryKey: getListCampaignsQueryKey() });
+        toast({ title: "Campaign created! 🎉", description: totalBudget > 0 ? `${totalBudget.toLocaleString()} gems will be reserved when the campaign is approved.` : undefined });
+        setLocation(`/campaigns/${campaign.id}`);
+      },
       onError: () => { toast({ title: "Failed to create campaign", variant: "destructive" }); },
     });
   };
@@ -143,9 +158,56 @@ export default function CampaignNewPage() {
                       <FormItem><FormLabel className={labelCls}>End date</FormLabel><FormControl><Input {...field} type="date" className={inputCls} data-testid="input-end-date" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
-                  <FormField control={form.control} name="noOfCreators" render={({ field }) => (
-                    <FormItem><FormLabel className={labelCls}>Number of creators</FormLabel><FormControl><Input {...field} type="number" min={1} className={inputCls} onChange={e => field.onChange(parseInt(e.target.value, 10))} data-testid="input-creators-count" /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="noOfCreators" render={({ field }) => (
+                      <FormItem><FormLabel className={labelCls}>Number of creators</FormLabel><FormControl><Input {...field} type="number" min={1} className={inputCls} onChange={e => field.onChange(parseInt(e.target.value, 10))} data-testid="input-creators-count" /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name="gemsPerCreator" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className={labelCls}>Gems per creator</FormLabel>
+                        <FormControl><Input {...field} type="number" min={0} className={inputCls} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} data-testid="input-gems-per-creator" /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  {/* Budget summary & balance warning */}
+                  {totalBudget > 0 && (
+                    <div className={`rounded-xl p-4 border ${hasEnoughGems ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`} data-testid="budget-summary">
+                      <div className="flex items-center gap-2 mb-2">
+                        {hasEnoughGems
+                          ? <Gem className="h-4 w-4 text-emerald-600" />
+                          : <AlertTriangle className="h-4 w-4 text-red-500" />}
+                        <span className={`text-sm font-semibold ${hasEnoughGems ? "text-emerald-700" : "text-red-600"}`}>
+                          {hasEnoughGems ? "Budget will be reserved on approval" : "Insufficient gems — top up before admin approval"}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total budget ({noOfCreators} creators × {gemsPerCreator} gems)</span>
+                          <span className="font-bold">{totalBudget.toLocaleString()} gems</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Your available gems</span>
+                          <span className={`font-bold ${hasEnoughGems ? "text-emerald-600" : "text-red-600"}`}>{availableGems.toLocaleString()} gems</span>
+                        </div>
+                        {!hasEnoughGems && (
+                          <div className="flex justify-between mt-1 pt-1 border-t border-red-200">
+                            <span className="text-red-600 font-semibold">Shortfall</span>
+                            <span className="text-red-600 font-bold">{shortfall.toLocaleString()} gems needed</span>
+                          </div>
+                        )}
+                      </div>
+                      {!hasEnoughGems && (
+                        <Link href={`/billing?shortfall=${shortfall}`}>
+                          <button type="button" className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2" data-testid="link-top-up">
+                            <ExternalLink className="h-3 w-3" /> Top up gems now
+                          </button>
+                        </Link>
+                      )}
+                    </div>
+                  )}
+
                   <FormField control={form.control} name="description" render={({ field }) => (
                     <FormItem><FormLabel className={labelCls}>Campaign description</FormLabel><FormControl><Textarea {...field} rows={3} className="rounded-xl" data-testid="input-description" /></FormControl><FormMessage /></FormItem>
                   )} />
@@ -198,6 +260,30 @@ export default function CampaignNewPage() {
                       <FormItem><FormLabel className={`${labelCls} text-red-500`}>Don'ts ✗</FormLabel><FormControl><Textarea {...field} rows={4} className="rounded-xl border-red-200" data-testid="input-donts" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
+
+                  {/* Final budget reminder */}
+                  {totalBudget > 0 && (
+                    <div className={`rounded-xl p-4 border ${hasEnoughGems ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Gem className={`h-4 w-4 ${hasEnoughGems ? "text-emerald-600" : "text-amber-600"}`} />
+                        <span className={`text-xs font-semibold ${hasEnoughGems ? "text-emerald-700" : "text-amber-700"}`}>
+                          {hasEnoughGems
+                            ? `${totalBudget.toLocaleString()} gems will be reserved when admin approves`
+                            : `Top up ${shortfall.toLocaleString()} more gems before admin approval`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        You have {availableGems.toLocaleString()} gems available.
+                      </p>
+                      {!hasEnoughGems && (
+                        <Link href={`/billing?shortfall=${shortfall}`}>
+                          <button type="button" className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-amber-700 hover:text-amber-800 underline underline-offset-2" data-testid="link-top-up-final">
+                            <ExternalLink className="h-3 w-3" /> Top up gems
+                          </button>
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -211,7 +297,7 @@ export default function CampaignNewPage() {
                   </Button>
                 ) : (
                   <Button type="submit" className="rounded-xl font-semibold px-6" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }} disabled={createMutation.isPending} data-testid="button-submit-campaign">
-                    {createMutation.isPending ? "Creating…" : "🚀 Launch Campaign"}
+                    {createMutation.isPending ? "Creating…" : "🚀 Submit for Review"}
                   </Button>
                 )}
               </div>
