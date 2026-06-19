@@ -80,6 +80,8 @@ export const usersTable = pgTable("users", {
   reservedBalance: integer("reserved_balance").notNull().default(0),
   // Identity verification
   verified: boolean("verified").notNull().default(false),
+  // Onboarding wizard
+  onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   // Brand website
   websiteUrl: text("website_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

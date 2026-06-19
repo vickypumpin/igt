@@ -98,5 +98,6 @@ export function formatUser(u: Record<string, unknown>) {
     agencyId: u.agencyId ?? null,
     createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
     verified: u.verified ?? false,
+    onboardingComplete: u.onboardingComplete ?? false,
   };
 }

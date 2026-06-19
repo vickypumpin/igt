@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useGetCreatorDashboard, useGetMe, getGetCreatorDashboardQueryKey, useGetMyKycRequest } from "@workspace/api-client-react";
 import CreatorLayout from "@/components/layout/creator-layout";
+import CreatorOnboardingWizard from "@/components/creator-onboarding-wizard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, Star, Inbox, CheckCircle, XCircle, ChevronRight, Eye, Gem, ShieldCheck } from "lucide-react";
+import { DollarSign, Star, Inbox, CheckCircle, XCircle, ChevronRight, Eye, ShieldCheck } from "lucide-react";
 
 const PLATFORM_ROWS = [
   { key: "instagram", label: "Instagram", emoji: "📸" },
@@ -46,11 +47,73 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function ProfileCompletionRing({ pct }: { pct: number }) {
+  const size = 72;
+  const stroke = 6;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const dashOffset = circ - (pct / 100) * circ;
+  const color = pct >= 70 ? "#1DCFB3" : pct >= 40 ? "#F59E0B" : "#EF4444";
+
+  return (
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center gap-4">
+      <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F3F4F6" strokeWidth={stroke} />
+          <circle
+            cx={size / 2} cy={size / 2} r={r} fill="none"
+            stroke={color} strokeWidth={stroke}
+            strokeDasharray={circ}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+            style={{ transition: "stroke-dashoffset 0.5s ease" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-sm font-extrabold" style={{ color }}>{pct}%</span>
+        </div>
+      </div>
+      <div>
+        <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-0.5">Profile Completion</div>
+        <div className="text-sm font-semibold text-foreground">
+          {pct >= 80 ? "Looking great!" : pct >= 50 ? "Almost there" : "Keep going!"}
+        </div>
+        <div className="text-xs text-muted-foreground mt-0.5">
+          {pct < 100 ? "Complete your profile to get more brand invites" : "Your profile is complete!"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function calcProfileCompletion(user: Record<string, unknown> | null | undefined): number {
+  if (!user) return 0;
+  // Spec: "social handles filled / total fields"
+  // Weight: 4 essential profile fields + 6 social handle fields = 10 total
+  const essentialFields = ["firstName", "lastName", "bio", "avatarUrl"];
+  const socialHandleFields = [
+    "instagramProfile", "tiktokProfile", "youtubeProfile",
+    "twitterProfile", "facebookProfile", "snapchatProfile",
+  ];
+  const allFields = [...essentialFields, ...socialHandleFields];
+  const filled = allFields.filter(f => {
+    const v = user[f];
+    return v !== null && v !== undefined && v !== "";
+  });
+  return Math.round((filled.length / allFields.length) * 100);
+}
+
 export default function CreatorDashboardPage() {
   const { data, isLoading } = useGetCreatorDashboard({ query: { queryKey: getGetCreatorDashboardQueryKey() } });
   const { data: user } = useGetMe();
   const [showEntries, setShowEntries] = useState(10);
   const { data: kycRequest } = useGetMyKycRequest({ query: { retry: false } });
+  const [wizardDismissed, setWizardDismissed] = useState(false);
+
+  const userAny = user as unknown as Record<string, unknown> | undefined;
+  const onboardingComplete = userAny?.onboardingComplete as boolean | undefined;
+  const completionPct = calcProfileCompletion(userAny ?? null);
+  const showWizard = !wizardDismissed && user?.role === "creator" && onboardingComplete === false && completionPct < 50;
 
   const showVerifyBanner = !user?.verified && (!kycRequest || kycRequest.status === "rejected");
 
@@ -68,6 +131,10 @@ export default function CreatorDashboardPage() {
 
   return (
     <CreatorLayout>
+      {showWizard && (
+        <CreatorOnboardingWizard onClose={() => setWizardDismissed(true)} />
+      )}
+
       <div data-testid="page-creator-dashboard">
         {/* Get Verified banner */}
         {showVerifyBanner && (
@@ -106,6 +173,11 @@ export default function CreatorDashboardPage() {
               {badgeLabel} Trender
             </div>
           </div>
+        </div>
+
+        {/* Profile completion ring */}
+        <div className="mb-5">
+          <ProfileCompletionRing pct={completionPct} />
         </div>
 
         {/* Overview section: 2×2 stats grid + Platform Handles table */}

@@ -454,6 +454,17 @@ export const useBrandRejectApplication = (
     ...options,
   });
 
+// ── Onboarding Complete ────────────────────────────────────────────────────────
+
+export const useCompleteOnboarding = (
+  options?: UseMutationOptions<{ message: string }, unknown, void>
+) =>
+  useMutation<{ message: string }, unknown, void>({
+    mutationFn: () =>
+      customFetch<{ message: string }>("/api/auth/me/onboarding-complete", { method: "PATCH" }),
+    ...options,
+  });
+
 // ── Update Bank Details (creator) ─────────────────────────────────────────────
 
 export const useUpdateBankDetails = (

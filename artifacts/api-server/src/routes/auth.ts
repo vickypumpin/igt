@@ -253,6 +253,11 @@ router.patch("/auth/me/bank-details", requireAuth, async (req, res): Promise<voi
   res.json({ message: "Bank details saved" });
 });
 
+router.patch("/auth/me/onboarding-complete", requireAuth, async (req, res): Promise<void> => {
+  await db.update(usersTable).set({ onboardingComplete: true, updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
+  res.json({ message: "Onboarding complete" });
+});
+
 router.patch("/auth/me/pricing", requireAuth, async (req, res): Promise<void> => {
   const fields = [
     "instagramDayPostPrice","instagramWeekPostPrice","instagramDayStoryPrice","instagramWeekStoryPrice",
