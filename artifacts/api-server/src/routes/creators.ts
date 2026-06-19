@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, ilike, and, sql } from "drizzle-orm";
+import { eq, ilike, and, sql, desc } from "drizzle-orm";
 import { db, usersTable, campaignInvitesTable, submissionsTable, kycRequestsTable, settingsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
@@ -38,6 +38,14 @@ function formatCreator(u: Record<string, unknown>, stats?: { totalReach: number;
     youtubeDayPostPrice: u.youtubeDayPostPrice ?? null,
     youtubeWeekPostPrice: u.youtubeWeekPostPrice ?? null,
     gems: u.gems ?? 0,
+    verified: u.verified ?? false,
+    profilePublic: u.profilePublic ?? true,
+    instagramFollowers: u.instagramFollowers ?? null,
+    tiktokFollowers: u.tiktokFollowers ?? null,
+    youtubeFollowers: u.youtubeFollowers ?? null,
+    twitterFollowers: u.twitterFollowers ?? null,
+    facebookFollowers: u.facebookFollowers ?? null,
+    snapchatFollowers: u.snapchatFollowers ?? null,
   };
 }
 
@@ -47,12 +55,14 @@ router.get("/creators", requireAuth, async (req, res): Promise<void> => {
   const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
   const offset = (pageNum - 1) * limitNum;
 
-  const conditions = [eq(usersTable.role, "creator"), eq(usersTable.isActive, true)];
+  const conditions = [eq(usersTable.role, "creator"), eq(usersTable.isActive, true), eq(usersTable.profilePublic, true)];
   if (search) conditions.push(ilike(usersTable.userName, `%${search}%`));
   if (badge) conditions.push(eq(usersTable.badge, badge as "nano" | "micro" | "mid_tier" | "macro" | "mega" | "elite"));
 
   const [creators, [countRow]] = await Promise.all([
-    db.select().from(usersTable).where(and(...conditions)).limit(limitNum).offset(offset),
+    db.select().from(usersTable).where(and(...conditions))
+      .orderBy(desc(usersTable.verified))
+      .limit(limitNum).offset(offset),
     db.select({ count: sql<number>`count(*)` }).from(usersTable).where(and(...conditions)),
   ]);
 

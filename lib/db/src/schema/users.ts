@@ -82,6 +82,8 @@ export const usersTable = pgTable("users", {
   verified: boolean("verified").notNull().default(false),
   // Onboarding wizard
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  // Profile visibility (public directory)
+  profilePublic: boolean("profile_public").notNull().default(true),
   // Brand website
   websiteUrl: text("website_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

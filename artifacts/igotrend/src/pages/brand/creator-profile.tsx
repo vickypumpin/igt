@@ -4,8 +4,10 @@ import BrandLayout from "@/components/layout/brand-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SiInstagram, SiTiktok, SiYoutube, SiFacebook, SiX, SiSnapchat } from "react-icons/si";
-import { ExternalLink, TrendingUp, Gem, Trophy } from "lucide-react";
+import { ExternalLink, TrendingUp, Gem, Trophy, BadgeCheck, Share2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const BADGE_CFG: Record<string, { bg: string; text: string; gradient: string }> = {
   nano:     { bg: "rgba(107,114,128,0.12)", text: "#4B5563", gradient: "linear-gradient(135deg, #6B7280, #374151)" },
@@ -39,6 +41,17 @@ export default function CreatorProfilePage() {
   const params = useParams<{ id: string }>();
   const id = parseInt(params.id, 10);
   const { data: creator, isLoading } = useGetCreator(id, { query: { enabled: !!id, queryKey: getGetCreatorQueryKey(id) } });
+  const { toast } = useToast();
+
+  const handleShare = () => {
+    if (!creator?.userName) return;
+    const url = `${window.location.origin}/c/${creator.userName}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast({ title: "Link copied!", description: `Public profile URL copied to clipboard.` });
+    }).catch(() => {
+      toast({ title: "Copy failed", description: url, variant: "destructive" });
+    });
+  };
 
   if (isLoading) return <BrandLayout><div className="space-y-4">{Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div></BrandLayout>;
   if (!creator) return <BrandLayout><div className="text-muted-foreground py-12 text-center">Creator not found</div></BrandLayout>;
@@ -67,11 +80,19 @@ export default function CreatorProfilePage() {
             <div className="flex-1">
               <div className="flex items-center gap-2.5 flex-wrap mb-1">
                 <h1 className="text-2xl font-extrabold">{creator.firstName} {creator.lastName}</h1>
+                {(creator as Record<string, unknown>).verified && (
+                  <BadgeCheck className="h-5 w-5 flex-shrink-0" style={{ color: "#1DCFB3" }} />
+                )}
                 {creator.badge && (
                   <span className="text-xs px-2.5 py-1 rounded-full font-bold capitalize" style={{ background: badgeCfg?.bg ?? "rgba(29,207,179,0.1)", color: badgeCfg?.text ?? "#0FA88E" }}>
                     {creator.badge.replace("_", " ")}
                   </span>
                 )}
+                <Button size="sm" variant="outline" onClick={handleShare}
+                  className="ml-auto h-8 px-3 rounded-xl gap-1.5 text-xs font-semibold"
+                  data-testid="button-share-profile">
+                  <Share2 className="h-3.5 w-3.5" /> Share profile
+                </Button>
               </div>
               <div className="text-sm text-muted-foreground mb-2 font-medium">@{creator.userName}{creator.country ? ` · ${creator.country}` : ""}</div>
               {creator.bio && <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">{creator.bio}</p>}

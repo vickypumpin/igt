@@ -65,6 +65,7 @@ import TrendAiPage from "@/pages/shared/trend-ai";
 import BlogPage from "@/pages/public/blog";
 import HelpPage from "@/pages/public/help";
 import PublicSearchPage from "@/pages/public/search";
+import PublicCreatorProfilePage from "@/pages/public/creator-profile";
 import AdminReportsPage from "@/pages/admin/reports";
 import BrandReportsPage from "@/pages/brand/reports";
 
@@ -114,6 +115,9 @@ function AppRouter() {
       <Route path="/register" component={RegisterPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+
+      {/* ── Public creator profiles (always accessible) ── */}
+      <Route path="/c/:username" component={PublicCreatorProfilePage} />
 
       {/* ── Public pages (always accessible to everyone) ── */}
       <Route path="/privacy" component={LegalPage} />

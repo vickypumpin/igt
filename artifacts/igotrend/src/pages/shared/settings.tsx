@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { SiInstagram, SiTiktok, SiYoutube, SiX } from "react-icons/si";
-import { User, Lock, Landmark, Building2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { User, Lock, Landmark, Building2, CheckCircle, XCircle, Clock, Globe } from "lucide-react";
 
 const NIGERIAN_BANKS = [
   { label: "Access Bank", code: "044" },
@@ -55,6 +55,7 @@ const profileSchema = z.object({
   tiktokProfile: z.string().optional(),
   youtubeProfile: z.string().optional(),
   twitterProfile: z.string().optional(),
+  profilePublic: z.boolean().optional(),
 });
 const passwordSchema = z.object({
   currentPassword: z.string().min(1),
@@ -229,7 +230,7 @@ export default function SettingsPage() {
 
   const profileForm = useForm<ProfileData>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { firstName: "", lastName: "", phone: "", bio: "", instagramProfile: "", tiktokProfile: "", youtubeProfile: "", twitterProfile: "" },
+    defaultValues: { firstName: "", lastName: "", phone: "", bio: "", instagramProfile: "", tiktokProfile: "", youtubeProfile: "", twitterProfile: "", profilePublic: true },
   });
   const passwordForm = useForm<PasswordData>({
     resolver: zodResolver(passwordSchema),
@@ -242,7 +243,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (me) {
-      profileForm.reset({ firstName: me.firstName, lastName: me.lastName, phone: me.phone ?? "", bio: me.bio ?? "", instagramProfile: me.instagramProfile ?? "", tiktokProfile: me.tiktokProfile ?? "", youtubeProfile: me.youtubeProfile ?? "", twitterProfile: me.twitterProfile ?? "" });
+      profileForm.reset({ firstName: me.firstName, lastName: me.lastName, phone: me.phone ?? "", bio: me.bio ?? "", instagramProfile: me.instagramProfile ?? "", tiktokProfile: me.tiktokProfile ?? "", youtubeProfile: me.youtubeProfile ?? "", twitterProfile: me.twitterProfile ?? "", profilePublic: (me as Record<string, unknown>).profilePublic !== false });
       if (me.bankDetails) {
         bankForm.reset({
           bankName: me.bankDetails.bankName,
@@ -307,6 +308,38 @@ export default function SettingsPage() {
               )} />
               {role === "creator" && (
                 <>
+                  <div className="pt-1 pb-0.5">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Profile visibility</p>
+                  </div>
+                  <FormField control={profileForm.control} name="profilePublic" render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between rounded-xl border border-border/60 px-4 py-3">
+                        <div>
+                          <FormLabel className="text-sm font-semibold flex items-center gap-2 cursor-pointer">
+                            <Globe className="h-4 w-4" style={{ color: "#1DCFB3" }} />
+                            Public profile
+                          </FormLabel>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {field.value ? "Your profile appears in the public creator directory and at your shareable link." : "Your profile is hidden from the public directory and shareable link."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={field.value}
+                          onClick={() => field.onChange(!field.value)}
+                          data-testid="toggle-profile-public"
+                          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0"
+                          style={{ background: field.value ? "#1DCFB3" : "#D1D5DB" }}
+                        >
+                          <span
+                            className="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform"
+                            style={{ transform: field.value ? "translateX(22px)" : "translateX(2px)" }}
+                          />
+                        </button>
+                      </div>
+                    </FormItem>
+                  )} />
                   <div className="pt-1 pb-0.5">
                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Social profiles</p>
                   </div>

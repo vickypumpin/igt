@@ -5,7 +5,7 @@ import BrandLayout from "@/components/layout/brand-layout";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Users } from "lucide-react";
+import { Search, Users, BadgeCheck } from "lucide-react";
 import { SiInstagram, SiTiktok, SiYoutube, SiFacebook, SiX } from "react-icons/si";
 
 const BADGES = ["", "nano", "micro", "mid_tier", "macro", "mega", "elite"];
@@ -93,7 +93,10 @@ export default function CreatorsPage() {
                       <AvatarFallback className="text-sm font-bold" style={{ background: AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length], color: "white" }}>{c.firstName[0]}{c.lastName[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-sm truncate group-hover:text-primary transition-colors">{c.firstName} {c.lastName}</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="font-bold text-sm truncate group-hover:text-primary transition-colors">{c.firstName} {c.lastName}</div>
+                        {(c as Record<string, unknown>).verified && <BadgeCheck className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#1DCFB3" }} />}
+                      </div>
                       <div className="text-xs text-muted-foreground">@{c.userName}</div>
                       {c.badge && (
                         <span className="mt-1 inline-block text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: BADGE_CFG[c.badge]?.bg ?? "rgba(29,207,179,0.1)", color: BADGE_CFG[c.badge]?.text ?? "#0FA88E" }}>
@@ -110,6 +113,23 @@ export default function CreatorsPage() {
                     {c.twitterProfile && <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-medium" style={{ background: "rgba(29,161,242,0.1)", color: "#1DA1F2" }}><SiX className="h-3 w-3" /> X</div>}
                   </div>
                   {c.contentCategoryNames && <div className="mt-2.5 text-xs text-muted-foreground truncate">{c.contentCategoryNames}</div>}
+                  {(() => {
+                    const r = c as Record<string, unknown>;
+                    const prices = [
+                      r.instagramDayPostPrice, r.instagramWeekPostPrice,
+                      r.tiktokDayPostPrice, r.tiktokWeekPostPrice,
+                      r.youtubeDayPostPrice, r.youtubeWeekPostPrice,
+                    ].filter((v): v is number => typeof v === "number" && v > 0);
+                    if (!prices.length) return null;
+                    const min = Math.min(...prices);
+                    return (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(29,207,179,0.12)", color: "#0FA88E" }}>
+                          from ₦{min.toLocaleString()}/post
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               </Link>
             ))}

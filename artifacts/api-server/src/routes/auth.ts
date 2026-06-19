@@ -110,7 +110,7 @@ router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
 router.patch("/auth/me/profile", requireAuth, async (req, res): Promise<void> => {
   const { firstName, lastName, phone, gender, countryId, stateId, companyName, companySize, companyType,
     instagramProfile, facebookProfile, twitterProfile, youtubeProfile, tiktokProfile, snapchatProfile,
-    dob, contentCategory, creatorCategory, bio } = req.body;
+    dob, contentCategory, creatorCategory, bio, profilePublic } = req.body;
   const updates: Record<string, unknown> = {};
   if (firstName != null) updates.firstName = firstName;
   if (lastName != null) updates.lastName = lastName;
@@ -131,6 +131,7 @@ router.patch("/auth/me/profile", requireAuth, async (req, res): Promise<void> =>
   if (contentCategory != null) updates.contentCategory = contentCategory;
   if (creatorCategory != null) updates.creatorCategory = creatorCategory;
   if (bio != null) updates.bio = bio;
+  if (typeof profilePublic === "boolean") updates.profilePublic = profilePublic;
   updates.updatedAt = new Date();
   const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
   res.json(formatUser(user as unknown as Record<string, unknown>));
