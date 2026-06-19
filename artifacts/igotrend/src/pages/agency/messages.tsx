@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Send, MessageSquare } from "lucide-react";
+import { usePageVisible } from "@/hooks/use-page-visible";
 
 const PURPLE = "#6B2FCE";
 const POLL_INTERVAL = 4000;
@@ -16,17 +17,19 @@ export default function AgencyMessagesPage() {
   const [messageText, setMessageText] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { data: me } = useGetMe();
+  const isVisible = usePageVisible();
   const { data: conversations = [], isLoading } = useListConversations({ query: { queryKey: getListConversationsQueryKey() } });
   const { data: messages = [] } = useGetMessages(selectedUserId ?? 0, { query: { enabled: !!selectedUserId, queryKey: getGetMessagesQueryKey(selectedUserId ?? 0) } });
   const sendMutation = useSendMessage();
 
   useEffect(() => {
+    if (!isVisible) return;
     const id = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: getListConversationsQueryKey() });
       if (selectedUserId) queryClient.invalidateQueries({ queryKey: getGetMessagesQueryKey(selectedUserId) });
     }, POLL_INTERVAL);
     return () => clearInterval(id);
-  }, [selectedUserId]);
+  }, [selectedUserId, isVisible]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
@@ -120,6 +123,15 @@ export default function AgencyMessagesPage() {
                 </Avatar>
                 <div>
                   <div className="text-sm font-bold text-gray-900">{(selected as any)?.user?.firstName} {(selected as any)?.user?.lastName}</div>
+                </div>
+                <div className="ml-auto flex items-center gap-1.5" data-testid="live-indicator">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background: isVisible ? "#6B2FCE" : "#9CA3AF" }} />
+                    <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: isVisible ? "#6B2FCE" : "#9CA3AF" }} />
+                  </span>
+                  <span className="text-xs font-semibold" style={{ color: isVisible ? PURPLE : "#9CA3AF" }}>
+                    {isVisible ? "Live" : "Paused"}
+                  </span>
                 </div>
               </div>
 
