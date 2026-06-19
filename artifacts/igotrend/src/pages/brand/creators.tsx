@@ -42,8 +42,8 @@ export default function CreatorsPage() {
 
   const handleSearch = (val: string) => {
     setSearch(val);
-    clearTimeout((window as Record<string, unknown>).__searchTimer as number);
-    (window as Record<string, unknown>).__searchTimer = setTimeout(() => setDebouncedSearch(val), 350) as unknown as number;
+    clearTimeout((window as unknown as Record<string, unknown>).__searchTimer as number);
+    (window as unknown as Record<string, unknown>).__searchTimer = setTimeout(() => setDebouncedSearch(val), 350) as unknown as number;
   };
 
   return (
@@ -95,7 +95,7 @@ export default function CreatorsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <div className="font-bold text-sm truncate group-hover:text-primary transition-colors">{c.firstName} {c.lastName}</div>
-                        {(c as Record<string, unknown>).verified && <BadgeCheck className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#1DCFB3" }} />}
+                        {!!(c as unknown as Record<string, unknown>).verified && <BadgeCheck className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "#1DCFB3" }} />}
                       </div>
                       <div className="text-xs text-muted-foreground">@{c.userName}</div>
                       {c.badge && (
@@ -114,7 +114,7 @@ export default function CreatorsPage() {
                   </div>
                   {c.contentCategoryNames && <div className="mt-2.5 text-xs text-muted-foreground truncate">{c.contentCategoryNames}</div>}
                   {(() => {
-                    const r = c as Record<string, unknown>;
+                    const r = c as unknown as Record<string, unknown>;
                     const prices = [
                       r.instagramDayPostPrice, r.instagramWeekPostPrice,
                       r.tiktokDayPostPrice, r.tiktokWeekPostPrice,

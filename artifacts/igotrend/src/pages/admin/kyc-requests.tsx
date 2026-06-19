@@ -1,11 +1,27 @@
 import { useState } from "react";
-import { useAdminKycRequests, useAdminApproveKycRequest, useAdminRejectKycRequest, getAdminKycRequestsQueryKey } from "@workspace/api-client-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import AdminLayout from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle, ShieldCheck, Eye } from "lucide-react";
+
+interface KycRequest {
+  id: number;
+  creatorId: number;
+  legalName: string;
+  country: string;
+  idType: string;
+  idNumber: string;
+  documentUrl: string | null;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  creator: { firstName: string; lastName: string; userName: string };
+}
+
+const KYC_QUERY_KEY = ["/api/admin/kyc-requests"] as const;
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 
@@ -36,25 +52,24 @@ export default function AdminKycRequestsPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const { data = [], isLoading } = useAdminKycRequests({ query: { queryKey: getAdminKycRequestsQueryKey() } });
-  const approveMutation = useAdminApproveKycRequest();
-  const rejectMutation = useAdminRejectKycRequest();
+  const { data = [], isLoading } = useQuery<KycRequest[]>({
+    queryKey: KYC_QUERY_KEY,
+    queryFn: () => customFetch("/api/admin/kyc-requests"),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: number) => customFetch(`/api/admin/kyc-requests/${id}/approve`, { method: "POST" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEY }); toast({ title: "Verification approved ✓" }); },
+    onError: () => toast({ title: "Failed to approve", variant: "destructive" }),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: number) => customFetch(`/api/admin/kyc-requests/${id}/reject`, { method: "POST" }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEY }); toast({ title: "Verification rejected" }); },
+    onError: () => toast({ title: "Failed to reject", variant: "destructive" }),
+  });
 
   const filtered = filter === "all" ? data : data.filter(r => r.status === filter);
-
-  const handleApprove = (id: number) => {
-    approveMutation.mutate({ id }, {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getAdminKycRequestsQueryKey() }); toast({ title: "Verification approved ✓" }); },
-      onError: () => toast({ title: "Failed to approve", variant: "destructive" }),
-    });
-  };
-  const handleReject = (id: number) => {
-    rejectMutation.mutate({ id }, {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getAdminKycRequestsQueryKey() }); toast({ title: "Verification rejected" }); },
-      onError: () => toast({ title: "Failed to reject", variant: "destructive" }),
-    });
-  };
-
   const pendingCount = data.filter(r => r.status === "pending").length;
 
   return (
@@ -143,10 +158,10 @@ export default function AdminKycRequestsPage() {
                       <td className="px-5 py-3.5">
                         {r.status === "pending" && (
                           <div className="flex gap-2">
-                            <Button size="sm" className="h-8 text-xs rounded-xl font-semibold" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }} onClick={() => handleApprove(r.id)} disabled={approveMutation.isPending} data-testid={`btn-approve-${r.id}`}>
+                            <Button size="sm" className="h-8 text-xs rounded-xl font-semibold" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }} onClick={() => approveMutation.mutate(r.id)} disabled={approveMutation.isPending} data-testid={`btn-approve-${r.id}`}>
                               <CheckCircle className="h-3 w-3 mr-1" />Approve
                             </Button>
-                            <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl text-destructive font-semibold" onClick={() => handleReject(r.id)} disabled={rejectMutation.isPending} data-testid={`btn-reject-${r.id}`}>
+                            <Button size="sm" variant="outline" className="h-8 text-xs rounded-xl text-destructive font-semibold" onClick={() => rejectMutation.mutate(r.id)} disabled={rejectMutation.isPending} data-testid={`btn-reject-${r.id}`}>
                               <XCircle className="h-3 w-3 mr-1" />Reject
                             </Button>
                           </div>

@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetCreatorDashboard, useGetMe, getGetCreatorDashboardQueryKey, useGetMyKycRequest } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { useGetCreatorDashboard, useGetMe, getGetCreatorDashboardQueryKey, customFetch } from "@workspace/api-client-react";
 import CreatorLayout from "@/components/layout/creator-layout";
 import CreatorOnboardingWizard from "@/components/creator-onboarding-wizard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, Star, Inbox, CheckCircle, XCircle, ChevronRight, Eye, ShieldCheck } from "lucide-react";
+
+type KycRequest = { id: number; status: "pending" | "approved" | "rejected"; createdAt: string };
 
 const PLATFORM_ROWS = [
   { key: "instagram", label: "Instagram", emoji: "📸" },
@@ -15,7 +18,7 @@ const PLATFORM_ROWS = [
   { key: "snapchat", label: "Snapchat", emoji: "👻" },
 ] as const;
 
-interface StatBoxProps { label: string; value: number; sub: string; color: string; icon: React.ComponentType<{ className?: string }> }
+interface StatBoxProps { label: string; value: number; sub: string; color: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }> }
 function StatBox({ label, value, sub, color, icon: Icon }: StatBoxProps) {
   return (
     <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
@@ -107,7 +110,11 @@ export default function CreatorDashboardPage() {
   const { data, isLoading } = useGetCreatorDashboard({ query: { queryKey: getGetCreatorDashboardQueryKey() } });
   const { data: user } = useGetMe();
   const [showEntries, setShowEntries] = useState(10);
-  const { data: kycRequest } = useGetMyKycRequest({ query: { retry: false } });
+  const { data: kycRequest } = useQuery<KycRequest | null>({
+    queryKey: ["/api/creator/kyc-request"],
+    queryFn: () => customFetch("/api/creator/kyc-request").catch(() => null) as Promise<KycRequest | null>,
+    retry: false,
+  });
   const [wizardDismissed, setWizardDismissed] = useState(false);
 
   const userAny = user as unknown as Record<string, unknown> | undefined;
@@ -115,7 +122,7 @@ export default function CreatorDashboardPage() {
   const completionPct = calcProfileCompletion(userAny ?? null);
   const showWizard = !wizardDismissed && user?.role === "creator" && onboardingComplete === false && completionPct < 50;
 
-  const showVerifyBanner = !user?.verified && (!kycRequest || kycRequest.status === "rejected");
+  const showVerifyBanner = !(user as unknown as { verified?: boolean })?.verified && (!kycRequest || kycRequest.status === "rejected");
 
   const accepted = (data?.totalInvites ?? 0) - (data?.pendingInvites ?? 0) - (data?.declinedInvites ?? 0) - (data?.completedCampaigns ?? 0);
   const badgeLabel = user?.badge ?? "Micro";

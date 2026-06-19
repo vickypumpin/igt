@@ -80,7 +80,7 @@ export default function CreatorProfilePage() {
             <div className="flex-1">
               <div className="flex items-center gap-2.5 flex-wrap mb-1">
                 <h1 className="text-2xl font-extrabold">{creator.firstName} {creator.lastName}</h1>
-                {(creator as Record<string, unknown>).verified && (
+                {!!(creator as unknown as Record<string, unknown>).verified && (
                   <BadgeCheck className="h-5 w-5 flex-shrink-0" style={{ color: "#1DCFB3" }} />
                 )}
                 {creator.badge && (
@@ -101,7 +101,7 @@ export default function CreatorProfilePage() {
                   {socials.map(({ profile, Icon, label }) => {
                     const style = PLATFORM_STYLE[label] ?? { bg: "rgba(0,0,0,0.07)", color: "#555" };
                     return (
-                      <a key={label} href={profile} target="_blank" rel="noopener noreferrer"
+                      <a key={label} href={profile ?? undefined} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-semibold transition-all hover:opacity-80"
                         style={{ background: style.bg, color: style.color }}
                         data-testid={`link-${label.toLowerCase()}`}>
@@ -118,7 +118,7 @@ export default function CreatorProfilePage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-5">
           {[
-            { label: "Total reach", value: creator.totalReach.toLocaleString(), gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)", Icon: TrendingUp },
+            { label: "Total reach", value: (creator.totalReach ?? 0).toLocaleString(), gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)", Icon: TrendingUp },
             { label: "Campaigns done", value: creator.campaignsCompleted, gradient: "linear-gradient(135deg, #8B5CF6, #6D28D9)", Icon: Trophy },
             { label: "Gems earned", value: creator.gems, gradient: "linear-gradient(135deg, #F59E0B, #D97706)", Icon: Gem },
           ].map(({ label, value, gradient, Icon }) => (

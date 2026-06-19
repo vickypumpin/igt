@@ -37,7 +37,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
   const { isOpen, toggle, close } = useMobileSidebar();
 
   const handleLogout = () => {
-    logoutMutation.mutate({}, { onSettled: () => { logout(); queryClient.clear(); } });
+    logoutMutation.mutate(undefined, { onSettled: () => { logout(); queryClient.clear(); } });
   };
 
   const badge = user?.badge?.toLowerCase() ?? "creator";
@@ -85,7 +85,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
             ]}
           />
           <NavLink href="/messages" icon={MessageSquare} label="Messages" />
-          {!user?.verified && <NavLink href="/verify" icon={ShieldCheck} label="Get Verified" />}
+          {!(user as unknown as { verified?: boolean })?.verified && <NavLink href="/verify" icon={ShieldCheck} label="Get Verified" />}
           <NavLink href="/trend-ai" icon={Bot} label="Trend Ai" />
           <NavLink href="/faq" icon={HelpCircle} label="FAQ" />
         </nav>

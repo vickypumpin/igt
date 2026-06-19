@@ -24,7 +24,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   instagram: "📸", facebook: "👥", twitter: "🐦", youtube: "▶️", tiktok: "🎵", snapchat: "👻",
 };
 
-interface OverviewCardProps { label: string; primary: number; primaryLabel: string; secondary: number; secondaryLabel: string; icon: React.ComponentType<{ className?: string }>; color: string }
+interface OverviewCardProps { label: string; primary: number; primaryLabel: string; secondary: number; secondaryLabel: string; icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; color: string }
 function OverviewCard({ label, primary, primaryLabel, secondary, secondaryLabel, icon: Icon, color }: OverviewCardProps) {
   return (
     <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">

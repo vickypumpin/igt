@@ -83,7 +83,7 @@ export default function AdminCampaignsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 text-muted-foreground capitalize text-xs font-medium">{c.type.replace("_", " ")}</td>
+                      <td className="px-5 py-3.5 text-muted-foreground capitalize text-xs font-medium">{c.type?.replace("_", " ") ?? ""}</td>
                       <td className="px-5 py-3.5"><StatusBadge status={c.status} /></td>
                       <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</td>
                       <td className="px-5 py-3.5">

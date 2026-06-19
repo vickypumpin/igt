@@ -99,7 +99,7 @@ export default function CampaignsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 text-muted-foreground capitalize text-xs">{c.type.replace("_", " ")}</td>
+                    <td className="px-5 py-3.5 text-muted-foreground capitalize text-xs">{c.type?.replace("_", " ") ?? ""}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-1 text-muted-foreground text-xs"><Calendar className="h-3 w-3" />{c.startDate} — {c.endDate}</div>
                     </td>

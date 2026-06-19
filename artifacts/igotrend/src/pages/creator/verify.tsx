@@ -1,11 +1,15 @@
 import { useState, useRef } from "react";
-import { useGetMyKycRequest, useSubmitKycRequest, getMyKycRequestQueryKey } from "@workspace/api-client-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldCheck, ShieldX, Clock, Upload, CheckCircle2 } from "lucide-react";
+
+type KycEntry = { id: number; status: "pending" | "approved" | "rejected"; legalName: string; country: string; idType: string; idNumber: string; createdAt: string };
+const KYC_QUERY_KEY = ["/api/creator/kyc-request"] as const;
 
 const ID_TYPES = [
   { value: "national_id", label: "National ID" },
@@ -32,16 +36,21 @@ export default function VerifyPage() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: existing, isLoading, error } = useGetMyKycRequest({
-    query: { retry: false },
+  const { data: existing, isLoading } = useQuery<KycEntry | null>({
+    queryKey: KYC_QUERY_KEY,
+    queryFn: () => customFetch("/api/creator/kyc-request").catch(() => null) as Promise<KycEntry | null>,
+    retry: false,
   });
-  const submitMutation = useSubmitKycRequest();
+  const submitMutation = useMutation({
+    mutationFn: (data: { legalName: string; country: string; idType: string; idNumber: string; documentUrl: string }) =>
+      customFetch("/api/creator/kyc-request", { method: "POST", body: JSON.stringify(data) }),
+  });
 
   const [form, setForm] = useState({ legalName: "", country: "", idType: "national_id", idNumber: "" });
   const [docFile, setDocFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const notFound = (error as { status?: number })?.status === 404 || (!isLoading && !existing);
+  const notFound = !isLoading && !existing;
   const canSubmit = !existing || existing.status === "rejected";
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -63,7 +72,7 @@ export default function VerifyPage() {
     try {
       const documentUrl = await fileToBase64(docFile);
       await submitMutation.mutateAsync({ ...form, documentUrl });
-      queryClient.invalidateQueries({ queryKey: getMyKycRequestQueryKey() });
+      queryClient.invalidateQueries({ queryKey: KYC_QUERY_KEY });
       toast({ title: "Verification request submitted! 🎉" });
       setForm({ legalName: "", country: "", idType: "national_id", idNumber: "" });
       setDocFile(null);

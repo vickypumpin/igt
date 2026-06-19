@@ -39,7 +39,7 @@ export default function LoginPage() {
         setAuth(auth.token, auth.user);
         if (returnTo && returnTo.startsWith("/")) {
           setLocation(returnTo);
-        } else if (auth.user.role === "admin") {
+        } else if ((auth.user.role as string) === "admin") {
           setLocation("/admin");
         } else if (auth.user.role === "agency") {
           setLocation("/agency/dashboard");

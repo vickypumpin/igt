@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAdminListPayouts, getAdminListPayoutsQueryKey, useAdminApproveAndDisburse, type DisburseResult } from "@workspace/api-client-react";
+import { useAdminListPayouts, getAdminListPayoutsQueryKey, useAdminApprovePayout } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { customFetch } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
@@ -66,7 +66,7 @@ export default function AdminPayoutsPage() {
   const [tab, setTab] = useState<Tab>("payouts");
   const [disbursing, setDisbursing] = useState<number | null>(null);
   const { data = [], isLoading } = useAdminListPayouts({ query: { queryKey: getAdminListPayoutsQueryKey() } });
-  const approveMutation = useAdminApproveAndDisburse();
+  const approveMutation = useAdminApprovePayout();
 
   const { data: subscriptions = [], isLoading: subsLoading } = useQuery<SubUser[]>({
     queryKey: ["/admin/payments/subscriptions"],
@@ -85,10 +85,9 @@ export default function AdminPayoutsPage() {
     approveMutation.mutate(
       { id },
       {
-        onSuccess: (data: DisburseResult) => {
+        onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getAdminListPayoutsQueryKey() });
-          const gw = data?.gateway ? ` via ${data.gateway}` : "";
-          toast({ title: `Approved & disbursed${gw} ✓` });
+          toast({ title: "Approved & disbursed ✓" });
         },
         onError: (err: unknown) => {
           const msg = (err as { data?: { error?: string } })?.data?.error ?? "Disbursement failed";
@@ -144,7 +143,7 @@ export default function AdminPayoutsPage() {
                   { label: "Total requests", value: data.length, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
                   { label: "Pending amount", value: `₦${totalPending.toLocaleString()}`, gradient: "linear-gradient(135deg, #F59E0B, #D97706)" },
                   { label: "Approved", value: data.filter(p => p.status === "approved").length, gradient: "linear-gradient(135deg, #10B981, #059669)" },
-                  { label: "Disbursed", value: data.filter(p => p.status === "disbursed").length, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
+                  { label: "Disbursed", value: data.filter(p => (p.status as string) === "disbursed").length, gradient: "linear-gradient(135deg, #1DCFB3, #0FA88E)" },
                 ].map(({ label, value, gradient }) => (
                   <Card key={label} className="border-0 shadow-sm">
                     <CardContent className="p-4">
@@ -227,7 +226,7 @@ export default function AdminPayoutsPage() {
                                 {disbursing === p.id ? "Processing…" : "Approve & Disburse"}
                               </Button>
                             )}
-                            {p.status === "disbursed" && (
+                            {(p.status as string) === "disbursed" && (
                               <div className="text-xs text-muted-foreground font-mono truncate max-w-[120px]" title={(p as { transferRef?: string | null }).transferRef ?? ""}>
                                 {(p as { transferRef?: string | null }).transferRef ? `ref: ${(p as { transferRef?: string | null }).transferRef}` : "—"}
                               </div>

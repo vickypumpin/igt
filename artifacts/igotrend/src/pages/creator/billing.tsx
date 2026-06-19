@@ -51,7 +51,7 @@ function AddBankModal({ onClose }: { onClose: () => void }) {
               <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
               <Input
                 placeholder={placeholder}
-                value={(form as Record<string, string>)[key]}
+                value={(form as unknown as Record<string, string>)[key]}
                 onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                 className="h-10 rounded-xl"
               />

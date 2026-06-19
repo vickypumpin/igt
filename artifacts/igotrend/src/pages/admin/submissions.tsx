@@ -60,8 +60,8 @@ export default function AdminSubmissionsPage() {
                     <span className="text-xs px-2 py-0.5 rounded-full font-semibold capitalize" style={{ background: "rgba(29,207,179,0.1)", color: "#0FA88E" }}>{s.platform}</span>
                     <StatusBadge status={s.status} />
                   </div>
-                  <a href={s.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs flex items-center gap-1 hover:underline truncate" style={{ color: "#1DCFB3" }}>
-                    <ExternalLink className="h-3 w-3 flex-shrink-0" />{s.screenshotUrl.slice(0, 60)}{s.screenshotUrl.length > 60 ? "…" : ""}
+                  <a href={s.screenshotUrl ?? undefined} target="_blank" rel="noopener noreferrer" className="text-xs flex items-center gap-1 hover:underline truncate" style={{ color: "#1DCFB3" }}>
+                    <ExternalLink className="h-3 w-3 flex-shrink-0" />{(s.screenshotUrl ?? "").slice(0, 60)}{(s.screenshotUrl ?? "").length > 60 ? "…" : ""}
                   </a>
                   {(s.views || s.likes) && <div className="text-xs text-muted-foreground mt-1 font-medium">{s.views?.toLocaleString()} views · {s.likes?.toLocaleString()} likes</div>}
                 </div>

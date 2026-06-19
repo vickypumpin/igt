@@ -108,7 +108,7 @@ export default function AdminUsersPage() {
                           {u.isLocked ? "Locked" : u.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</td>
+                      <td className="px-5 py-3.5 text-xs text-muted-foreground">{new Date(u.createdAt ?? Date.now()).toLocaleDateString()}</td>
                       <td className="px-5 py-3.5">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" data-testid={`button-actions-${u.id}`}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>

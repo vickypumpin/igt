@@ -4,7 +4,6 @@ import { z } from "zod";
 import { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useGetMe, useUpdateProfile, useUpdatePassword, getGetMeQueryKey, customFetch } from "@workspace/api-client-react";
-import { useUpdateBankDetails } from "@workspace/api-client-react";
 import { queryClient as globalQueryClient } from "@/lib/query-client";
 import { useAuth } from "@/contexts/auth-context";
 import BrandLayout from "@/components/layout/brand-layout";
@@ -226,7 +225,10 @@ export default function SettingsPage() {
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const updateProfile = useUpdateProfile();
   const updatePassword = useUpdatePassword();
-  const updateBankDetails = useUpdateBankDetails();
+  const updateBankDetails = useMutation({
+    mutationFn: (data: BankData) =>
+      customFetch("/api/auth/me/bank-details", { method: "PATCH", body: JSON.stringify(data) }),
+  });
 
   const profileForm = useForm<ProfileData>({
     resolver: zodResolver(profileSchema),
@@ -243,12 +245,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (me) {
-      profileForm.reset({ firstName: me.firstName, lastName: me.lastName, phone: me.phone ?? "", bio: me.bio ?? "", instagramProfile: me.instagramProfile ?? "", tiktokProfile: me.tiktokProfile ?? "", youtubeProfile: me.youtubeProfile ?? "", twitterProfile: me.twitterProfile ?? "", profilePublic: (me as Record<string, unknown>).profilePublic !== false });
-      if (me.bankDetails) {
+      const meExt = me as unknown as { profilePublic?: boolean; bankDetails?: { bankName: string; accountName: string } };
+      profileForm.reset({ firstName: me.firstName, lastName: me.lastName, phone: me.phone ?? "", bio: me.bio ?? "", instagramProfile: me.instagramProfile ?? "", tiktokProfile: me.tiktokProfile ?? "", youtubeProfile: me.youtubeProfile ?? "", twitterProfile: me.twitterProfile ?? "", profilePublic: meExt.profilePublic !== false });
+      if (meExt.bankDetails) {
         bankForm.reset({
-          bankName: me.bankDetails.bankName,
+          bankName: meExt.bankDetails.bankName,
           accountNumber: "",
-          accountName: me.bankDetails.accountName,
+          accountName: meExt.bankDetails.accountName,
         });
       }
     }
@@ -275,6 +278,7 @@ export default function SettingsPage() {
       },
     });
   };
+
 
   const role = user?.role;
   const Layout = role === "creator" ? CreatorLayout : role === "agency" ? AgencyLayout : BrandLayout;
@@ -374,11 +378,11 @@ export default function SettingsPage() {
               <p className="text-xs text-muted-foreground">
                 Your bank details are used for payout disbursements. The account number is masked when displayed.
               </p>
-              {me?.bankDetails && (
+              {(me as unknown as { bankDetails?: { bankName: string; accountName: string; maskedAccountNumber?: string } })?.bankDetails && (
                 <div className="mt-3 p-3 rounded-xl border border-border/60 bg-muted/30 text-sm">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1 font-semibold uppercase tracking-widest">Current account on file</div>
-                  <div className="font-semibold">{me.bankDetails.bankName}</div>
-                  <div className="text-muted-foreground text-xs mt-0.5">{me.bankDetails.accountName} &mdash; {me.bankDetails.maskedAccountNumber}</div>
+                  <div className="font-semibold">{(me as unknown as { bankDetails: { bankName: string } }).bankDetails.bankName}</div>
+                  <div className="text-muted-foreground text-xs mt-0.5">{(me as unknown as { bankDetails: { accountName: string; maskedAccountNumber?: string } }).bankDetails.accountName} &mdash; {(me as unknown as { bankDetails: { maskedAccountNumber?: string } }).bankDetails.maskedAccountNumber}</div>
                 </div>
               )}
             </div>

@@ -79,7 +79,7 @@ export default function CampaignNewPage() {
     createMutation.mutate({ data: {
       name: values.name, sponsor: values.sponsor, description: values.description, kpis: values.kpis,
       type: values.type, campaignDuration: values.campaignDuration, startDate: values.startDate,
-      endDate: values.endDate, noOfCreators: values.noOfCreators, gemsPerCreator: values.gemsPerCreator,
+      endDate: values.endDate, noOfCreators: values.noOfCreators,
       postCaptionText: values.postCaptionText ?? null, handlesHash: values.handlesHash ?? null,
       dos: values.dos ?? null, donts: values.donts ?? null,
       dailyInstagramPost: values.dailyInstagramPost, dailyInstagramStoryPost: values.dailyInstagramStoryPost,
@@ -90,7 +90,8 @@ export default function CampaignNewPage() {
       weeklyInstagramPost: values.weeklyInstagramPost, weeklyInstagramStoryPost: 0,
       weeklyInstagramReel: 0, weeklyFbPost: 0, weeklyTiktokPost: values.weeklyTiktokPost,
       weeklyYoutubePost: values.weeklyYoutubePost, weeklyTwitterPost: values.weeklyTwitterPost, weeklySnapchatStory: 0,
-    } }, {
+      ...(values.gemsPerCreator > 0 ? { gemsPerCreator: values.gemsPerCreator } : {}),
+    } as import("@workspace/api-client-react").CampaignInput }, {
       onSuccess: (campaign) => {
         queryClient.invalidateQueries({ queryKey: getListCampaignsQueryKey() });
         toast({ title: "Campaign created! 🎉", description: totalBudget > 0 ? `${totalBudget.toLocaleString()} gems will be reserved when the campaign is approved.` : undefined });

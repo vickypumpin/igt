@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   useListMyInvites, useAcceptInvite, useDeclineInvite, getListMyInvitesQueryKey,
-  useDiscoverCampaigns, useApplyToCampaign, getDiscoverCampaignsQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
+import type { Campaign } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,11 +42,17 @@ export default function CreatorCampaignsPage() {
   const [mainTab, setMainTab] = useState<MainTab>("my-campaigns");
   const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
 
-  const { data: invites = [], isLoading: invitesLoading } = useListMyInvites({ query: { queryKey: getListMyInvitesQueryKey() } });
-  const { data: discoverCampaigns = [], isLoading: discoverLoading } = useDiscoverCampaigns({ query: { queryKey: getDiscoverCampaignsQueryKey() } });
+  const { data: invites = [], isLoading: invitesLoading } = useListMyInvites(undefined, { query: { queryKey: getListMyInvitesQueryKey() } });
+  const { data: discoverCampaigns = [], isLoading: discoverLoading } = useQuery<Campaign[]>({
+    queryKey: ["/api/creator/discover-campaigns"],
+    queryFn: () => customFetch("/api/creator/discover-campaigns") as Promise<Campaign[]>,
+  });
   const acceptMutation = useAcceptInvite();
   const declineMutation = useDeclineInvite();
-  const applyMutation = useApplyToCampaign();
+  const applyMutation = useMutation({
+    mutationFn: ({ campaignId }: { campaignId: number }) =>
+      customFetch(`/api/creator/campaigns/${campaignId}/apply`, { method: "POST" }),
+  });
 
   const filtered = filter === "all" ? invites : invites.filter(i =>
     filter === "active" ? i.status === "active" : i.status === filter
@@ -75,7 +83,7 @@ export default function CreatorCampaignsPage() {
     applyMutation.mutate({ campaignId }, {
       onSuccess: () => {
         setAppliedIds(prev => new Set(prev).add(campaignId));
-        queryClient.invalidateQueries({ queryKey: getDiscoverCampaignsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: ["/api/creator/discover-campaigns"] });
         queryClient.invalidateQueries({ queryKey: getListMyInvitesQueryKey() });
         toast({ title: "Application submitted! 🎉" });
       },
@@ -185,7 +193,7 @@ export default function CreatorCampaignsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
-                        {invite.source === "creator" && invite.status === "pending" ? (
+                        {(invite as unknown as { source?: string }).source === "creator" && invite.status === "pending" ? (
                           <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "rgba(245,158,11,0.12)", color: "#D97706" }} data-testid={`badge-awaiting-${invite.id}`}>
                             <Clock className="h-3.5 w-3.5" /> Awaiting Review
                           </span>
@@ -241,7 +249,7 @@ export default function CreatorCampaignsPage() {
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5 flex-wrap">
                           <span className="font-medium text-foreground/70">{campaign.sponsor}</span>
                           <span className="px-1.5 py-0.5 rounded-md font-medium capitalize" style={{ background: "rgba(107,47,206,0.08)", color: "#6B2FCE" }}>
-                            {campaign.type.replace("_", " ")}
+                            {campaign.type?.replace("_", " ") ?? ""}
                           </span>
                           <span className="capitalize flex items-center gap-0.5">
                             <Calendar className="h-3 w-3" /> {campaign.campaignDuration}
@@ -250,14 +258,14 @@ export default function CreatorCampaignsPage() {
                             <Users className="h-3 w-3" /> {campaign.noOfCreators} creators
                           </span>
                           {endDate && <span>Deadline {endDate}</span>}
-                          {campaign.gemsPerCreator != null && campaign.gemsPerCreator > 0 && (
+                          {(campaign as unknown as Record<string, unknown>).gemsPerCreator != null && Number((campaign as unknown as Record<string, unknown>).gemsPerCreator) > 0 && (
                             <span className="flex items-center gap-0.5 font-semibold" style={{ color: "#F59E0B" }}>
-                              <Gem className="h-3 w-3" /> {campaign.gemsPerCreator.toLocaleString()} gems
+                              <Gem className="h-3 w-3" /> {Number((campaign as unknown as Record<string, unknown>).gemsPerCreator).toLocaleString()} gems
                             </span>
                           )}
-                          {campaign.campaignCategoryId != null && (
+                          {(campaign as unknown as Record<string, unknown>).campaignCategoryId != null && (
                             <span className="flex items-center gap-0.5" style={{ color: "#6B2FCE" }}>
-                              <Tag className="h-3 w-3" /> Cat. {campaign.campaignCategoryId}
+                              <Tag className="h-3 w-3" /> Cat. {String((campaign as unknown as Record<string, unknown>).campaignCategoryId)}
                             </span>
                           )}
                         </div>

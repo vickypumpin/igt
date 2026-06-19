@@ -53,7 +53,7 @@ export default function RegisterPage() {
   });
 
   const onSubmit = (values: FormData) => {
-    registerMutation.mutate({ data: { ...values, role } }, {
+    registerMutation.mutate({ data: { ...values, role, phone: values.phone ?? "" } }, {
       onSuccess: (data) => {
         const auth = data as unknown as AuthResponse;
         setAuth(auth.token, auth.user);

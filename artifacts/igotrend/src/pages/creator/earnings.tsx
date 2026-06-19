@@ -24,7 +24,7 @@ export default function EarningsPage() {
   const [amount, setAmount] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
 
-  const hasBankDetails = Boolean(me?.bankDetails);
+  const hasBankDetails = Boolean((me as unknown as { bankDetails?: unknown })?.bankDetails);
 
   const payoutMutation = useMutation({
     mutationFn: (data: { amount: number; campaignId: number }) =>
@@ -92,12 +92,12 @@ export default function EarningsPage() {
         )}
 
         {/* Bank account summary (if on file) */}
-        {me?.bankDetails && (
+        {(me as unknown as { bankDetails?: { bankName: string; accountName: string; maskedAccountNumber?: string } })?.bankDetails && (
           <div className="mb-6 flex items-center gap-3 p-4 rounded-2xl border border-emerald-200 bg-emerald-50" data-testid="bank-details-summary">
             <Landmark className="h-5 w-5 text-emerald-600 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-emerald-800">{me.bankDetails.bankName}</p>
-              <p className="text-xs text-emerald-700">{me.bankDetails.accountName} &mdash; {me.bankDetails.maskedAccountNumber}</p>
+              <p className="text-sm font-semibold text-emerald-800">{(me as unknown as { bankDetails: { bankName: string } }).bankDetails.bankName}</p>
+              <p className="text-xs text-emerald-700">{(me as unknown as { bankDetails: { accountName: string; maskedAccountNumber?: string } }).bankDetails.accountName} &mdash; {(me as unknown as { bankDetails: { maskedAccountNumber?: string } }).bankDetails.maskedAccountNumber}</p>
             </div>
             <Link href="/settings">
               <span className="text-xs text-emerald-700 underline font-semibold cursor-pointer">Edit</span>

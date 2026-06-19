@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import {
   useAccountProfile,
   useUpdateAccountProfile,
   getAccountProfileQueryKey,
-  useCompleteOnboarding,
   getGetMeQueryKey,
+  customFetch,
 } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,9 @@ export default function CreatorOnboardingWizard({ onClose }: Props) {
   const [, navigate] = useLocation();
   const { data: profile } = useAccountProfile();
   const updateMutation = useUpdateAccountProfile();
-  const completeOnboarding = useCompleteOnboarding();
+  const completeOnboarding = useMutation({
+    mutationFn: () => customFetch("/api/auth/me/onboarding-complete", { method: "PATCH" }),
+  });
 
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
