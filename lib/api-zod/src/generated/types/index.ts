@@ -82,6 +82,8 @@ export * from './submissionInput';
 export * from './submissionReview';
 export * from './submissionReviewStatus';
 export * from './submissionStatus';
+export * from './uploadUrlRequest';
+export * from './uploadUrlResponse';
 export * from './user';
 export * from './userBadge';
 export * from './userListResponse';

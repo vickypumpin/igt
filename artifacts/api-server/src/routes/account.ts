@@ -3,7 +3,13 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import { initiateCollection, verifyCollection } from "../lib/gateway";
+import { ObjectStorageService } from "../lib/objectStorage";
 import type { IRouter } from "express";
+
+const objectStorageService = new ObjectStorageService();
+
+const AVATAR_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const AVATAR_MAX_SIZE = 5 * 1024 * 1024;
 
 const router: IRouter = Router();
 
@@ -55,6 +61,32 @@ const userProfileShape = (u: typeof usersTable.$inferSelect) => ({
   snapchatDayStoryPrice: u.snapchatDayStoryPrice ?? null,
   snapchatWeekStoryPrice: u.snapchatWeekStoryPrice ?? null,
   createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt),
+});
+
+// ── Avatar Upload ─────────────────────────────────────────────────────────────
+
+router.post("/account/avatar-upload", requireAuth, async (req, res): Promise<void> => {
+  const { name, size, contentType } = req.body ?? {};
+  if (!name || typeof name !== "string") {
+    res.status(400).json({ error: "name is required" }); return;
+  }
+  if (typeof size !== "number" || size <= 0) {
+    res.status(400).json({ error: "size must be a positive number" }); return;
+  }
+  if (size > AVATAR_MAX_SIZE) {
+    res.status(400).json({ error: "File exceeds maximum size of 5 MB" }); return;
+  }
+  if (!contentType || !AVATAR_ALLOWED_TYPES.includes(contentType as string)) {
+    res.status(400).json({ error: `contentType must be one of: ${AVATAR_ALLOWED_TYPES.join(", ")}` }); return;
+  }
+  try {
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+    res.json({ uploadURL, objectPath });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to generate upload URL";
+    res.status(500).json({ error: msg });
+  }
 });
 
 // ── Profile ─────────────────────────────────────────────────────────────────

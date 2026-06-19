@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { User, Instagram, Camera, MapPin, DollarSign } from "lucide-react";
+import { AvatarUpload } from "@/components/AvatarUpload";
 
 type FormState = {
   firstName: string; lastName: string; email: string; userName: string; phone: string;
@@ -170,16 +171,16 @@ export default function CreatorAccountEditPage() {
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)" }}><Camera className="h-4 w-4" /></div>
               <div className="text-sm font-bold">Profile Photo</div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#1DCFB3] to-[#6B2FCE] flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
-                {form.avatarUrl
-                  ? <img src={form.avatarUrl} alt="avatar" className="w-14 h-14 rounded-xl object-cover" />
-                  : (form.firstName[0] ?? "?").toUpperCase()}
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Avatar URL</label>
-                <Input value={form.avatarUrl} onChange={field("avatarUrl")} placeholder="https://…" className="h-10 rounded-xl" data-testid="input-avatarUrl" />
-                <p className="text-xs text-muted-foreground mt-1">Paste a link to your profile photo</p>
+            <div className="flex items-center gap-5">
+              <AvatarUpload
+                currentUrl={form.avatarUrl}
+                initials={form.firstName[0] ?? "?"}
+                onUpload={(url) => setForm(f => ({ ...f, avatarUrl: url }))}
+                size={80}
+              />
+              <div>
+                <p className="text-sm font-semibold">Profile Photo</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Click the circle to upload a photo (JPEG, PNG, or WEBP · max 5 MB). The URL is saved when you click Save Changes.</p>
               </div>
             </div>
           </div>

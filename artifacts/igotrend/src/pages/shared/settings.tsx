@@ -1,11 +1,12 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useGetMe, useUpdateProfile, useUpdatePassword, getGetMeQueryKey, customFetch } from "@workspace/api-client-react";
+import { useGetMe, useUpdateProfile, useUpdatePassword, useUpdateAccountProfile, getGetMeQueryKey, getAccountProfileQueryKey, customFetch } from "@workspace/api-client-react";
 import { queryClient as globalQueryClient } from "@/lib/query-client";
 import { useAuth } from "@/contexts/auth-context";
+import { AvatarUpload } from "@/components/AvatarUpload";
 import BrandLayout from "@/components/layout/brand-layout";
 import CreatorLayout from "@/components/layout/creator-layout";
 import AgencyLayout from "@/components/layout/agency-layout";
@@ -225,6 +226,23 @@ export default function SettingsPage() {
   const { data: me } = useGetMe({ query: { queryKey: getGetMeQueryKey() } });
   const updateProfile = useUpdateProfile();
   const updatePassword = useUpdatePassword();
+  const updateAccountProfile = useUpdateAccountProfile();
+  const [avatarUrl, setAvatarUrl] = useState<string>("");
+
+  const handleAvatarUpload = (url: string) => {
+    setAvatarUrl(url);
+    updateAccountProfile.mutate({ avatarUrl: url } as Parameters<typeof updateAccountProfile.mutate>[0], {
+      onSuccess: () => {
+        globalQueryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        globalQueryClient.invalidateQueries({ queryKey: getAccountProfileQueryKey() });
+        toast({ title: "Profile photo updated ✓" });
+      },
+      onError: () => {
+        toast({ title: "Failed to save photo", variant: "destructive" });
+      },
+    });
+  };
+
   const updateBankDetails = useMutation({
     mutationFn: (data: BankData) =>
       customFetch("/api/auth/me/bank-details", { method: "PATCH", body: JSON.stringify(data) }),
@@ -245,7 +263,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (me) {
-      const meExt = me as unknown as { profilePublic?: boolean; bankDetails?: { bankName: string; accountName: string } };
+      const meExt = me as unknown as { profilePublic?: boolean; bankDetails?: { bankName: string; accountName: string }; avatarUrl?: string };
+      setAvatarUrl(meExt.avatarUrl ?? "");
       profileForm.reset({ firstName: me.firstName, lastName: me.lastName, phone: me.phone ?? "", bio: me.bio ?? "", instagramProfile: me.instagramProfile ?? "", tiktokProfile: me.tiktokProfile ?? "", youtubeProfile: me.youtubeProfile ?? "", twitterProfile: me.twitterProfile ?? "", profilePublic: meExt.profilePublic !== false });
       if (meExt.bankDetails) {
         bankForm.reset({
@@ -296,6 +315,18 @@ export default function SettingsPage() {
         <Section icon={User} title="Profile Information">
           <Form {...profileForm}>
             <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-3">
+              <div className="flex items-center gap-4 pb-1">
+                <AvatarUpload
+                  currentUrl={avatarUrl}
+                  initials={(me?.firstName?.[0] ?? user?.firstName?.[0] ?? "?")}
+                  onUpload={handleAvatarUpload}
+                  size={72}
+                />
+                <div>
+                  <p className="text-sm font-semibold">Profile Photo</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Click to upload (JPEG, PNG, or WEBP · max 5 MB). Saved immediately.</p>
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField control={profileForm.control} name="firstName" render={({ field }) => (
                   <FormItem><FormLabel className={labelCls}>First name</FormLabel><FormControl><Input {...field} className={inputCls} data-testid="input-first-name" /></FormControl><FormMessage /></FormItem>
