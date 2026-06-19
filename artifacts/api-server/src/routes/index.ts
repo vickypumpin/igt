@@ -20,6 +20,7 @@ import adminAccountsRouter from "./admin_accounts";
 import agencyRouter from "./agency";
 import openaiRouter from "./openai";
 import storageRouter from "./storage";
+import geoRouter from "./geo";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(adminMessagesRouter);
 router.use(adminAccountsRouter);
 router.use(openaiRouter);
 router.use(storageRouter);
+router.use(geoRouter);
 
 export default router;

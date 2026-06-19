@@ -8,6 +8,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { User, Instagram, Camera, MapPin, DollarSign } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
+import { CountrySelect } from "@/components/CountrySelect";
+import { StateSelect } from "@/components/StateSelect";
+import { TagMultiSelect } from "@/components/TagMultiSelect";
+
+const CONTENT_CATEGORIES = [
+  "Lifestyle", "Fashion", "Tech", "Beauty", "Food", "Travel", "Comedy",
+  "Music", "Sports", "Gaming", "Education", "Business", "Health",
+  "Parenting", "Finance", "Entertainment", "News", "Politics", "Others",
+];
+
+const CREATOR_CATEGORIES = [
+  "Nano", "Micro", "Mid-tier", "Macro", "Mega",
+];
 
 type FormState = {
   firstName: string; lastName: string; email: string; userName: string; phone: string;
@@ -58,7 +71,6 @@ const PRICE_KEYS: (keyof FormState)[] = [
   "snapchatDayStoryPrice", "snapchatWeekStoryPrice",
 ];
 
-// Follower count keys are stored as extra properties on the profile (string fields)
 const FOLLOWER_KEYS: (keyof FormState)[] = [
   "instagramFollowers", "facebookFollowers", "twitterFollowers",
   "youtubeFollowers", "tiktokFollowers", "snapchatFollowers",
@@ -111,6 +123,10 @@ export default function CreatorAccountEditPage() {
 
   const field = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
+
+  const handleCountryChange = (countryId: string) => {
+    setForm(f => ({ ...f, countryId, stateId: "" }));
+  };
 
   const handleSave = () => {
     const payload: Record<string, unknown> = {
@@ -213,11 +229,23 @@ export default function CreatorAccountEditPage() {
               ))}
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Creator category</label>
-                <Input value={form.creatorCategory} onChange={field("creatorCategory")} placeholder="e.g. Fashion, Tech" className="h-10 rounded-xl" data-testid="input-creatorCategory" />
+                <TagMultiSelect
+                  options={CREATOR_CATEGORIES}
+                  value={form.creatorCategory}
+                  onChange={(v) => setForm(f => ({ ...f, creatorCategory: v }))}
+                  placeholder="Select creator type…"
+                  data-testid="input-creatorCategory"
+                />
               </div>
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Content category</label>
-                <Input value={form.contentCategory} onChange={field("contentCategory")} placeholder="e.g. Lifestyle, Reviews" className="h-10 rounded-xl" data-testid="input-contentCategory" />
+                <TagMultiSelect
+                  options={CONTENT_CATEGORIES}
+                  value={form.contentCategory}
+                  onChange={(v) => setForm(f => ({ ...f, contentCategory: v }))}
+                  placeholder="Select content categories…"
+                  data-testid="input-contentCategory"
+                />
               </div>
               <div className="col-span-1 sm:col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Bio</label>
@@ -234,12 +262,21 @@ export default function CreatorAccountEditPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country ID</label>
-                <Input type="number" value={form.countryId} onChange={field("countryId")} placeholder="Country ID" className="h-10 rounded-xl" data-testid="input-countryId" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country</label>
+                <CountrySelect
+                  value={form.countryId}
+                  onChange={handleCountryChange}
+                  data-testid="input-countryId"
+                />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">State ID</label>
-                <Input type="number" value={form.stateId} onChange={field("stateId")} placeholder="State ID" className="h-10 rounded-xl" data-testid="input-stateId" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">State / Region</label>
+                <StateSelect
+                  value={form.stateId}
+                  onChange={(v) => setForm(f => ({ ...f, stateId: v }))}
+                  countryId={form.countryId}
+                  data-testid="input-stateId"
+                />
               </div>
             </div>
           </div>

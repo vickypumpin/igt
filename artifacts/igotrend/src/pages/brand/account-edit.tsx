@@ -8,6 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Building2, Globe, Camera, MapPin } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
+import { CountrySelect } from "@/components/CountrySelect";
+import { StateSelect } from "@/components/StateSelect";
 
 type FormState = {
   firstName: string; lastName: string; email: string; phone: string;
@@ -48,6 +50,10 @@ export default function BrandAccountEditPage() {
 
   const field = (key: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
+
+  const handleCountryChange = (countryId: string) => {
+    setForm(f => ({ ...f, countryId, stateId: "" }));
+  };
 
   const handleSave = () => {
     const payload = {
@@ -124,7 +130,7 @@ export default function BrandAccountEditPage() {
             </div>
           </div>
 
-          {/* Account info (read-only email) */}
+          {/* Account info */}
           <div className="bg-white rounded-2xl border border-border/60 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white" style={{ background: "linear-gradient(135deg, #6B2FCE, #5B21B6)" }}><Globe className="h-4 w-4" /></div>
@@ -187,12 +193,21 @@ export default function BrandAccountEditPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country ID</label>
-                <Input type="number" value={form.countryId} onChange={field("countryId")} placeholder="Country ID" className="h-10 rounded-xl" data-testid="input-countryId" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">Country</label>
+                <CountrySelect
+                  value={form.countryId}
+                  onChange={handleCountryChange}
+                  data-testid="input-countryId"
+                />
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground mb-1 block">State ID</label>
-                <Input type="number" value={form.stateId} onChange={field("stateId")} placeholder="State ID" className="h-10 rounded-xl" data-testid="input-stateId" />
+                <label className="text-xs font-semibold text-muted-foreground mb-1 block">State / Region</label>
+                <StateSelect
+                  value={form.stateId}
+                  onChange={(v) => setForm(f => ({ ...f, stateId: v }))}
+                  countryId={form.countryId}
+                  data-testid="input-stateId"
+                />
               </div>
             </div>
           </div>
