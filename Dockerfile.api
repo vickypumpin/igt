@@ -1,0 +1,57 @@
+FROM node:20-alpine AS builder
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+
+COPY lib/db/package.json ./lib/db/
+COPY lib/api-spec/package.json ./lib/api-spec/
+COPY lib/api-zod/package.json ./lib/api-zod/
+COPY lib/api-client-react/package.json ./lib/api-client-react/
+COPY lib/object-storage-web/package.json ./lib/object-storage-web/
+COPY lib/integrations-openai-ai-server/package.json ./lib/integrations-openai-ai-server/
+COPY lib/integrations-openai-ai-react/package.json ./lib/integrations-openai-ai-react/
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY artifacts/igotrend/package.json ./artifacts/igotrend/
+COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
+
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+
+RUN pnpm --filter @workspace/api-server run build
+
+
+FROM node:20-alpine AS runtime
+
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+WORKDIR /app
+
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+
+COPY lib/db/package.json ./lib/db/
+COPY lib/api-spec/package.json ./lib/api-spec/
+COPY lib/api-zod/package.json ./lib/api-zod/
+COPY lib/api-client-react/package.json ./lib/api-client-react/
+COPY lib/object-storage-web/package.json ./lib/object-storage-web/
+COPY lib/integrations-openai-ai-server/package.json ./lib/integrations-openai-ai-server/
+COPY lib/integrations-openai-ai-react/package.json ./lib/integrations-openai-ai-react/
+COPY artifacts/api-server/package.json ./artifacts/api-server/
+COPY artifacts/igotrend/package.json ./artifacts/igotrend/
+COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
+
+COPY lib/db/migrations ./lib/db/migrations
+
+ENV NODE_ENV=production
+ENV PORT=8080
+
+EXPOSE 8080
+
+CMD ["node", "--enable-source-maps", "./artifacts/api-server/dist/index.mjs"]
