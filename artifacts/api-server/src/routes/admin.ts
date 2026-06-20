@@ -357,6 +357,7 @@ router.get("/admin/payouts", requireAuth, requireRole("admin"), async (req, res)
         bankName: bank.bankName,
         accountName: bank.accountName,
         accountNumber: bank.accountNumber,
+        verified: bank.verified ?? false,
       } : null,
     };
   }));

@@ -7,7 +7,7 @@ import AdminLayout from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Wallet, CreditCard, Percent, Send } from "lucide-react";
+import { Wallet, CreditCard, Percent, Send, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -197,7 +197,14 @@ export default function AdminPayoutsPage() {
                           <td className="px-5 py-3.5">
                             {bank ? (
                               <div>
-                                <div className="text-xs font-semibold text-foreground">{bank.bankName}</div>
+                                <div className="text-xs font-semibold text-foreground flex items-center gap-1">
+                                  {bank.bankName}
+                                  {bank.verified && (
+                                    <span className="inline-flex items-center gap-0.5 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
+                                      <ShieldCheck className="h-2.5 w-2.5" />Verified
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground font-mono">{bank.accountNumber}</div>
                                 <div className="text-xs text-muted-foreground">{bank.accountName}</div>
                               </div>

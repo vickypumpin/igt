@@ -11,7 +11,13 @@ export interface BankAccount {
   accountNumber: string;
   accountName: string;
   isDefault: boolean;
+  verified: boolean;
   createdAt: string;
+}
+
+export interface BankOption {
+  name: string;
+  code: string;
 }
 
 export interface GemsTransaction {
@@ -61,6 +67,32 @@ export interface AdminMessage {
   createdAt: string;
 }
 
+// ── Bank List & Verification (Paystack) ───────────────────────────────────────
+
+export const getListBanksQueryKey = () => ["/account/banks"] as const;
+
+export const useListBanks = <TData = BankOption[]>(options?: {
+  query?: UseQueryOptions<BankOption[], unknown, TData>;
+}) =>
+  useQuery<BankOption[], unknown, TData>({
+    queryKey: getListBanksQueryKey(),
+    queryFn: () => customFetch<BankOption[]>("/api/account/banks"),
+    staleTime: 24 * 60 * 60 * 1000,
+    ...options?.query,
+  });
+
+export const useVerifyBankAccount = (
+  options?: UseMutationOptions<{ accountName: string }, unknown, { accountNumber: string; bankCode: string }>
+) =>
+  useMutation<{ accountName: string }, unknown, { accountNumber: string; bankCode: string }>({
+    mutationFn: (data) =>
+      customFetch<{ accountName: string }>("/api/account/bank-accounts/verify", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    ...options,
+  });
+
 // ── Bank Accounts ─────────────────────────────────────────────────────────────
 
 export const getListBankAccountsQueryKey = () => ["/account/bank-accounts"] as const;
@@ -78,9 +110,9 @@ export const useListBankAccounts = <TData = BankAccount[]>(options?: {
   });
 
 export const useAddBankAccount = (
-  options?: UseMutationOptions<BankAccount, unknown, { bankName: string; bankCode?: string; accountNumber: string; accountName: string; isDefault?: boolean }>
+  options?: UseMutationOptions<BankAccount, unknown, { bankName: string; bankCode: string; accountNumber: string; isDefault?: boolean }>
 ) =>
-  useMutation<BankAccount, unknown, { bankName: string; bankCode?: string; accountNumber: string; accountName: string; isDefault?: boolean }>({
+  useMutation<BankAccount, unknown, { bankName: string; bankCode: string; accountNumber: string; isDefault?: boolean }>({
     mutationFn: (data) =>
       customFetch<BankAccount>("/api/account/bank-accounts", {
         method: "POST",
@@ -695,6 +727,7 @@ export interface PayoutWithGateway {
     bankName: string;
     accountName: string;
     accountNumber: string;
+    verified: boolean;
   } | null;
 }
 

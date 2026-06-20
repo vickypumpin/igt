@@ -11,6 +11,7 @@ export const bankAccountsTable = pgTable("bank_accounts", {
   accountNumber: text("account_number").notNull(),
   accountName: text("account_name").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
+  verified: boolean("verified").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

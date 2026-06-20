@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import {
   useListBankAccounts, useAddBankAccount, useSetDefaultBankAccount, useDeleteBankAccount,
   useBillingBalance, getBillingBalanceQueryKey, getListBankAccountsQueryKey,
+  useListBanks, useVerifyBankAccount,
 } from "@workspace/api-client-react";
 import { queryClient } from "@/lib/query-client";
 import CreatorLayout from "@/components/layout/creator-layout";
@@ -11,26 +12,83 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowDownCircle, ArrowUpCircle, Gem, Gift, Landmark, Plus, Star, Trash2, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, BadgeCheck, Gem, Gift, Landmark, Loader2, Plus, ShieldCheck, Star, Trash2, X } from "lucide-react";
 
 function AddBankModal({ onClose }: { onClose: () => void }) {
   const { toast } = useToast();
   const addMutation = useAddBankAccount();
-  const [form, setForm] = useState({ bankName: "", bankCode: "", accountNumber: "", accountName: "", isDefault: false });
+  const { data: bankOptions = [], isLoading: banksLoading } = useListBanks();
+  const verifyMutation = useVerifyBankAccount();
+
+  const [selectedBank, setSelectedBank] = useState<{ name: string; code: string } | null>(null);
+  const [bankSearch, setBankSearch] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState("");
+  const [verified, setVerified] = useState(false);
+  const [verifyError, setVerifyError] = useState("");
+  const [isDefault, setIsDefault] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filteredBanks = bankOptions.filter(b =>
+    b.name.toLowerCase().includes(bankSearch.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (accountNumber.length === 10 && selectedBank) {
+      setVerified(false);
+      setAccountName("");
+      setVerifyError("");
+      verifyMutation.mutate(
+        { accountNumber, bankCode: selectedBank.code },
+        {
+          onSuccess: (data) => {
+            setAccountName(data.accountName);
+            setVerified(true);
+            setVerifyError("");
+          },
+          onError: (err: unknown) => {
+            const msg = (err as { data?: { error?: string } })?.data?.error
+              ?? (err instanceof Error ? err.message : "Verification failed");
+            setVerifyError(msg);
+            setAccountName("");
+            setVerified(false);
+          },
+        }
+      );
+    } else if (accountNumber.length < 10) {
+      setVerified(false);
+      setAccountName("");
+      setVerifyError("");
+    }
+  }, [accountNumber, selectedBank]);
 
   const submit = () => {
-    if (!form.bankName || !form.accountNumber || !form.accountName) {
-      toast({ title: "All fields required", variant: "destructive" }); return;
+    if (!selectedBank || !accountNumber || !verified) {
+      toast({ title: "Please complete account verification first", variant: "destructive" }); return;
     }
-    addMutation.mutate(form, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getBillingBalanceQueryKey() });
-        toast({ title: "Bank account added ✓" });
-        onClose();
-      },
-      onError: () => toast({ title: "Failed to add account", variant: "destructive" }),
-    });
+    addMutation.mutate(
+      { bankName: selectedBank.name, bankCode: selectedBank.code, accountNumber, isDefault },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListBankAccountsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getBillingBalanceQueryKey() });
+          toast({ title: "Bank account added ✓" });
+          onClose();
+        },
+        onError: () => toast({ title: "Failed to add account", variant: "destructive" }),
+      }
+    );
   };
 
   return (
@@ -40,25 +98,108 @@ function AddBankModal({ onClose }: { onClose: () => void }) {
           <div className="text-base font-bold">Add Bank Account</div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
         </div>
-        <div className="p-6 space-y-3">
-          {[
-            { label: "Bank name", key: "bankName", placeholder: "e.g. Guaranty Trust Bank" },
-            { label: "Bank code", key: "bankCode", placeholder: "e.g. 058 (optional)" },
-            { label: "Account number", key: "accountNumber", placeholder: "10-digit account number" },
-            { label: "Account name", key: "accountName", placeholder: "As it appears on bank records" },
-          ].map(({ label, key, placeholder }) => (
-            <div key={key}>
-              <label className="text-xs font-semibold text-muted-foreground mb-1 block">{label}</label>
+        <div className="p-6 space-y-4">
+          {/* Bank dropdown */}
+          <div ref={dropdownRef} className="relative">
+            <label className="text-xs font-semibold text-muted-foreground mb-1 block">Bank</label>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(o => !o)}
+              className="w-full h-10 rounded-xl border border-input px-3 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-1 focus:ring-ring bg-white"
+            >
+              <span className={selectedBank ? "text-foreground" : "text-muted-foreground"}>
+                {banksLoading ? "Loading banks…" : (selectedBank?.name ?? "Select a bank…")}
+              </span>
+              <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
+            </button>
+            {dropdownOpen && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-border rounded-xl shadow-lg overflow-hidden">
+                <div className="p-2 border-b border-border/60">
+                  <Input
+                    autoFocus
+                    placeholder="Search bank…"
+                    value={bankSearch}
+                    onChange={e => setBankSearch(e.target.value)}
+                    className="h-8 rounded-lg text-sm"
+                  />
+                </div>
+                <div className="max-h-52 overflow-y-auto">
+                  {filteredBanks.length === 0 ? (
+                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">No banks found</div>
+                  ) : filteredBanks.map(b => (
+                    <button
+                      key={b.code}
+                      type="button"
+                      className="w-full px-3 py-2 text-sm text-left hover:bg-muted/60 transition-colors"
+                      onClick={() => {
+                        setSelectedBank(b);
+                        setBankSearch("");
+                        setDropdownOpen(false);
+                        setAccountNumber("");
+                        setAccountName("");
+                        setVerified(false);
+                        setVerifyError("");
+                      }}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Account number */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1 block">Account number</label>
+            <Input
+              placeholder="10-digit account number"
+              value={accountNumber}
+              maxLength={10}
+              onChange={e => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+              className="h-10 rounded-xl"
+            />
+          </div>
+
+          {/* Account name — auto-filled & read-only */}
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-2">
+              Account name
+              {verified && (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
+                  <ShieldCheck className="h-3 w-3" />Verified ✓
+                </span>
+              )}
+            </label>
+            <div className="relative">
               <Input
-                placeholder={placeholder}
-                value={(form as unknown as Record<string, string>)[key]}
-                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                className="h-10 rounded-xl"
+                readOnly
+                placeholder={
+                  !selectedBank ? "Select a bank first" :
+                  accountNumber.length < 10 ? "Enter 10-digit account number" :
+                  verifyMutation.isPending ? "Verifying…" :
+                  verifyError ? "Verification failed" :
+                  "Account name will appear here"
+                }
+                value={accountName}
+                className="h-10 rounded-xl bg-muted/40 cursor-default pr-9"
               />
+              {verifyMutation.isPending && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {verified && !verifyMutation.isPending && (
+                <BadgeCheck className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#059669" }} />
+              )}
             </div>
-          ))}
+            {verifyError && (
+              <p className="text-xs mt-1" style={{ color: "#DC2626" }}>{verifyError}</p>
+            )}
+          </div>
+
           <label className="flex items-center gap-2 cursor-pointer pt-1">
-            <input type="checkbox" checked={form.isDefault} onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))} className="h-4 w-4 rounded border-border" />
+            <input type="checkbox" checked={isDefault} onChange={e => setIsDefault(e.target.checked)} className="h-4 w-4 rounded border-border" />
             <span className="text-sm text-muted-foreground">Set as default payout account</span>
           </label>
         </div>
@@ -66,7 +207,7 @@ function AddBankModal({ onClose }: { onClose: () => void }) {
           <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl">Cancel</Button>
           <Button
             onClick={submit}
-            disabled={addMutation.isPending}
+            disabled={addMutation.isPending || !verified}
             className="flex-1 rounded-xl font-semibold"
             style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
           >
@@ -175,6 +316,11 @@ export default function CreatorBillingPage() {
                     <div className="font-semibold text-sm flex items-center gap-2">
                       {a.bankName}
                       {a.isDefault && <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(29,207,179,0.12)", color: "#0FA88E" }}>Default</span>}
+                      {a.verified && (
+                        <span className="inline-flex items-center gap-0.5 text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(16,185,129,0.12)", color: "#059669" }}>
+                          <ShieldCheck className="h-3 w-3" />Verified
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground">{a.accountName} · {a.accountNumber}</div>
                   </div>

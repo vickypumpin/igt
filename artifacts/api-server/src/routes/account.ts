@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
-import { initiateCollection, verifyCollection } from "../lib/gateway";
+import { initiateCollection, verifyCollection, listBanks, resolveAccount } from "../lib/gateway";
 import { ObjectStorageService } from "../lib/objectStorage";
 import type { IRouter } from "express";
 
@@ -24,6 +24,7 @@ const GEMS_PACKAGES: Record<string, { gems: number; amountNGN: number }> = {
 const accountShape = (a: typeof bankAccountsTable.$inferSelect) => ({
   id: a.id, userId: a.userId, bankName: a.bankName, bankCode: a.bankCode ?? null,
   accountNumber: a.accountNumber, accountName: a.accountName, isDefault: a.isDefault,
+  verified: a.verified ?? false,
   createdAt: a.createdAt instanceof Date ? a.createdAt.toISOString() : String(a.createdAt),
 });
 
@@ -123,6 +124,43 @@ router.put("/account/profile", requireAuth, async (req, res): Promise<void> => {
   res.json(userProfileShape(u));
 });
 
+// ── Bank list (Paystack → Flutterwave fallback) — 24h in-memory cache ─────────
+
+let bankListCache: { data: { name: string; code: string }[]; expiresAt: number } | null = null;
+
+router.get("/account/banks", requireAuth, async (_req, res): Promise<void> => {
+  const now = Date.now();
+  if (bankListCache && bankListCache.expiresAt > now) {
+    res.json(bankListCache.data); return;
+  }
+  try {
+    const banks = await listBanks();
+    bankListCache = { data: banks, expiresAt: now + 24 * 60 * 60 * 1000 };
+    res.json(banks);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to fetch bank list";
+    const status = msg.includes("No payment gateway") ? 503 : 502;
+    res.status(status).json({ error: msg });
+  }
+});
+
+// ── Bank account verification (Paystack → Flutterwave fallback) ───────────────
+
+router.post("/account/bank-accounts/verify", requireAuth, async (req, res): Promise<void> => {
+  const { accountNumber, bankCode } = req.body;
+  if (!accountNumber || !bankCode) {
+    res.status(400).json({ error: "accountNumber and bankCode are required" }); return;
+  }
+  try {
+    const accountName = await resolveAccount(String(accountNumber), String(bankCode));
+    res.json({ accountName });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Verification failed";
+    const status = msg.includes("No payment gateway") ? 503 : 422;
+    res.status(status).json({ error: msg });
+  }
+});
+
 // ── Bank Accounts ─────────────────────────────────────────────────────────────
 
 router.get("/account/bank-accounts", requireAuth, async (req, res): Promise<void> => {
@@ -133,16 +171,31 @@ router.get("/account/bank-accounts", requireAuth, async (req, res): Promise<void
 });
 
 router.post("/account/bank-accounts", requireAuth, async (req, res): Promise<void> => {
-  const { bankName, bankCode, accountNumber, accountName, isDefault } = req.body;
-  if (!bankName || !accountNumber || !accountName) {
-    res.status(400).json({ error: "bankName, accountNumber, and accountName are required" }); return;
+  const { bankName, bankCode, accountNumber, isDefault } = req.body;
+  if (!bankName || !bankCode || !accountNumber) {
+    res.status(400).json({ error: "bankName, bankCode, and accountNumber are required" }); return;
   }
+  if (typeof accountNumber !== "string" || !/^\d{10}$/.test(accountNumber)) {
+    res.status(400).json({ error: "accountNumber must be exactly 10 digits" }); return;
+  }
+
+  // Server-authoritative: always re-verify — never trust client-supplied accountName
+  let verifiedAccountName: string;
+  try {
+    verifiedAccountName = await resolveAccount(accountNumber, String(bankCode));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Verification failed";
+    const status = msg.includes("No payment gateway") ? 503 : 422;
+    res.status(status).json({ error: msg }); return;
+  }
+
   if (isDefault) {
     await db.update(bankAccountsTable).set({ isDefault: false }).where(eq(bankAccountsTable.userId, req.userId!));
   }
   const [account] = await db.insert(bankAccountsTable).values({
-    userId: req.userId!, bankName, bankCode: bankCode ?? null,
-    accountNumber, accountName, isDefault: isDefault ?? false,
+    userId: req.userId!, bankName: String(bankName), bankCode: String(bankCode),
+    accountNumber, accountName: verifiedAccountName, isDefault: isDefault === true,
+    verified: true,
   }).returning();
   res.status(201).json(accountShape(account));
 });

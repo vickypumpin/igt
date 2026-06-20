@@ -192,6 +192,76 @@ async function psInitiateDisbursement(params: {
   throw new Error(transferData.message ?? "Paystack transfer failed");
 }
 
+// ── Bank list ─────────────────────────────────────────────────────────────────
+
+async function psListBanks(secretKey: string): Promise<{ name: string; code: string }[]> {
+  const resp = await fetch("https://api.paystack.co/bank?country=nigeria&perPage=200&use_cursor=false", {
+    headers: { "Authorization": `Bearer ${secretKey}` },
+  });
+  const json = await resp.json() as { status: boolean; data?: { name: string; code: string }[]; message?: string };
+  if (!json.status || !json.data) throw new Error(json.message ?? "Paystack bank list failed");
+  return json.data.map(b => ({ name: b.name, code: b.code }));
+}
+
+async function fwListBanks(secretKey: string): Promise<{ name: string; code: string }[]> {
+  const resp = await fetch("https://api.flutterwave.com/v3/banks/NG", {
+    headers: { "Authorization": `Bearer ${secretKey}` },
+  });
+  const json = await resp.json() as { status: string; data?: { name: string; code: string }[]; message?: string };
+  if (json.status !== "success" || !json.data) throw new Error(json.message ?? "Flutterwave bank list failed");
+  return json.data.map(b => ({ name: b.name, code: b.code }));
+}
+
+/** Fetch Nigerian bank list — tries Paystack first, falls back to Flutterwave */
+export async function listBanks(): Promise<{ name: string; code: string }[]> {
+  const keys = await getGatewayKeys();
+  if (keys.paystack.secretKey) {
+    try { return await psListBanks(keys.paystack.secretKey); } catch { /* fall through */ }
+  }
+  if (keys.flutterwave.secretKey) {
+    return fwListBanks(keys.flutterwave.secretKey);
+  }
+  throw new Error("No payment gateway configured — cannot fetch bank list");
+}
+
+// ── Account resolution ────────────────────────────────────────────────────────
+
+async function psResolveAccount(accountNumber: string, bankCode: string, secretKey: string): Promise<string> {
+  const resp = await fetch(
+    `https://api.paystack.co/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+    { headers: { "Authorization": `Bearer ${secretKey}` } },
+  );
+  const json = await resp.json() as { status: boolean; data?: { account_name?: string }; message?: string };
+  if (!json.status || !json.data?.account_name) throw new Error(json.message ?? "Could not verify account. Check the account number and bank.");
+  return json.data.account_name;
+}
+
+async function fwResolveAccount(accountNumber: string, bankCode: string, secretKey: string): Promise<string> {
+  const resp = await fetch("https://api.flutterwave.com/v3/accounts/resolve", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${secretKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ account_number: accountNumber, account_bank: bankCode }),
+  });
+  const json = await resp.json() as { status: string; data?: { account_name?: string }; message?: string };
+  if (json.status !== "success" || !json.data?.account_name) throw new Error(json.message ?? "Could not verify account. Check the account number and bank.");
+  return json.data.account_name;
+}
+
+/** Resolve an account number to its registered account name — tries Paystack first, falls back to Flutterwave */
+export async function resolveAccount(accountNumber: string, bankCode: string): Promise<string> {
+  const keys = await getGatewayKeys();
+  if (keys.paystack.secretKey) {
+    try { return await psResolveAccount(accountNumber, bankCode, keys.paystack.secretKey); } catch (err) {
+      // Only fall through if Flutterwave is available; otherwise re-throw the original error
+      if (!keys.flutterwave.secretKey) throw err;
+    }
+  }
+  if (keys.flutterwave.secretKey) {
+    return fwResolveAccount(accountNumber, bankCode, keys.flutterwave.secretKey);
+  }
+  throw new Error("No payment gateway configured — cannot verify account");
+}
+
 // ── Gateway selector ──────────────────────────────────────────────────────────
 
 function selectGateway(keys: GatewayKeys): ("paystack" | "flutterwave")[] {

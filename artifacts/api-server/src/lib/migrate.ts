@@ -49,6 +49,10 @@ export async function runStartupMigrations(): Promise<void> {
       );
     `);
 
+    await client.query(`
+      ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
+    `);
+
     await client.query("COMMIT");
     logger.info("Startup migrations applied successfully");
   } catch (err) {
