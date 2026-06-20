@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, and, ilike, sql, desc, inArray } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable, gemsTransactionsTable } from "@workspace/db";
+import { eq, and, ilike, sql, desc, inArray, or, gt } from "drizzle-orm";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable, gemsTransactionsTable, adminAuditLogsTable, campaignInvitesTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { initiateDisbursement } from "../lib/gateway";
 import { requireAuth, requireRole } from "../lib/auth";
@@ -9,6 +9,15 @@ import { sendEmail, sendSms, tplPayoutDisbursed, tplCampaignApproved, tplCampaig
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
+
+async function writeAuditLog(adminId: number, action: string, targetUserId: number | null, metadata?: Record<string, unknown>) {
+  await db.insert(adminAuditLogsTable).values({
+    adminId,
+    action,
+    targetUserId: targetUserId ?? null,
+    metadata: metadata ?? null,
+  }).catch(console.error);
+}
 
 router.get("/admin/users", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const { role, status, search, page = "1" } = req.query as Record<string, string>;
@@ -38,10 +47,145 @@ router.patch("/admin/users/:id/status", requireAuth, requireRole("admin"), async
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (action === "activate") updates.isActive = true;
   if (action === "deactivate") updates.isActive = false;
-  if (action === "lock") updates.isLocked = true;
-  if (action === "unlock") updates.isLocked = false;
+  if (action === "lock") { updates.isLocked = true; updates.lockedUntil = null; }
+  if (action === "unlock") { updates.isLocked = false; updates.lockedUntil = null; updates.failedLoginAttempts = 0; }
   await db.update(usersTable).set(updates).where(eq(usersTable.id, id));
+  await writeAuditLog(req.userId!, `user_${action}`, id, { action });
   res.json({ message: "Updated" });
+});
+
+// ── Admin fraud dashboard — flagged accounts ──────────────────────────────────
+router.get("/admin/flagged-accounts", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const now = new Date();
+
+  // Locked accounts (time-based lock still active OR manual lock)
+  const locked = await db.select({
+    id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName,
+    userName: usersTable.userName, email: usersTable.email, role: usersTable.role,
+    isLocked: usersTable.isLocked, lockedUntil: usersTable.lockedUntil,
+    failedLoginAttempts: usersTable.failedLoginAttempts, followersFlag: usersTable.followersFlag,
+    createdAt: usersTable.createdAt,
+  }).from(usersTable).where(
+    or(
+      eq(usersTable.isLocked, true),
+      gt(usersTable.lockedUntil, now),
+    )
+  );
+
+  // Follower-flagged accounts
+  const followerFlagged = await db.select({
+    id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName,
+    userName: usersTable.userName, email: usersTable.email, role: usersTable.role,
+    isLocked: usersTable.isLocked, lockedUntil: usersTable.lockedUntil,
+    failedLoginAttempts: usersTable.failedLoginAttempts, followersFlag: usersTable.followersFlag,
+    createdAt: usersTable.createdAt,
+  }).from(usersTable).where(eq(usersTable.followersFlag, true));
+
+  // Multiple KYC rejections (more than 1 rejected attempt)
+  const multipleRejections = await db.select({
+    userId: kycRequestsTable.userId,
+    rejections: sql<number>`count(*)`,
+    firstName: usersTable.firstName, lastName: usersTable.lastName,
+    userName: usersTable.userName, email: usersTable.email, role: usersTable.role,
+    isLocked: usersTable.isLocked, lockedUntil: usersTable.lockedUntil,
+    failedLoginAttempts: usersTable.failedLoginAttempts, followersFlag: usersTable.followersFlag,
+    createdAt: usersTable.createdAt,
+  }).from(kycRequestsTable)
+    .leftJoin(usersTable, eq(kycRequestsTable.userId, usersTable.id))
+    .where(eq(kycRequestsTable.status, "rejected"))
+    .groupBy(
+      kycRequestsTable.userId, usersTable.firstName, usersTable.lastName,
+      usersTable.userName, usersTable.email, usersTable.role,
+      usersTable.isLocked, usersTable.lockedUntil, usersTable.failedLoginAttempts,
+      usersTable.followersFlag, usersTable.createdAt,
+    )
+    .having(sql`count(*) > 1`);
+
+  // Creators with unverified bank accounts who have pending payouts
+  const unverifiedBankPayouts = await db.select({
+    id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName,
+    userName: usersTable.userName, email: usersTable.email, role: usersTable.role,
+    isLocked: usersTable.isLocked, lockedUntil: usersTable.lockedUntil,
+    failedLoginAttempts: usersTable.failedLoginAttempts, followersFlag: usersTable.followersFlag,
+    createdAt: usersTable.createdAt,
+  }).from(usersTable)
+    .innerJoin(payoutsTable, eq(payoutsTable.creatorId, usersTable.id))
+    .innerJoin(bankAccountsTable, and(
+      eq(bankAccountsTable.userId, usersTable.id),
+      eq(bankAccountsTable.isDefault, true),
+      eq(bankAccountsTable.verified, false),
+    ))
+    .where(eq(payoutsTable.status, "pending"))
+    .groupBy(usersTable.id);
+
+  const formatFlaggedUser = (u: {
+    id: number | null; firstName: string | null; lastName: string | null;
+    userName: string | null; email: string | null; role: string | null;
+    isLocked: boolean | null; lockedUntil: Date | null;
+    failedLoginAttempts: number | null; followersFlag: boolean | null;
+    createdAt: Date | null;
+  }) => ({
+    id: u.id, firstName: u.firstName, lastName: u.lastName,
+    userName: u.userName, email: u.email, role: u.role,
+    isLocked: u.isLocked ?? false, lockedUntil: u.lockedUntil?.toISOString() ?? null,
+    failedLoginAttempts: u.failedLoginAttempts ?? 0, followersFlag: u.followersFlag ?? false,
+    createdAt: u.createdAt instanceof Date ? u.createdAt.toISOString() : String(u.createdAt ?? ""),
+  });
+
+  res.json({
+    locked: locked.map(formatFlaggedUser),
+    followerFlagged: followerFlagged.map(formatFlaggedUser),
+    multipleKycRejections: multipleRejections.map(u => ({
+      ...formatFlaggedUser(u as Parameters<typeof formatFlaggedUser>[0]),
+      rejections: Number(u.rejections),
+    })),
+    unverifiedBankPayouts: unverifiedBankPayouts.map(formatFlaggedUser),
+  });
+});
+
+router.patch("/admin/flagged-accounts/:id/clear-flag", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  await db.update(usersTable).set({ followersFlag: false, updatedAt: new Date() }).where(eq(usersTable.id, id));
+  await writeAuditLog(req.userId!, "clear_followers_flag", id);
+  res.json({ message: "Followers flag cleared" });
+});
+
+// ── Audit logs ────────────────────────────────────────────────────────────────
+router.get("/admin/audit-logs", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const { page = "1" } = req.query as Record<string, string>;
+  const pageNum = parseInt(page, 10) || 1;
+  const limit = 50;
+  const offset = (pageNum - 1) * limit;
+
+  const [logs, [countRow]] = await Promise.all([
+    db.select({
+      id: adminAuditLogsTable.id,
+      action: adminAuditLogsTable.action,
+      targetUserId: adminAuditLogsTable.targetUserId,
+      metadata: adminAuditLogsTable.metadata,
+      createdAt: adminAuditLogsTable.createdAt,
+      adminFirstName: usersTable.firstName,
+      adminLastName: usersTable.lastName,
+      adminUserName: usersTable.userName,
+    }).from(adminAuditLogsTable)
+      .leftJoin(usersTable, eq(adminAuditLogsTable.adminId, usersTable.id))
+      .orderBy(desc(adminAuditLogsTable.createdAt))
+      .limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(adminAuditLogsTable),
+  ]);
+
+  res.json({
+    data: logs.map(l => ({
+      id: l.id, action: l.action, targetUserId: l.targetUserId ?? null,
+      metadata: l.metadata ?? null,
+      createdAt: l.createdAt instanceof Date ? l.createdAt.toISOString() : String(l.createdAt),
+      admin: { firstName: l.adminFirstName, lastName: l.adminLastName, userName: l.adminUserName },
+    })),
+    total: Number(countRow.count),
+    page: pageNum,
+    limit,
+  });
 });
 
 router.get("/admin/campaigns", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
@@ -143,6 +287,7 @@ router.patch("/admin/campaigns/:id/status", requireAuth, requireRole("admin"), a
   }
 
   const [campaign] = await db.update(campaignsTable).set({ status, updatedAt: new Date() }).where(eq(campaignsTable.id, id)).returning();
+  await writeAuditLog(req.userId!, `campaign_${status}`, campaign?.brandId ?? null, { campaignId: id, status });
 
   // Notify brand of approval/rejection
   if (campaign && (status === "active" || status === "declined")) {
@@ -192,6 +337,7 @@ router.post("/admin/verify-requests/:id/approve", requireAuth, requireRole("admi
   const [vr] = await db.update(verifyRequestsTable).set({ isApproved: true }).where(eq(verifyRequestsTable.id, id)).returning({ userId: verifyRequestsTable.userId });
   if (vr?.userId) {
     await db.update(usersTable).set({ verified: true }).where(eq(usersTable.id, vr.userId));
+    await writeAuditLog(req.userId!, "verify_request_approve", vr.userId, { verifyRequestId: id });
   }
   res.json({ message: "Approved" });
 });
@@ -199,7 +345,10 @@ router.post("/admin/verify-requests/:id/approve", requireAuth, requireRole("admi
 router.post("/admin/verify-requests/:id/reject", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  await db.update(verifyRequestsTable).set({ isApproved: false }).where(eq(verifyRequestsTable.id, id));
+  const [vr] = await db.update(verifyRequestsTable).set({ isApproved: false }).where(eq(verifyRequestsTable.id, id)).returning({ userId: verifyRequestsTable.userId });
+  if (vr?.userId) {
+    await writeAuditLog(req.userId!, "verify_request_reject", vr.userId, { verifyRequestId: id });
+  }
   res.json({ message: "Rejected" });
 });
 
@@ -258,6 +407,8 @@ router.post("/admin/kyc-requests/:id/approve", requireAuth, requireRole("admin")
     await tx.update(usersTable).set({ verified: true, updatedAt: new Date() }).where(eq(usersTable.id, kyc.userId));
   });
 
+  await writeAuditLog(req.userId!, "kyc_approve", kyc.userId, { kycRequestId: id });
+
   // Notify creator
   Promise.all([
     db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
@@ -287,6 +438,7 @@ router.post("/admin/kyc-requests/:id/reject", requireAuth, requireRole("admin"),
   if (!kyc) { res.status(404).json({ error: "KYC request not found" }); return; }
 
   await db.update(kycRequestsTable).set({ status: "rejected", updatedAt: new Date() }).where(eq(kycRequestsTable.id, id));
+  await writeAuditLog(req.userId!, "kyc_reject", kyc.userId, { kycRequestId: id });
 
   // Notify creator
   Promise.all([
@@ -477,6 +629,8 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
       }
     }
   });
+
+  await writeAuditLog(req.userId!, "payout_approve", payout.creatorId, { payoutId: id, amount: payoutAmount, transferRef });
 
   // Notify creator of disbursement
   Promise.all([

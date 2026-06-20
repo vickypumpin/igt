@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable } from "@workspace/db";
+import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable, adminAuditLogsTable, kycRequestsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
 import { initiateCollection, verifyCollection, listBanks, resolveAccount } from "../lib/gateway";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -19,6 +19,16 @@ const GEMS_PACKAGES: Record<string, { gems: number; amountNGN: number }> = {
   growth:     { gems: 1100, amountNGN: 10000 },
   pro:        { gems: 3000, amountNGN: 25000 },
   enterprise: { gems: 6500, amountNGN: 50000 },
+};
+
+// Follower hard caps per platform (max plausible followers)
+const FOLLOWER_HARD_CAPS: Record<string, number> = {
+  instagramFollowers: 500_000_000,
+  tiktokFollowers:    200_000_000,
+  youtubeFollowers:   100_000_000,
+  twitterFollowers:   200_000_000,
+  facebookFollowers:  500_000_000,
+  snapchatFollowers:  100_000_000,
 };
 
 const accountShape = (a: typeof bankAccountsTable.$inferSelect) => ({
@@ -43,6 +53,7 @@ const userProfileShape = (u: typeof usersTable.$inferSelect) => ({
   contentCategory: u.contentCategory ?? null, creatorCategory: u.creatorCategory ?? null,
   countryId: u.countryId ?? null, stateId: u.stateId ?? null,
   gems: u.gems, balance: u.balance,
+  followersFlag: u.followersFlag ?? false,
   instagramDayPostPrice: u.instagramDayPostPrice ?? null,
   instagramWeekPostPrice: u.instagramWeekPostPrice ?? null,
   instagramDayStoryPrice: u.instagramDayStoryPrice ?? null,
@@ -115,12 +126,68 @@ router.put("/account/profile", requireAuth, async (req, res): Promise<void> => {
     "snapchatDayStoryPrice", "snapchatWeekStoryPrice",
     "contentCreatorRate",
   ];
+
+  const followerFields = [
+    "instagramFollowers", "facebookFollowers", "twitterFollowers",
+    "youtubeFollowers", "tiktokFollowers", "snapchatFollowers",
+  ];
+
   const updates: Record<string, unknown> = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) updates[key] = req.body[key];
   }
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "No valid fields to update" }); return; }
+
+  // Validate hard caps on follower counts
+  for (const field of followerFields) {
+    if (updates[field] != null) {
+      const val = Number(updates[field]);
+      const cap = FOLLOWER_HARD_CAPS[field] ?? 0;
+      if (val > cap) {
+        res.status(400).json({
+          error: `Follower count for ${field.replace("Followers", "")} exceeds the maximum allowed value of ${cap.toLocaleString()}.`,
+          field,
+          max: cap,
+        });
+        return;
+      }
+    }
+  }
+
+  // Check for suspicious follower jumps (>50% increase in one edit) against current values
+  const hasFollowerUpdate = followerFields.some(f => updates[f] != null);
+  let shouldFlag = false;
+  if (hasFollowerUpdate) {
+    const [current] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!));
+    if (current) {
+      for (const field of followerFields) {
+        if (updates[field] == null) continue;
+        const newVal = Number(updates[field]);
+        const oldVal = Number((current as unknown as Record<string, unknown>)[field] ?? 0);
+        if (oldVal > 0 && newVal > oldVal * 1.5) {
+          shouldFlag = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (shouldFlag) {
+    updates.followersFlag = true;
+  }
+
   const [u] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
+
+  if (shouldFlag) {
+    await db.insert(adminAuditLogsTable).values({
+      adminId: req.userId!,
+      action: "follower_flag_raised",
+      targetType: "user",
+      targetId: req.userId!,
+      details: JSON.stringify({ reason: "Follower count increased by more than 50% in a single update" }),
+    }).catch(() => {});
+  }
+
   res.json(userProfileShape(u));
 });
 
@@ -391,6 +458,24 @@ router.get("/billing/gateway-info", requireAuth, async (_req, res): Promise<void
     flutterwaveConfigured: !!s?.fwPublicKey,
     paystackConfigured: !!s?.psPublicKey,
   });
+});
+
+// ── Payout eligibility check ─────────────────────────────────────────────────
+router.get("/creator/payout-eligibility", requireAuth, async (req, res): Promise<void> => {
+  const [kyc] = await db.select({ status: kycRequestsTable.status })
+    .from(kycRequestsTable)
+    .where(eq(kycRequestsTable.userId, req.userId!))
+    .orderBy(desc(kycRequestsTable.createdAt))
+    .limit(1);
+  const kycApproved = kyc?.status === "approved";
+
+  const [defaultBank] = await db.select({ verified: bankAccountsTable.verified })
+    .from(bankAccountsTable)
+    .where(and(eq(bankAccountsTable.userId, req.userId!), eq(bankAccountsTable.isDefault, true)))
+    .limit(1);
+  const hasVerifiedBank = defaultBank?.verified === true;
+
+  res.json({ kycApproved, hasVerifiedBank });
 });
 
 export default router;

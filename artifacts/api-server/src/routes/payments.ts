@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { eq, sql, desc, and } from "drizzle-orm";
-import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, submissionsTable } from "@workspace/db";
+import { db, paymentsTable, rewardsTable, payoutsTable, usersTable, submissionsTable, kycRequestsTable, bankAccountsTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
 import { initiateCollection, verifyCollection } from "../lib/gateway";
+import { payoutRateLimiter } from "../middlewares/rateLimiter";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -137,11 +138,51 @@ router.get("/payouts", requireAuth, requireRole("creator"), async (req, res): Pr
   })));
 });
 
-router.post("/rewards/payout", requireAuth, requireRole("creator"), async (req, res): Promise<void> => {
+router.post("/rewards/payout", requireAuth, requireRole("creator"), payoutRateLimiter, async (req, res): Promise<void> => {
   const { amount, bankCode, accountNumber, campaignId } = req.body;
   if (!amount) { res.status(400).json({ error: "Missing amount" }); return; }
 
   if (!campaignId) { res.status(400).json({ error: "campaignId is required for a payout request" }); return; }
+
+  // KYC gate: creator must have approved KYC
+  const [kyc] = await db.select({ status: kycRequestsTable.status })
+    .from(kycRequestsTable)
+    .where(eq(kycRequestsTable.userId, req.userId!))
+    .limit(1);
+
+  if (!kyc || kyc.status !== "approved") {
+    res.status(403).json({
+      error: "Your identity must be verified before you can request a payout. Please complete KYC verification first.",
+      code: "KYC_REQUIRED",
+      redirectTo: "/verify",
+    });
+    return;
+  }
+
+  // Verified bank account gate
+  const [defaultBank] = await db.select({ verified: bankAccountsTable.verified, id: bankAccountsTable.id })
+    .from(bankAccountsTable)
+    .where(and(eq(bankAccountsTable.userId, req.userId!), eq(bankAccountsTable.isDefault, true)))
+    .limit(1);
+
+  if (!defaultBank) {
+    res.status(403).json({
+      error: "You must add a bank account before requesting a payout.",
+      code: "NO_BANK_ACCOUNT",
+      redirectTo: "/account",
+    });
+    return;
+  }
+
+  if (!defaultBank.verified) {
+    res.status(403).json({
+      error: "Your bank account must be verified before you can request a payout. Please update your bank account details.",
+      code: "BANK_ACCOUNT_NOT_VERIFIED",
+      redirectTo: "/account",
+    });
+    return;
+  }
+
   const [validSub] = await db
     .select({ campaignId: submissionsTable.campaignId })
     .from(submissionsTable)

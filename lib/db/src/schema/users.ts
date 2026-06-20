@@ -86,6 +86,11 @@ export const usersTable = pgTable("users", {
   profilePublic: boolean("profile_public").notNull().default(true),
   // Brand website
   websiteUrl: text("website_url"),
+  // Brute-force login protection
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
+  // Follower plausibility fraud flag
+  followersFlag: boolean("followers_flag").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowDownToLine, CheckCircle, Clock, XCircle, DollarSign } from "lucide-react";
+import { ArrowDownToLine, CheckCircle, Clock, XCircle, DollarSign, AlertTriangle, ShieldCheck, CreditCard } from "lucide-react";
+import { Link } from "wouter";
 
 type Payout = { id: number; amount: string; status: string; bankCode: string | null; accountNumber: string | null; createdAt: string };
 type EligibleCampaign = { campaignId: number; campaignName: string; sponsor: string | null };
+type PayoutEligibility = { kycApproved: boolean; hasVerifiedBank: boolean };
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; Icon: React.ElementType; label: string }> = {
   pending:  { bg: "rgba(245,158,11,0.12)",  color: "#D97706", Icon: Clock,        label: "Pending"  },
@@ -31,12 +33,18 @@ export default function CreatorPaymentsPage() {
     queryKey: ["/creator/eligible-campaigns"],
     queryFn: () => customFetch("/api/creator/eligible-campaigns"),
   });
+  const { data: eligibility } = useQuery<PayoutEligibility>({
+    queryKey: ["/creator/payout-eligibility"],
+    queryFn: () => customFetch<PayoutEligibility>("/api/creator/payout-eligibility"),
+  });
   const [amount, setAmount] = useState("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
 
   const totalPaid = payouts.filter(p => p.status === "approved").reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
   const totalPending = payouts.filter(p => p.status === "pending").reduce((sum, p) => sum + parseFloat(String(p.amount)), 0);
   const balance = Number(me?.balance ?? 0);
+
+  const payoutBlocked = eligibility !== undefined && (!eligibility.kycApproved || !eligibility.hasVerifiedBank);
 
   const payoutMutation = useMutation({
     mutationFn: (data: { amount: number; campaignId: number }) =>
@@ -95,13 +103,50 @@ export default function CreatorPaymentsPage() {
             <div className="text-sm font-bold">Request Payout</div>
             <div className="text-xs text-muted-foreground mt-0.5">Minimum $10 · Processed within 1–2 business days</div>
           </div>
+
+          {/* Verification gate banner */}
+          {payoutBlocked && (
+            <div
+              className="mx-5 mt-4 rounded-xl p-4 flex gap-3"
+              style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}
+              data-testid="payout-gate-banner"
+            >
+              <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: "#DC2626" }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "#DC2626" }}>Verification required before requesting a payout</p>
+                <p className="text-xs text-muted-foreground mt-0.5 mb-3">Complete the steps below to unlock payouts.</p>
+                <div className="space-y-2">
+                  {!eligibility?.kycApproved && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-muted-foreground">Identity not verified (KYC) —</span>
+                      <Link href="/creator/settings" className="font-semibold underline" style={{ color: "#7C3AED" }}>
+                        Submit KYC
+                      </Link>
+                    </div>
+                  )}
+                  {!eligibility?.hasVerifiedBank && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <CreditCard className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-muted-foreground">No verified bank account —</span>
+                      <Link href="/creator/settings" className="font-semibold underline" style={{ color: "#7C3AED" }}>
+                        Add bank account
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="p-5 space-y-3">
             <div>
               <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Campaign *</label>
               <select
                 value={selectedCampaignId}
                 onChange={e => setSelectedCampaignId(e.target.value)}
-                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                disabled={payoutBlocked}
+                className="w-full h-10 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="select-payout-campaign"
               >
                 <option value="">Select a campaign with approved submission…</option>
@@ -111,7 +156,7 @@ export default function CreatorPaymentsPage() {
                   </option>
                 ))}
               </select>
-              {eligibleCampaigns.length === 0 && (
+              {eligibleCampaigns.length === 0 && !payoutBlocked && (
                 <p className="text-xs text-muted-foreground mt-1">No campaigns with approved submissions yet.</p>
               )}
             </div>
@@ -119,13 +164,14 @@ export default function CreatorPaymentsPage() {
               <div className="flex-1 max-w-xs">
                 <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">Amount (USD)</label>
                 <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
-                  className="h-10 rounded-xl" data-testid="input-payout-amount" min="10" step="1" />
+                  disabled={payoutBlocked}
+                  className="h-10 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed" data-testid="input-payout-amount" min="10" step="1" />
               </div>
               <Button
                 onClick={handleRequest}
-                disabled={payoutMutation.isPending || !amount || parseFloat(amount) < 10 || !selectedCampaignId}
+                disabled={payoutBlocked || payoutMutation.isPending || !amount || parseFloat(amount) < 10 || !selectedCampaignId}
                 className="h-10 px-5 rounded-xl font-semibold gap-2"
-                style={{ background: "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
+                style={{ background: payoutBlocked ? undefined : "linear-gradient(135deg, #1DCFB3, #0FA88E)", border: "none" }}
                 data-testid="btn-request-payout"
               >
                 <ArrowDownToLine className="h-4 w-4" />

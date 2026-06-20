@@ -5,11 +5,15 @@ import { eq, and, gt } from "drizzle-orm";
 import { db, usersTable, agenciesTable, settingsTable, passwordResetTokensTable, bankAccountsTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
 import { sendEmail, tplWelcome, tplPasswordReset } from "../lib/notify";
+import { authRateLimiter } from "../middlewares/rateLimiter";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
 
-router.post("/auth/register", async (req, res): Promise<void> => {
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCK_DURATION_MS = 30 * 60 * 1000;
+
+router.post("/auth/register", authRateLimiter, async (req, res): Promise<void> => {
   const { firstName, lastName, userName, email, password, phone, role, gender, countryId, stateId, companyName, companySize, companyType } = req.body;
   if (!firstName || !lastName || !userName || !email || !password || !role) {
     res.status(400).json({ error: "Missing required fields" });
@@ -59,7 +63,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   res.status(201).json({ token, user: formatUser(user as unknown as Record<string, unknown>) });
 });
 
-router.post("/auth/login", async (req, res): Promise<void> => {
+router.post("/auth/login", authRateLimiter, async (req, res): Promise<void> => {
   const { email, password } = req.body;
   if (!email || !password) {
     res.status(400).json({ error: "Missing email or password" });
@@ -70,15 +74,64 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
-  if (!user.isActive || user.isLocked) {
+  if (!user.isActive) {
     res.status(401).json({ error: "Account is not available" });
     return;
   }
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    res.status(401).json({ error: "Invalid credentials" });
+
+  // Admin manual lock (lockedUntil = null) — block permanently, no auto-expiry
+  const now = new Date();
+  if (user.isLocked && !user.lockedUntil) {
+    res.status(423).json({
+      error: "Your account has been locked by an administrator. Please contact support.",
+      code: "ACCOUNT_LOCKED_ADMIN",
+    });
     return;
   }
+  // Time-based brute-force lock — active window
+  if (user.lockedUntil && user.lockedUntil > now) {
+    const minutesLeft = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60000);
+    res.status(423).json({
+      error: `Account is temporarily locked due to too many failed login attempts. Try again in ${minutesLeft} minute(s), or reset your password.`,
+      code: "ACCOUNT_LOCKED",
+      lockedUntil: user.lockedUntil.toISOString(),
+    });
+    return;
+  }
+  // Time-based lock window expired — auto-unlock
+  if (user.isLocked && user.lockedUntil && user.lockedUntil <= now) {
+    await db.update(usersTable).set({ isLocked: false, failedLoginAttempts: 0, lockedUntil: null }).where(eq(usersTable.id, user.id));
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    const newAttempts = (user.failedLoginAttempts ?? 0) + 1;
+    const updates: Record<string, unknown> = { failedLoginAttempts: newAttempts };
+    if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+      updates.isLocked = true;
+      updates.lockedUntil = new Date(Date.now() + LOCK_DURATION_MS);
+    }
+    await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id));
+
+    if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+      res.status(423).json({
+        error: "Account locked due to too many failed login attempts. Try again in 30 minutes, or reset your password.",
+        code: "ACCOUNT_LOCKED",
+      });
+    } else {
+      res.status(401).json({
+        error: "Invalid credentials",
+        attemptsLeft: MAX_FAILED_ATTEMPTS - newAttempts,
+      });
+    }
+    return;
+  }
+
+  // Successful login — reset counter
+  await db.update(usersTable)
+    .set({ failedLoginAttempts: 0, isLocked: false, lockedUntil: null })
+    .where(eq(usersTable.id, user.id));
+
   const token = signToken(user.id);
   res.json({ token, user: formatUser(user as unknown as Record<string, unknown>) });
 });
@@ -148,7 +201,7 @@ router.patch("/auth/me/password", requireAuth, async (req, res): Promise<void> =
   res.json({ message: "Password updated" });
 });
 
-router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+router.post("/auth/forgot-password", authRateLimiter, async (req, res): Promise<void> => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: "Email is required" });
@@ -217,7 +270,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
   const passwordHash = await bcrypt.hash(password, 10);
   await Promise.all([
     db.update(usersTable)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({ passwordHash, failedLoginAttempts: 0, isLocked: false, lockedUntil: null, updatedAt: new Date() })
       .where(eq(usersTable.id, resetToken.userId)),
     db.update(passwordResetTokensTable)
       .set({ usedAt: new Date() })

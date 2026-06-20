@@ -58,6 +58,7 @@ import AdminFaqsPage from "@/pages/admin/faqs";
 import AdminLegalPage from "@/pages/admin/legal";
 import AdminMessagingPage from "@/pages/admin/messaging";
 import AdminRolesPage from "@/pages/admin/roles";
+import AdminFraudPanelPage from "@/pages/admin/fraud-panel";
 
 import SettingsPage from "@/pages/shared/settings";
 import FaqPage from "@/pages/shared/faq";
@@ -194,6 +195,9 @@ function AppRouter() {
 
           {/* Roles & Permissions */}
           <Route path="/admin/roles" component={AdminRolesPage} />
+
+          {/* Fraud Panel */}
+          <Route path="/admin/fraud-panel" component={AdminFraudPanelPage} />
 
           {/* FAQs & Legal */}
           <Route path="/admin/faqs" component={AdminFaqsPage} />

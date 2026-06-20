@@ -18,3 +18,4 @@ export * from "./ai_conversations";
 export * from "./ai_messages";
 export * from "./kyc_requests";
 export * from "./password_reset_tokens";
+export * from "./admin_audit_logs";

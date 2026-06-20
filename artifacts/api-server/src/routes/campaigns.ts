@@ -355,6 +355,35 @@ router.post("/campaigns/:id/invites", requireAuth, requireRole("brand"), async (
   const campaignId = parseInt(raw, 10);
   const { creatorId } = req.body;
   if (!creatorId) { res.status(400).json({ error: "Missing creatorId" }); return; }
+
+  // Capacity enforcement: cannot invite more than noOfCreators
+  const [campaignMeta] = await db.select({
+    noOfCreators: campaignsTable.noOfCreators,
+    gemsPerCreator: campaignsTable.gemsPerCreator,
+    isFunded: campaignsTable.isFunded,
+    brandId: campaignsTable.brandId,
+    name: campaignsTable.name,
+  }).from(campaignsTable).where(eq(campaignsTable.id, campaignId)).limit(1);
+
+  if (!campaignMeta) { res.status(404).json({ error: "Campaign not found" }); return; }
+  if (campaignMeta.brandId !== req.userId) { res.status(403).json({ error: "Not your campaign" }); return; }
+
+  const [countRow] = await db.select({ count: sql<number>`count(*)` })
+    .from(campaignInvitesTable)
+    .where(eq(campaignInvitesTable.campaignId, campaignId));
+  const currentInvites = Number(countRow?.count ?? 0);
+  const maxInvites = campaignMeta.noOfCreators ?? 1;
+
+  if (currentInvites >= maxInvites) {
+    res.status(400).json({
+      error: `Campaign is at full capacity. You have already invited ${currentInvites} of ${maxInvites} creators.`,
+      code: "CAMPAIGN_AT_CAPACITY",
+      current: currentInvites,
+      max: maxInvites,
+    });
+    return;
+  }
+
   const [invite] = await db.insert(campaignInvitesTable).values({ campaignId, creatorId, status: "pending" }).returning();
 
   // Notify creator of invite
