@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, campaignInvitesTable, campaignsTable, usersTable, gemsTransactionsTable, settingsTable } from "@workspace/db";
+import { db, campaignInvitesTable, campaignsTable, usersTable, gemsTransactionsTable, settingsTable, agenciesTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
-import { sendEmail, sendSms, tplInviteResponse } from "../lib/notify";
+import { sendEmail, sendSms, tplInviteResponse, tplAgencyCreatorResponse } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -102,24 +102,37 @@ router.post("/invites/:id/accept", requireAuth, requireRole("creator"), async (r
     throw err;
   }
 
-  // Notify brand that creator accepted
+  // Notify brand (and agency if applicable) that creator accepted
   Promise.all([
-    db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, phone: usersTable.phone })
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, phone: usersTable.phone, agencyId: usersTable.agencyId })
       .from(usersTable).where(eq(usersTable.id, brandId)).limit(1),
     db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
       .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
     db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
-  ]).then(([[brand], [creator], [settings]]) => {
+  ]).then(async ([[brand], [creator], [settings]]) => {
     if (!brand || !creator) return;
     const siteName = settings?.siteName ?? "iGoTrend";
     const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${inv.campaignId}`;
     const creatorName = `${creator.firstName} ${creator.lastName}`.trim();
-    const brandFirstName = brand.firstName ?? "there";
     sendEmail(
       brand.email,
       `Creator accepted your campaign invite — ${inv.campaignName}`,
-      tplInviteResponse(siteName, brandFirstName, creatorName, inv.campaignName ?? "your campaign", true, campaignUrl),
+      tplInviteResponse(siteName, brand.firstName ?? "there", creatorName, inv.campaignName ?? "your campaign", true, campaignUrl),
     ).catch(console.error);
+    // Also notify agency if brand belongs to one
+    if (brand.agencyId) {
+      const [agency] = await db.select({ userId: agenciesTable.userId, name: agenciesTable.name }).from(agenciesTable).where(eq(agenciesTable.id, brand.agencyId)).limit(1);
+      if (agency) {
+        const [agencyUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, agency.userId)).limit(1);
+        if (agencyUser?.email) {
+          sendEmail(
+            agencyUser.email,
+            `Creator accepted campaign invite — ${inv.campaignName}`,
+            tplAgencyCreatorResponse(siteName, agency.name, creatorName, inv.campaignName ?? "your campaign", true, campaignUrl),
+          ).catch(console.error);
+        }
+      }
+    }
   }).catch(console.error);
 
   res.json({ message: "Accepted", gemsDebited: gemsRequired });
@@ -146,15 +159,15 @@ router.post("/invites/:id/decline", requireAuth, requireRole("creator"), async (
   await db.update(campaignInvitesTable).set({ status: "declined", updatedAt: new Date() })
     .where(and(eq(campaignInvitesTable.id, id), eq(campaignInvitesTable.creatorId, req.userId!)));
 
-  // Notify brand that creator declined
+  // Notify brand (and agency if applicable) that creator declined
   if (inv?.brandId) {
     Promise.all([
-      db.select({ email: usersTable.email, firstName: usersTable.firstName })
+      db.select({ email: usersTable.email, firstName: usersTable.firstName, agencyId: usersTable.agencyId })
         .from(usersTable).where(eq(usersTable.id, inv.brandId)).limit(1),
       db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
         .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
       db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
-    ]).then(([[brand], [creator], [settings]]) => {
+    ]).then(async ([[brand], [creator], [settings]]) => {
       if (!brand || !creator) return;
       const siteName = settings?.siteName ?? "iGoTrend";
       const campaignUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/campaigns/${inv.campaignId}`;
@@ -164,6 +177,19 @@ router.post("/invites/:id/decline", requireAuth, requireRole("creator"), async (
         `Creator declined your campaign invite — ${inv.campaignName}`,
         tplInviteResponse(siteName, brand.firstName ?? "there", creatorName, inv.campaignName ?? "your campaign", false, campaignUrl),
       ).catch(console.error);
+      if (brand.agencyId) {
+        const [agency] = await db.select({ userId: agenciesTable.userId, name: agenciesTable.name }).from(agenciesTable).where(eq(agenciesTable.id, brand.agencyId)).limit(1);
+        if (agency) {
+          const [agencyUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, agency.userId)).limit(1);
+          if (agencyUser?.email) {
+            sendEmail(
+              agencyUser.email,
+              `Creator declined campaign invite — ${inv.campaignName}`,
+              tplAgencyCreatorResponse(siteName, agency.name, creatorName, inv.campaignName ?? "your campaign", false, campaignUrl),
+            ).catch(console.error);
+          }
+        }
+      }
     }).catch(console.error);
   }
 

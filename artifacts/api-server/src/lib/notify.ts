@@ -328,6 +328,52 @@ export function tplFollowerFraudFlag(siteName: string, userName: string, userEma
   `);
 }
 
+export function tplAgencyClientResponse(siteName: string, agencyName: string, brandName: string, accepted: boolean, dashboardUrl: string): string {
+  return emailWrapper(siteName, accepted ? `
+    ${h2(`Brand Partnership Accepted`)}
+    ${p(`Hi ${agencyName},`)}
+    ${p(`<strong>${brandName}</strong> has <strong>accepted</strong> your agency partnership invitation.`)}
+    ${p(`They are now listed as your client. You can manage their campaigns from your agency dashboard.`)}
+    ${btn(dashboardUrl, "View Clients")}
+  ` : `
+    ${h2(`Brand Partnership Declined`)}
+    ${p(`Hi ${agencyName},`)}
+    ${p(`<strong>${brandName}</strong> has <strong>declined</strong> your agency partnership invitation.`)}
+    ${p(`You may reach out to them directly or invite another brand.`)}
+    ${btn(dashboardUrl, "Go to Dashboard")}
+  `);
+}
+
+export function tplAgencyCreatorResponse(siteName: string, agencyName: string, creatorName: string, campaignName: string, accepted: boolean, dashboardUrl: string): string {
+  const action = accepted ? "accepted" : "declined";
+  return emailWrapper(siteName, `
+    ${h2(`Creator ${accepted ? "Accepted" : "Declined"} Campaign Invite`)}
+    ${p(`Hi ${agencyName},`)}
+    ${p(`<strong>${creatorName}</strong> has <strong>${action}</strong> the invitation to your client's campaign <strong>"${campaignName}"</strong>.`)}
+    ${btn(dashboardUrl, "View Campaign")}
+  `);
+}
+
+export function tplAgencySubmission(siteName: string, agencyName: string, campaignName: string, creatorName: string, dashboardUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`New Submission on Your Client's Campaign`)}
+    ${p(`Hi ${agencyName},`)}
+    ${p(`<strong>${creatorName}</strong> has submitted content for the campaign <strong>"${campaignName}"</strong> managed on your behalf.`)}
+    ${p(`Your client will review and approve or reject the submission.`)}
+    ${btn(dashboardUrl, "View Campaign")}
+  `);
+}
+
+export function tplAgencyCommission(siteName: string, agencyName: string, creatorName: string, campaignName: string, payoutAmount: string, commissionAmount: string, dashboardUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`Commission Earned`)}
+    ${p(`Hi ${agencyName},`)}
+    ${p(`A payout of <strong>${payoutAmount}</strong> was disbursed to <strong>${creatorName}</strong> for the campaign <strong>"${campaignName}"</strong>.`)}
+    ${p(`Your agency commission of <strong>${commissionAmount}</strong> has been recorded.`)}
+    ${btn(dashboardUrl, "View Earnings")}
+  `);
+}
+
 export async function sendAdminAlert(subject: string, htmlBody: string): Promise<void> {
   const s = await getSettings();
   if (!s?.contactEmail) {

@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { eq, and, ilike, sql, desc, inArray, or, gt } from "drizzle-orm";
-import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable, gemsTransactionsTable, adminAuditLogsTable, campaignInvitesTable } from "@workspace/db";
+import { db, usersTable, campaignsTable, submissionsTable, verifyRequestsTable, payoutsTable, commissionDeductionsTable, bankAccountsTable, settingsTable, kycRequestsTable, gemsTransactionsTable, adminAuditLogsTable, campaignInvitesTable, agenciesTable } from "@workspace/db";
 import { resolveBilling } from "../lib/billing";
 import { initiateDisbursement } from "../lib/gateway";
 import { requireAuth, requireRole } from "../lib/auth";
 import { formatUser } from "../lib/auth";
-import { sendEmail, sendSms, tplPayoutDisbursed, tplCampaignApproved, tplCampaignRejected } from "../lib/notify";
+import { sendEmail, sendSms, tplPayoutDisbursed, tplCampaignApproved, tplCampaignRejected, tplAgencyCommission } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -632,12 +632,15 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
 
   await writeAuditLog(req.userId!, "payout_approve", payout.creatorId, { payoutId: id, amount: payoutAmount, transferRef });
 
-  // Notify creator of disbursement
+  // Notify creator of disbursement (and agency if commission applies)
   Promise.all([
-    db.select({ email: usersTable.email, firstName: usersTable.firstName, phone: usersTable.phone })
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, phone: usersTable.phone })
       .from(usersTable).where(eq(usersTable.id, payout.creatorId)).limit(1),
     db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
-  ]).then(([[creator], [settings]]) => {
+    payout.campaignId
+      ? db.select({ name: campaignsTable.name }).from(campaignsTable).where(eq(campaignsTable.id, payout.campaignId)).limit(1)
+      : Promise.resolve([null]),
+  ]).then(async ([[creator], [settings], [campaign]]) => {
     if (!creator) return;
     const siteName = settings?.siteName ?? "iGoTrend";
     const payoutsUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/payouts`;
@@ -649,6 +652,24 @@ router.post("/admin/payouts/:id/approve", requireAuth, requireRole("admin"), asy
     ).catch(console.error);
     if (creator.phone) {
       sendSms(creator.phone, `${siteName}: Your payout of ${amountStr} has been disbursed to your bank account. Allow 1–3 business days.`).catch(console.error);
+    }
+    // Notify agency if commission was recorded
+    if (billing?.agencyId && billing.billingMode === "commission" && billing.commissionRate > 0) {
+      const commissionAmount = (payoutAmount * billing.commissionRate) / 100;
+      const [agency] = await db.select({ userId: agenciesTable.userId, name: agenciesTable.name }).from(agenciesTable).where(eq(agenciesTable.id, billing.agencyId)).limit(1);
+      if (agency) {
+        const [agencyUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, agency.userId)).limit(1);
+        if (agencyUser?.email) {
+          const creatorName = `${creator.firstName ?? ""} ${creator.lastName ?? ""}`.trim();
+          const campaignName = (campaign as { name?: string } | null)?.name ?? "a campaign";
+          const commissionStr = `₦${commissionAmount.toLocaleString()}`;
+          sendEmail(
+            agencyUser.email,
+            `Commission earned — ${commissionStr} from ${campaignName}`,
+            tplAgencyCommission(siteName, agency.name, creatorName, campaignName, amountStr, commissionStr, payoutsUrl),
+          ).catch(console.error);
+        }
+      }
     }
   }).catch(console.error);
 

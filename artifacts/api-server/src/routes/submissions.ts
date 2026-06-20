@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, submissionsTable, usersTable, campaignsTable, settingsTable } from "@workspace/db";
+import { db, submissionsTable, usersTable, campaignsTable, settingsTable, agenciesTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
-import { sendEmail, sendSms, tplSubmissionReceived, tplSubmissionApproved, tplSubmissionRejected } from "../lib/notify";
+import { sendEmail, sendSms, tplSubmissionReceived, tplSubmissionApproved, tplSubmissionRejected, tplAgencySubmission } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -21,14 +21,16 @@ router.post("/submissions", requireAuth, requireRole("creator"), async (req, res
     views: views ?? null, likes: likes ?? null, caption: caption ?? null,
   }).returning();
 
-  // Notify brand of new submission
+  // Notify brand (and agency if applicable) of new submission
   Promise.all([
     db.select({ brandId: campaignsTable.brandId, name: campaignsTable.name })
       .from(campaignsTable).where(eq(campaignsTable.id, Number(campaignId))).limit(1),
+    db.select({ firstName: usersTable.firstName, lastName: usersTable.lastName })
+      .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1),
     db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
-  ]).then(async ([[campaign], [settings]]) => {
+  ]).then(async ([[campaign], [creator], [settings]]) => {
     if (!campaign) return;
-    const [brand] = await db.select({ email: usersTable.email, firstName: usersTable.firstName })
+    const [brand] = await db.select({ email: usersTable.email, firstName: usersTable.firstName, agencyId: usersTable.agencyId })
       .from(usersTable).where(eq(usersTable.id, campaign.brandId)).limit(1);
     if (!brand) return;
     const siteName = settings?.siteName ?? "iGoTrend";
@@ -38,6 +40,21 @@ router.post("/submissions", requireAuth, requireRole("creator"), async (req, res
       `New submission received — ${campaign.name}`,
       tplSubmissionReceived(siteName, brand.firstName ?? "there", campaign.name, dashboardUrl),
     ).catch(console.error);
+    // Also notify agency if brand belongs to one
+    if (brand.agencyId && creator) {
+      const [agency] = await db.select({ userId: agenciesTable.userId, name: agenciesTable.name }).from(agenciesTable).where(eq(agenciesTable.id, brand.agencyId)).limit(1);
+      if (agency) {
+        const [agencyUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, agency.userId)).limit(1);
+        if (agencyUser?.email) {
+          const creatorName = `${creator.firstName ?? ""} ${creator.lastName ?? ""}`.trim();
+          sendEmail(
+            agencyUser.email,
+            `New submission on client campaign — ${campaign.name}`,
+            tplAgencySubmission(siteName, agency.name, campaign.name, creatorName, dashboardUrl),
+          ).catch(console.error);
+        }
+      }
+    }
   }).catch(console.error);
 
   res.status(201).json({

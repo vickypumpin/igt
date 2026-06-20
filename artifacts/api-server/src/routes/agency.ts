@@ -3,7 +3,7 @@ import { eq, and, sql, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, usersTable, agenciesTable, agencyClientsTable, campaignsTable, paymentsTable, commissionDeductionsTable, settingsTable, campaignInvitesTable } from "@workspace/db";
 import { requireAuth, requireRole } from "../lib/auth";
-import { sendEmail, sendSms, tplCampaignInvite } from "../lib/notify";
+import { sendEmail, sendSms, tplCampaignInvite, tplAgencyClientResponse } from "../lib/notify";
 import type { IRouter } from "express";
 
 const router: IRouter = Router();
@@ -171,6 +171,26 @@ router.patch("/agency/clients/:id/respond", requireAuth, async (req, res): Promi
   } else {
     await db.update(agencyClientsTable).set({ inviteStatus: "declined" }).where(eq(agencyClientsTable.id, id));
   }
+
+  // Notify agency of brand's response
+  Promise.all([
+    db.select({ userId: agenciesTable.userId, name: agenciesTable.name }).from(agenciesTable).where(eq(agenciesTable.id, invite.agencyId)).limit(1),
+    db.select({ email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName }).from(usersTable).where(eq(usersTable.id, invite.brandUserId)).limit(1),
+    db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1),
+  ]).then(async ([[agency], [brand], [settings]]) => {
+    if (!agency || !brand) return;
+    const [agencyUser] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, agency.userId)).limit(1);
+    if (!agencyUser?.email) return;
+    const siteName = settings?.siteName ?? "iGoTrend";
+    const dashboardUrl = `${process.env["APP_BASE_URL"] ?? "https://igotrend.com"}/agency/clients`;
+    const brandName = `${brand.firstName ?? ""} ${brand.lastName ?? ""}`.trim();
+    sendEmail(
+      agencyUser.email,
+      `Brand ${action === "accept" ? "accepted" : "declined"} your agency invite — ${siteName}`,
+      tplAgencyClientResponse(siteName, agency.name, brandName, action === "accept", dashboardUrl),
+    ).catch(console.error);
+  }).catch(console.error);
+
   res.json({ message: action === "accept" ? "Invite accepted" : "Invite declined" });
 });
 
