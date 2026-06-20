@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { db, bankAccountsTable, gemsTransactionsTable, usersTable, settingsTable, adminAuditLogsTable, kycRequestsTable } from "@workspace/db";
 import { requireAuth } from "../lib/auth";
+import { sendAdminAlert, tplFollowerFraudFlag } from "../lib/notify";
 import { initiateCollection, verifyCollection, listBanks, resolveAccount } from "../lib/gateway";
 import { ObjectStorageService } from "../lib/objectStorage";
 import type { IRouter } from "express";
@@ -186,6 +187,15 @@ router.put("/account/profile", requireAuth, async (req, res): Promise<void> => {
       targetId: req.userId!,
       details: JSON.stringify({ reason: "Follower count increased by more than 50% in a single update" }),
     }).catch(() => {});
+
+    const [s] = await db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1);
+    const siteName = s?.siteName ?? "iGoTrend";
+    const adminUrl = process.env["ADMIN_BASE_URL"] ?? process.env["APP_BASE_URL"] ?? "https://igotrend.com";
+    const fullName = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email;
+    sendAdminAlert(
+      `[${siteName}] Follower Count Fraud Flag — Creator Account`,
+      tplFollowerFraudFlag(siteName, fullName, u.email, adminUrl),
+    ).catch(console.error);
   }
 
   res.json(userProfileShape(u));

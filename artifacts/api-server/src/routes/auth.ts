@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import { eq, and, gt } from "drizzle-orm";
 import { db, usersTable, agenciesTable, settingsTable, passwordResetTokensTable, bankAccountsTable } from "@workspace/db";
 import { signToken, requireAuth, formatUser } from "../lib/auth";
-import { sendEmail, tplWelcome, tplPasswordReset } from "../lib/notify";
+import { sendEmail, tplWelcome, tplPasswordReset, tplAccountLocked, sendAdminAlert } from "../lib/notify";
 import { authRateLimiter } from "../middlewares/rateLimiter";
 import type { IRouter } from "express";
 
@@ -114,6 +114,15 @@ router.post("/auth/login", authRateLimiter, async (req, res): Promise<void> => {
     await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id));
 
     if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+      const lockedUntilDate = new Date(Date.now() + LOCK_DURATION_MS);
+      const adminUrl = process.env["ADMIN_BASE_URL"] ?? process.env["APP_BASE_URL"] ?? "https://igotrend.com";
+      const [s] = await db.select({ siteName: settingsTable.siteName }).from(settingsTable).limit(1);
+      const siteName = s?.siteName ?? "iGoTrend";
+      const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.email;
+      sendAdminAlert(
+        `[${siteName}] Account Locked — Brute-Force Detected`,
+        tplAccountLocked(siteName, fullName, user.email, lockedUntilDate.toLocaleString(), adminUrl),
+      ).catch(console.error);
       res.status(423).json({
         error: "Account locked due to too many failed login attempts. Try again in 30 minutes, or reset your password.",
         code: "ACCOUNT_LOCKED",

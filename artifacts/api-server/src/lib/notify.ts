@@ -302,3 +302,37 @@ export function tplTest(siteName: string): string {
     ${p("If you received this, your SMTP configuration is working correctly.")}
   `);
 }
+
+export function tplAccountLocked(siteName: string, userName: string, userEmail: string, lockedUntil: string, adminUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`⚠️ Account Locked — Brute-Force Detected`)}
+    ${p(`A user account has been automatically locked on <strong>${siteName}</strong> due to too many failed login attempts.`)}
+    ${p(`<strong>Name:</strong> ${userName}`)}
+    ${p(`<strong>Email:</strong> ${userEmail}`)}
+    ${p(`<strong>Reason:</strong> Exceeded maximum failed login attempts`)}
+    ${p(`<strong>Locked until:</strong> ${lockedUntil}`)}
+    ${p(`Please review this account and take action if suspicious activity is suspected.`)}
+    ${btn(adminUrl, "View in Admin Panel")}
+  `);
+}
+
+export function tplFollowerFraudFlag(siteName: string, userName: string, userEmail: string, adminUrl: string): string {
+  return emailWrapper(siteName, `
+    ${h2(`🚩 Follower Count Fraud Flag Raised`)}
+    ${p(`A creator account has been flagged for a suspicious follower count increase on <strong>${siteName}</strong>.`)}
+    ${p(`<strong>Name:</strong> ${userName}`)}
+    ${p(`<strong>Email:</strong> ${userEmail}`)}
+    ${p(`<strong>Reason:</strong> Follower count increased by more than 50% in a single profile update`)}
+    ${p(`Please review this account to determine whether the follower data is legitimate.`)}
+    ${btn(adminUrl, "Review Creator Account")}
+  `);
+}
+
+export async function sendAdminAlert(subject: string, htmlBody: string): Promise<void> {
+  const s = await getSettings();
+  if (!s?.contactEmail) {
+    console.warn("[notify] Admin contact email not configured — skipping admin alert:", subject);
+    return;
+  }
+  await sendEmail(s.contactEmail, subject, htmlBody);
+}
