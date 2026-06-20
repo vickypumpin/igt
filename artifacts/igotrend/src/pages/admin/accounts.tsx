@@ -7,7 +7,7 @@ import AdminLayout from "@/components/layout/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Search, ShieldBan, ShieldCheck, Trash2, Pencil, Gem } from "lucide-react";
+import { Users, Search, ShieldBan, ShieldCheck, Trash2, Pencil, Gem, Mail } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface User {
@@ -49,6 +49,8 @@ export default function AdminAccountsPage() {
   const [page, setPage] = useState(1);
   const [billingUser, setBillingUser] = useState<User | null>(null);
   const [billingForm, setBillingForm] = useState({ billingMode: "commission", commissionRate: "5.00", billingAmount: "0", subscriptionStatus: "active", billingNotes: "" });
+  const [emailUser, setEmailUser] = useState<User | null>(null);
+  const [emailInput, setEmailInput] = useState("");
   const qc = useQueryClient();
 
   const activeTab: Tab = location.endsWith("/brands") ? "brands"
@@ -77,6 +79,16 @@ export default function AdminAccountsPage() {
       customFetch(`/api/admin/accounts/${id}/billing`, { method: "PUT", body: JSON.stringify(data) }),
     onSuccess: () => { toast({ title: "Billing updated" }); setBillingUser(null); refetch(); },
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
+  });
+
+  const emailMutation = useMutation({
+    mutationFn: ({ id, email }: { id: number; email: string }) =>
+      customFetch(`/api/admin/accounts/${id}/email`, { method: "PATCH", body: JSON.stringify({ email }) }),
+    onSuccess: () => { toast({ title: "Email updated" }); setEmailUser(null); refetch(); },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      toast({ title: msg.includes("409") || msg.toLowerCase().includes("use") ? "Email already in use" : "Update failed", variant: "destructive" });
+    },
   });
 
   const handleAction = async (id: number, action: string) => {
@@ -247,6 +259,9 @@ export default function AdminAccountsPage() {
                                 <ShieldCheck className="h-3 w-3" />Activate
                               </Button>
                             )}
+                            <button onClick={() => { setEmailUser(u); setEmailInput(u.email); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-blue-500 hover:bg-blue-50 transition-colors" title="Edit email">
+                              <Mail className="h-3.5 w-3.5" />
+                            </button>
                             <button onClick={() => handleDelete(u.id, displayName)} className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors" title="Delete">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -337,6 +352,37 @@ export default function AdminAccountsPage() {
                 data-testid="button-save-billing"
               >
                 {billingMutation.isPending ? "Saving…" : "Save Billing Settings"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Email Edit Modal ── */}
+        <Dialog open={!!emailUser} onOpenChange={open => { if (!open) setEmailUser(null); }}>
+          <DialogContent className="max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle>Change Email — {emailUser?.firstName} {emailUser?.lastName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <div>
+                <label className="text-xs font-semibold block mb-1.5">New email address</label>
+                <Input
+                  type="email"
+                  value={emailInput}
+                  onChange={e => setEmailInput(e.target.value)}
+                  placeholder="user@example.com"
+                  className="h-10 rounded-xl"
+                  data-testid="input-edit-email"
+                />
+              </div>
+              <Button
+                className="w-full h-10 rounded-xl font-semibold"
+                style={{ background: "linear-gradient(135deg, #FF8C42, #E47128)", border: "none", color: "white" }}
+                onClick={() => emailUser && emailMutation.mutate({ id: emailUser.id, email: emailInput })}
+                disabled={emailMutation.isPending || !emailInput.includes("@")}
+                data-testid="button-save-email"
+              >
+                {emailMutation.isPending ? "Saving…" : "Update Email"}
               </Button>
             </div>
           </DialogContent>

@@ -100,6 +100,22 @@ router.delete("/admin/accounts/:id", requireAuth, requireRole("admin"), async (r
   res.json({ message: "Deleted" });
 });
 
+router.patch("/admin/accounts/:id/email", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  const { email } = req.body;
+  if (!email || typeof email !== "string" || !email.includes("@")) {
+    res.status(400).json({ error: "Valid email required" }); return;
+  }
+  const normalized = email.trim().toLowerCase();
+  const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, normalized));
+  if (existing && existing.id !== id) {
+    res.status(409).json({ error: "Email already in use" }); return;
+  }
+  const [u] = await db.update(usersTable).set({ email: normalized }).where(eq(usersTable.id, id)).returning();
+  if (!u) { res.status(404).json({ error: "User not found" }); return; }
+  res.json({ id: u.id, email: u.email });
+});
+
 router.get("/admin/accounts/:id/billing", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const id = parseInt(req.params.id as string, 10);
   const [user] = await db.select({

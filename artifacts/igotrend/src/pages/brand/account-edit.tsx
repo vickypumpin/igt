@@ -139,7 +139,11 @@ export default function BrandAccountEditPage() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">Email address</label>
-                <Input value={form.email} onChange={field("email")} type="email" placeholder="you@brand.com" className="h-10 rounded-xl" data-testid="input-email" />
+                <div className="relative">
+                  <Input value={form.email} readOnly disabled type="email" className="h-10 rounded-xl pr-9 bg-muted/40 cursor-not-allowed text-muted-foreground" data-testid="input-email" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60"><svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Email cannot be changed. Contact support if needed.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {([["First name", "firstName"], ["Last name", "lastName"]] as [string, keyof FormState][]).map(([label, key]) => (
