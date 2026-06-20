@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "1zz8UCwXPjefF9l7seihE"
+uri = "file://igotrend-vps-setup.zip"
+type = "unspecified"
+title = "iGoTrend VPS Setup Files"
