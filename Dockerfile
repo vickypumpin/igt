@@ -21,12 +21,19 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+ENV NODE_ENV=production
+ENV BASE_PATH=/
+ENV PORT=3000
+
 RUN pnpm --filter @workspace/api-server run build
+RUN pnpm --filter @workspace/igotrend run build
 
 
 FROM node:20-alpine AS runtime
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
+
+RUN apk add --no-cache nginx supervisor
 
 WORKDIR /app
 
@@ -46,12 +53,18 @@ COPY artifacts/mockup-sandbox/package.json ./artifacts/mockup-sandbox/
 RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
+COPY --from=builder /app/artifacts/igotrend/dist/public /usr/share/nginx/html
 
 COPY lib/db/migrations ./lib/db/migrations
+
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisord.conf
+
+RUN mkdir -p /var/log/supervisor /run/nginx
 
 ENV NODE_ENV=production
 ENV PORT=8080
 
-EXPOSE 8080
+EXPOSE 80
 
-CMD ["node", "--enable-source-maps", "./artifacts/api-server/dist/index.mjs"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-push:
-    name: Build Docker Images
+    name: Build Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -35,27 +35,15 @@ jobs:
           SHA_TAG="${{ github.sha }}"
           echo "sha_tag=${SHA_TAG::8}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push API image
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.api
+          file: Dockerfile
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/igotrend-api:latest
-            ${{ secrets.DOCKER_USERNAME }}/igotrend-api:${{ steps.meta.outputs.sha_tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push Web image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.web
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/igotrend-web:latest
-            ${{ secrets.DOCKER_USERNAME }}/igotrend-web:${{ steps.meta.outputs.sha_tag }}
+            vickypumpin/igotrend:latest
+            vickypumpin/igotrend:${{ steps.meta.outputs.sha_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -77,7 +65,7 @@ jobs:
 
             cd ~/igotrend
 
-            echo "Pulling latest images..."
+            echo "Pulling latest image..."
             docker compose pull
 
             echo "Starting services..."

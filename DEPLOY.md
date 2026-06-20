@@ -7,11 +7,13 @@ This guide covers deploying the full iGoTrend stack (API + web frontend + Postgr
 ## Architecture
 
 ```
-Internet → nginx (web container, port 80)
+Internet → nginx (port 80, inside the app container)
                ├── static files (React build)
-               └── /api/* → api container (port 8080)
-                                └── postgres container (port 5432, internal only)
+               └── /api/* → Node.js API (port 8080, same container)
+                                └── postgres (separate container, internal only)
 ```
+
+A single Docker image (`vickypumpin/igotrend`) runs both nginx and the Node.js API server using **supervisord**. This means one container, one image to pull, and simpler VPS management.
 
 ---
 
@@ -21,7 +23,7 @@ Configure these in **GitHub → Settings → Secrets and variables → Actions**
 
 | Secret | Description |
 |---|---|
-| `DOCKER_USERNAME` | Your Docker Hub username |
+| `DOCKER_USERNAME` | Your Docker Hub username (e.g. `vickypumpin`) |
 | `DOCKER_TOKEN` | Docker Hub access token (not your password) |
 | `VPS_HOST` | IP address or hostname of your VPS |
 | `VPS_USER` | SSH username on the VPS (e.g. `ubuntu`, `root`) |
@@ -46,10 +48,10 @@ mkdir -p ~/igotrend
 cd ~/igotrend
 
 # Download only the compose file from GitHub
-curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/vickypumpin/igt/main/docker-compose.yml -o docker-compose.yml
 
 # Create your environment file from the example
-curl -fsSL https://raw.githubusercontent.com/<your-org>/<your-repo>/main/.env.example -o .env
+curl -fsSL https://raw.githubusercontent.com/vickypumpin/igt/main/.env.example -o .env
 ```
 
 Open `.env` and fill in every required value — pay particular attention to:
@@ -57,6 +59,7 @@ Open `.env` and fill in every required value — pay particular attention to:
 - `DATABASE_URL` — must use the same password as `POSTGRES_PASSWORD`
 - `JWT_SECRET` — at least 32 random characters
 - `APP_URL` — the public URL where users access the app
+- `DOCKER_USERNAME` — set to `vickypumpin` (used by docker-compose to resolve the image name)
 
 ### 3. Pull and start the stack for the first time
 
@@ -65,31 +68,30 @@ docker compose pull
 docker compose up -d
 ```
 
-The API container automatically applies database migrations on startup, so no manual schema setup is required.
+The API server automatically applies database migrations on startup, so no manual schema setup is required.
 
 ### 4. Verify everything is running
 
 ```bash
 docker compose ps
-docker compose logs -f api
+docker compose logs -f app
 ```
 
 ---
 
 ## How the Deploy Pipeline Works
 
-1. You push a commit to the `main` branch.
-2. GitHub Actions checks out the code and builds two Docker images:
-   - `<your-dockerhub>/igotrend-api` — the Express API server
-   - `<your-dockerhub>/igotrend-web` — nginx serving the React static build
-3. Both images are pushed to Docker Hub tagged `latest` and with the short git SHA (for traceability).
+1. You push a commit to the `main` branch of `github.com/vickypumpin/igt`.
+2. GitHub Actions checks out the code and builds a single Docker image:
+   - `vickypumpin/igotrend:latest` — nginx + Node.js API in one container
+3. The image is also tagged with the short git SHA (e.g. `vickypumpin/igotrend:a1b2c3d4`) for traceability.
 4. GitHub Actions SSHs into your VPS and runs:
    ```bash
    docker compose pull
    docker compose up -d --remove-orphans
    docker image prune -f
    ```
-5. The new containers start. The API container runs database migrations automatically before accepting traffic.
+5. The new container starts. The API server runs database migrations automatically before accepting traffic.
 
 ---
 
@@ -99,11 +101,11 @@ docker compose logs -f api
 # View live logs from all services
 docker compose logs -f
 
-# View API logs only
-docker compose logs -f api
+# View app logs only (nginx + API)
+docker compose logs -f app
 
-# Restart a specific service
-docker compose restart api
+# Restart the app container
+docker compose restart app
 
 # Stop everything
 docker compose down
@@ -122,13 +124,13 @@ If you want to use a managed database (e.g. Supabase, RDS, Neon), edit `.env`:
 DATABASE_URL=postgresql://user:password@your-db-host:5432/igotrend
 ```
 
-Then remove (or comment out) the `postgres` service from `docker-compose.yml` and update the `api` service to remove its `depends_on: postgres` entry.
+Then remove (or comment out) the `postgres` service from `docker-compose.yml` and remove the `depends_on: postgres` entry from the `app` service.
 
 ---
 
 ## SSL / TLS
 
-SSL termination is **not** handled by the web container. The recommended approach is to run [Caddy](https://caddyserver.com/) or [Nginx Proxy Manager](https://nginxproxymanager.com/) on the host as a reverse proxy, pointing to port 80 of the `web` container and letting it handle HTTPS automatically.
+SSL termination is **not** handled by the app container. The recommended approach is to run [Caddy](https://caddyserver.com/) or [Nginx Proxy Manager](https://nginxproxymanager.com/) on the host as a reverse proxy, pointing to port 80 of the `app` container and letting it handle HTTPS automatically.
 
 Example Caddyfile for automatic HTTPS:
 
