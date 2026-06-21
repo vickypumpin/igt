@@ -1,22 +1,20 @@
 import OpenAI from "openai";
 
 function createOpenAIClient(): OpenAI {
-  if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) {
+  const apiKey =
+    process.env.AI_INTEGRATIONS_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  const baseURL =
+    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ??
+    process.env.OPENAI_BASE_URL ??
+    "https://api.openai.com/v1";
+
+  if (!apiKey) {
     throw new Error(
-      "AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?",
+      "No OpenAI API key found. Set OPENAI_API_KEY in your .env file.",
     );
   }
 
-  if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
-    throw new Error(
-      "AI_INTEGRATIONS_OPENAI_API_KEY must be set. Did you forget to provision the OpenAI AI integration?",
-    );
-  }
-
-  return new OpenAI({
-    apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  });
+  return new OpenAI({ apiKey, baseURL });
 }
 
 let _client: OpenAI | null = null;
