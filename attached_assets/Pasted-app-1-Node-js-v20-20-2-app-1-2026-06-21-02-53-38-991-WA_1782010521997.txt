@@ -1,0 +1,64 @@
+app-1  | Node.js v20.20.2
+app-1  | 2026-06-21 02:53:38,991 WARN exited: api (exit status 1; not expected)
+app-1  | 2026-06-21 02:53:40,011 INFO spawned: 'api' with pid 632
+app-1  | 2026-06-21 02:53:41,027 INFO success: api entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+app-1  | /app/lib/integrations-openai-ai-server/src/image/client.ts:6
+app-1  |   throw new Error(
+app-1  |         ^
+app-1  |
+app-1  |
+app-1  | Error: AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?
+app-1  |     at <anonymous> (/app/lib/integrations-openai-ai-server/src/image/client.ts:6:9)
+app-1  |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+app-1  |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+app-1  |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+app-1  |
+app-1  | Node.js v20.20.2
+app-1  | 2026-06-21 02:53:42,292 WARN exited: api (exit status 1; not expected)
+app-1  | 2026-06-21 02:53:43,300 INFO spawned: 'api' with pid 650
+app-1  | 2026-06-21 02:53:44,309 INFO success: api entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+app-1  | /app/lib/integrations-openai-ai-server/src/image/client.ts:6
+app-1  |   throw new Error(
+app-1  |         ^
+app-1  |
+app-1  |
+app-1  | Error: AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?
+app-1  |     at <anonymous> (/app/lib/integrations-openai-ai-server/src/image/client.ts:6:9)
+app-1  |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+app-1  |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+app-1  |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+app-1  |
+app-1  | Node.js v20.20.2
+app-1  | 2026-06-21 02:53:45,888 WARN exited: api (exit status 1; not expected)
+app-1  | 2026-06-21 02:53:46,894 INFO spawned: 'api' with pid 661
+app-1  | 2026-06-21 02:53:47,896 INFO success: api entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+app-1  | /app/lib/integrations-openai-ai-server/src/image/client.ts:6
+app-1  |   throw new Error(
+app-1  |         ^
+app-1  |
+app-1  |
+app-1  | Error: AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?
+app-1  |     at <anonymous> (/app/lib/integrations-openai-ai-server/src/image/client.ts:6:9)
+app-1  |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+app-1  |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+app-1  |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+app-1  |
+app-1  | Node.js v20.20.2
+app-1  | 2026-06-21 02:53:49,029 WARN exited: api (exit status 1; not expected)
+app-1  | 2026-06-21 02:53:50,059 INFO spawned: 'api' with pid 672
+app-1  | 2026-06-21 02:53:51,064 INFO success: api entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+app-1  | /app/lib/integrations-openai-ai-server/src/image/client.ts:6
+app-1  |   throw new Error(
+app-1  |         ^
+app-1  |
+app-1  |
+app-1  | Error: AI_INTEGRATIONS_OPENAI_BASE_URL must be set. Did you forget to provision the OpenAI AI integration?
+app-1  |     at <anonymous> (/app/lib/integrations-openai-ai-server/src/image/client.ts:6:9)
+app-1  |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+app-1  |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+app-1  |     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5)
+app-1  |
+app-1  | Node.js v20.20.2
+app-1  | 2026-06-21 02:53:51,871 WARN exited: api (exit status 1; not expected)
+app-1  | 2026-06-21 02:53:52,880 INFO spawned: 'api' with pid 683
+root@vmi1548051:/home/docker/igotrend#
