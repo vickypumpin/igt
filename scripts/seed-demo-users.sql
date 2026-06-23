@@ -22,7 +22,7 @@ ON CONFLICT (email) DO UPDATE SET
 INSERT INTO agencies (user_id, name, contact_name, contact_email, billing_mode, commission_rate)
 SELECT id, 'Agency Demo', 'Agency Demo', 'agency@igotrend.com', 'commission', '5.00'
 FROM users WHERE email = 'agency@igotrend.com'
-ON CONFLICT (user_id) DO NOTHING;
+  AND NOT EXISTS (SELECT 1 FROM agencies WHERE agencies.user_id = users.id);
 
 COMMIT;
 
